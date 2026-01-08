@@ -11,6 +11,7 @@ function SuperAdmin() {
   const [editingShopId, setEditingShopId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editKana, setEditKana] = useState('');
+  const [editPassword, setEditPassword] = useState(''); // パスワード編集用
 
   const DELETE_PASSWORD = "1212";
 
@@ -23,27 +24,43 @@ function SuperAdmin() {
     if (data) setCreatedShops(data);
   };
 
+  // パスワード自動生成関数
+  const generateRandomPassword = () => {
+    return Math.random().toString(36).slice(-8); // ランダムな8文字
+  };
+
   const createNewShop = async () => {
     if (!newShopName || !newShopKana) return alert('店舗名とふりがなを入力してください');
+    
+    const newPass = generateRandomPassword(); // パスワード生成
+
     const { error } = await supabase
       .from('profiles')
-      .insert([{ business_name: newShopName, business_name_kana: newShopKana }]);
+      .insert([{ 
+        business_name: newShopName, 
+        business_name_kana: newShopKana,
+        admin_password: newPass // パスワードを保存
+      }]);
 
     if (error) {
       alert('作成に失敗しました');
     } else {
       setNewShopName(''); setNewShopKana('');
       fetchCreatedShops();
-      alert(`「${newShopName}」を作成しました！`);
+      alert(`「${newShopName}」を作成しました！\n初期パスワードは 【 ${newPass} 】 です。`);
     }
   };
 
   const updateShopInfo = async (id) => {
-    if (!editName || !editKana) return alert('店舗名とふりがなを入力してください');
+    if (!editName || !editKana || !editPassword) return alert('全項目入力してください');
     
     const { error } = await supabase
       .from('profiles')
-      .update({ business_name: editName, business_name_kana: editKana })
+      .update({ 
+        business_name: editName, 
+        business_name_kana: editKana,
+        admin_password: editPassword 
+      })
       .eq('id', id);
 
     if (!error) {
@@ -123,10 +140,13 @@ function SuperAdmin() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 'bold' }}>No.{shop.displayNumber}</div>
                 {editingShopId === shop.id ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '5px' }}>
-                    {/* ここがエラーの修正箇所：valueに空文字ガードを入れました */}
-                    <input value={editName || ""} onChange={(e) => setEditName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #2563eb', fontSize: '1rem' }} placeholder="店舗名" />
-                    <input value={editKana || ""} onChange={(e) => setEditKana(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #2563eb', fontSize: '1rem' }} placeholder="ふりがな" />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '5px' }}>
+                    <input value={editName || ""} onChange={(e) => setEditName(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #2563eb', fontSize: '0.9rem' }} placeholder="店舗名" />
+                    <input value={editKana || ""} onChange={(e) => setEditKana(e.target.value)} style={{ padding: '8px', borderRadius: '4px', border: '1px solid #2563eb', fontSize: '0.9rem' }} placeholder="ふりがな" />
+                    <div style={{ background: '#fef3c7', padding: '8px', borderRadius: '6px' }}>
+                       <label style={{ fontSize: '0.65rem', fontWeight: 'bold', display: 'block' }}>管理画面パスワード</label>
+                       <input value={editPassword || ""} onChange={(e) => setEditPassword(e.target.value)} style={{ width: '100%', padding: '5px', border: '1px solid #d97706', borderRadius: '4px', fontSize: '0.9rem' }} />
+                    </div>
                     <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
                       <button onClick={() => updateShopInfo(shop.id)} style={{ padding: '6px 15px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>保存</button>
                       <button onClick={() => setEditingShopId(null)} style={{ padding: '6px 15px', background: '#94a3b8', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>取消</button>
@@ -139,19 +159,23 @@ function SuperAdmin() {
                       {shop.business_name}
                     </h2>
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{shop.business_name_kana}</div>
+                    <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '0.7rem', color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
+                           PW: <strong>{shop.admin_password || '未設定'}</strong>
+                        </span>
+                    </div>
                   </>
                 )}
               </div>
               <div style={{ display: 'flex', gap: '5px' }}>
-                <button onClick={() => { setEditingShopId(shop.id); setEditName(shop.business_name || ""); setEditKana(shop.business_name_kana || ""); }} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px' }}>編集</button>
+                <button onClick={() => { setEditingShopId(shop.id); setEditName(shop.business_name || ""); setEditKana(shop.business_name_kana || ""); setEditPassword(shop.admin_password || ""); }} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px' }}>編集</button>
                 <button onClick={() => deleteShop(shop)} style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', cursor: 'pointer', fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px' }}>消去</button>
               </div>
             </div>
 
-            {/* URLコピー・リンクボタン */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
               <div>
-                <label style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold' }}>🔑 店舗主用設定</label>
+                <label style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold' }}>🔑 店舗主用設定 (PW: {shop.admin_password})</label>
                 <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
                   <input readOnly value={`${window.location.origin}/admin/${shop.id}`} style={{ flex: 1, padding: '8px', fontSize: '0.7rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px' }} />
                   <button onClick={() => copyToClipboard(`${window.location.origin}/admin/${shop.id}`)} style={{ padding: '8px 10px', fontSize: '0.7rem', borderRadius: '6px', border: '1px solid #2563eb', color: '#2563eb', background: '#fff' }}>コピー</button>

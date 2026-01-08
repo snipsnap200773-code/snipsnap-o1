@@ -8,7 +8,7 @@ function Home() {
   useEffect(() => {
     const fetchShops = async () => {
       // business_nameが設定されており、かつ is_suspended が false（中止されていない）店舗を取得
-      // 並び替えは任意ですが、ここでは「ふりがな順」で出すようにしています
+      // 並び替えは「ふりがな順」
       const { data } = await supabase
         .from('profiles')
         .select('*')
