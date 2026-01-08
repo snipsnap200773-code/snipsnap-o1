@@ -13,7 +13,7 @@ function ConfirmReservation() {
   const [shop, setShop] = useState(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [customerEmail, setCustomerEmail] = useState(''); // メールアドレス用State
+  const [customerEmail, setCustomerEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -35,7 +35,6 @@ function ConfirmReservation() {
       return;
     }
 
-    // 簡単なメール形式チェック
     if (!customerEmail.includes('@')) {
       alert('有効なメールアドレスを入力してください');
       return;
@@ -43,33 +42,60 @@ function ConfirmReservation() {
 
     setIsSubmitting(true);
 
-    // 予約開始時間と終了時間を計算
     const startDateTime = new Date(`${date}T${time}`);
     const interval = shop.slot_interval_min || 15;
     const endDateTime = new Date(startDateTime.getTime() + totalSlotsNeeded * interval * 60000);
 
-    const { error } = await supabase.from('reservations').insert([
+    // 1. 予約データをテーブルに保存
+    // 🔵 total_slots を追加して制約違反を解消します
+    const { data: resData, error: dbError } = await supabase.from('reservations').insert([
       {
         shop_id: shopId,
         customer_name: customerName,
         customer_phone: customerPhone,
-        customer_email: customerEmail, // 追加
-        start_time: startDateTime.toISOString(),
-        end_time: endDateTime.toISOString(),
-        services: {
+        customer_email: customerEmail,
+        start_at: startDateTime.toISOString(),
+        end_at: endDateTime.toISOString(),
+        total_slots: totalSlotsNeeded, // 🔵 ここを追加！
+        res_type: 'normal',
+        options: {
           services: selectedServices,
           options: selectedOptions
         }
       }
-    ]);
+    ]).select();
 
-    if (error) {
-      alert('予約に失敗しました。もう一度やり直してください。');
-      console.error(error);
-    } else {
-      alert('予約が完了しました！');
-      navigate('/'); 
+    if (dbError) {
+      console.error("Database Error:", dbError);
+      alert(`予約に失敗しました。理由: ${dbError.message}`);
+      setIsSubmitting(false);
+      return;
     }
+
+    // 2. 成功したらメール送信
+    try {
+      const { error: funcError } = await supabase.functions.invoke('send-reservation-email', {
+        body: {
+          reservationId: resData[0].id,
+          customerEmail: customerEmail,
+          customerName: customerName,
+          shopName: shop.shop_name,
+          shopEmail: shop.email_contact,
+          startTime: `${date.replace(/-/g, '/')} ${time}`,
+          services: selectedServices.map(s => s.name).join(', ')
+        }
+      });
+
+      if (funcError) {
+        console.error("Mail Function Error:", funcError);
+        alert('予約は完了しましたが、確認メールの送信のみ失敗しました。');
+      }
+    } catch (err) {
+      console.error("Function Call Error:", err);
+    }
+
+    alert('予約が完了しました！');
+    navigate('/'); 
     setIsSubmitting(false);
   };
 
@@ -81,7 +107,6 @@ function ConfirmReservation() {
       
       <h2 style={{ borderLeft: '4px solid #2563eb', paddingLeft: '10px', fontSize: '1.2rem', marginBottom: '25px' }}>予約内容の確認</h2>
 
-      {/* 予約内容カード */}
       <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '15px', marginBottom: '25px', fontSize: '0.9rem', border: '1px solid #e2e8f0' }}>
         <p style={{ margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '1.2rem' }}>📅</span> <b>日時：</b> {date.replace(/-/g, '/')} {time} 〜
@@ -99,50 +124,21 @@ function ConfirmReservation() {
         </p>
       </div>
 
-      {/* 入力フォーム */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div>
           <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>お名前</label>
-          <input 
-            type="text" 
-            value={customerName} 
-            onChange={(e) => setCustomerName(e.target.value)} 
-            placeholder="三土手 功真"
-            style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }}
-          />
+          <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="三土手 功真" style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} />
         </div>
-
         <div>
           <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>メールアドレス</label>
-          <input 
-            type="email" 
-            value={customerEmail} 
-            onChange={(e) => setCustomerEmail(e.target.value)} 
-            placeholder="example@mail.com"
-            style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }}
-          />
+          <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="example@mail.com" style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} />
         </div>
-
         <div>
           <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>電話番号</label>
-          <input 
-            type="tel" 
-            value={customerPhone} 
-            onChange={(e) => setCustomerPhone(e.target.value)} 
-            placeholder="09012345678"
-            style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }}
-          />
+          <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="09012345678" style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} />
         </div>
 
-        <button 
-          onClick={handleReserve} 
-          disabled={isSubmitting}
-          style={{ 
-            marginTop: '10px', padding: '18px', background: isSubmitting ? '#94a3b8' : '#2563eb', color: '#fff', 
-            border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: isSubmitting ? 'not-allowed' : 'pointer',
-            boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)'
-          }}
-        >
+        <button onClick={handleReserve} disabled={isSubmitting} style={{ marginTop: '10px', padding: '18px', background: isSubmitting ? '#94a3b8' : '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: isSubmitting ? 'not-allowed' : 'pointer', boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}>
           {isSubmitting ? '予約処理中...' : 'この内容で予約を確定する'}
         </button>
       </div>
