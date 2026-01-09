@@ -141,6 +141,29 @@ function ReservationForm() {
     if (Object.keys(grouped).every(gn => newOptions[`${serviceId}-${gn}`])) scrollToNextValidCategory(catIdx);
   };
 
+  const handleNextStep = () => {
+    window.scrollTo(0,0);
+    if (isAdminMode) {
+      // 💡 管理者モード（ねじ込み）なら日時選択を飛ばして直接確認画面へリレー
+      navigate(`/shop/${shopId}/confirm`, { 
+        state: { 
+          selectedServices, 
+          selectedOptions, 
+          totalSlotsNeeded,
+          date: adminDate,    // 管理画面から受け取った日付を渡す
+          time: adminTime,    // 管理画面から受け取った時間を渡す
+          adminDate,          // ✅ 重要：ConfirmReservationへバトンを繋ぐ
+          adminTime           // ✅ 重要：ConfirmReservationへバトンを繋ぐ
+        } 
+      });
+    } else {
+      // 通常モードなら日時選択画面へ
+      navigate(`/shop/${shopId}/reserve/time`, { 
+        state: { selectedServices, selectedOptions, totalSlotsNeeded } 
+      });
+    }
+  };
+
   const getGroupedOptions = (serviceId) => {
     return options.filter(o => o.service_id === serviceId).reduce((acc, opt) => {
       if (!acc[opt.group_name]) acc[opt.group_name] = [];
@@ -153,27 +176,6 @@ function ReservationForm() {
     const grouped = getGroupedOptions(s.id);
     return Object.keys(grouped).every(groupName => selectedOptions[`${s.id}-${groupName}`]);
   });
-
-  const handleNextStep = () => {
-    window.scrollTo(0,0);
-    if (isAdminMode) {
-      // 管理者モードなら日時選択を飛ばして直接確認画面へ
-      navigate(`/shop/${shopId}/confirm`, { 
-        state: { 
-          selectedServices, 
-          selectedOptions, 
-          totalSlotsNeeded,
-          date: adminDate,
-          time: adminTime
-        } 
-      });
-    } else {
-      // 通常モードなら日時選択画面へ
-      navigate(`/shop/${shopId}/reserve/time`, { 
-        state: { selectedServices, selectedOptions, totalSlotsNeeded } 
-      });
-    }
-  };
 
   if (loading) return <div style={{ textAlign: 'center', padding: '100px', color: '#666' }}>読み込み中...</div>;
   if (shop?.is_suspended) return <div style={{ padding: '60px 20px', textAlign: 'center' }}><h2>現在、予約受付を停止しています</h2></div>;
@@ -201,7 +203,7 @@ function ReservationForm() {
       </div>
 
       <div>
-        <h3 style={{ fontSize: '1rem', borderLeft: '4px solid #2563eb', paddingLeft: '10px', marginBottom: '20px' }}>1. メニューを選択</h3>
+        <h3 style={{ fontSize: '1rem', borderLeft: '4px solid #2563eb', paddingLeft: '10px', marginBottom: '20px' }}>1. メメニューを選択</h3>
         {categories.map((cat, idx) => {
           const isDisabled = disabledCategoryNames.includes(cat.name);
           return (
@@ -275,7 +277,7 @@ function ReservationForm() {
                   : !isTotalTimeOk
                     ? 'メニューを組み合わせて選択してください'
                     : isAdminMode 
-                      ? `このメニューで予約を確定する (${totalSlotsNeeded * (shop.slot_interval_min || 15)}分)`
+                      ? `このメニューで予約をねじ込む (${totalSlotsNeeded * (shop.slot_interval_min || 15)}分)`
                       : `日時選択へ進む (${totalSlotsNeeded * (shop.slot_interval_min || 15)}分)`}
             </button>
           </div>
