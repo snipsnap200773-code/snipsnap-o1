@@ -4,7 +4,7 @@ import Home from './pages/Home';
 import ReservationForm from './pages/ReservationForm';
 import AdminDashboard from './pages/AdminDashboard';
 import SuperAdmin from './pages/SuperAdmin'; 
-import TimeSelection from './pages/TimeSelection'; // ← ファイルが存在することを確認してください！
+import TimeSelection from './pages/TimeSelection'; 
 import ConfirmReservation from './pages/ConfirmReservation';
 import AdminReservations from './pages/AdminReservations';
 
@@ -13,16 +13,16 @@ function App() {
     <Router>
       <div className="mobile-container">
         <Routes>
-          {/* 三土手さん専用の管理画面 */}
+          {/* 三土手さん専用の管理画面（秘密のパス） */}
           <Route path="/super-admin-snipsnap" element={<SuperAdmin />} />
 
           {/* ポータル（ホーム）画面 */}
           <Route path="/" element={<Home />} />
 
-          {/* 店舗主用：設定画面（パスを統一） */}
+          {/* 店舗主用：設定画面 */}
           <Route path="/admin/:shopId" element={<AdminDashboard />} />
 
-          {/* ユーザー用：予約プロセス（2画面分割） */}
+          {/* ユーザー用：予約プロセス（3ステップ分割ロジック） */}
           {/* 1. メニュー選択画面 */}
           <Route path="/shop/:shopId/reserve" element={<ReservationForm />} />
           {/* 2. 日時選択画面 */}
@@ -30,11 +30,10 @@ function App() {
           {/* 3. 最終確認画面 */}
           <Route path="/shop/:shopId/confirm" element={<ConfirmReservation />} />
 
-          {/* ユーザー用：管理画面 */}
-          {/* 1. 管理画面 */}
+          {/* 店舗主用：予約一覧（台帳）画面 */}
           <Route path="/admin/:shopId/reservations" element={<AdminReservations />} />
 
-          {/* 予備のルート */}
+          {/* 予備・互換用ルート */}
           <Route path="/shop/:shopId/admin" element={<AdminDashboard />} />
         </Routes>
       </div>
