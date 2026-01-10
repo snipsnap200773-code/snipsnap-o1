@@ -124,8 +124,12 @@ function ConfirmReservation() {
     if (!isAdminEntry) {
       const menuLabel = selectedServices.map(s => s.name).join(', ');
       
+      // 💡 追加：新しいURL体系に基づいたキャンセルURLの生成
+      const cancelToken = resData[0].cancel_token;
+      const cancelUrl = `https://snipsnap-o1.vercel.app/cancel?token=${cancelToken}`;
+
       try {
-        // ★ 移植：公式LINE通知の実行
+        // ★ 移植：公式LINE通知の実行（キャンセルURLをパラメータに追加）
         await callSnipSnapApi("notify-reservation", {
           date: targetDate,
           startTime: targetTime,
@@ -136,10 +140,11 @@ function ConfirmReservation() {
           contact: `${customerEmail} / ${customerPhone}`,
           note: "SnipSnap Web予約",
           source: "web-matrix",
-          lineUserId: lineUser?.userId || "" 
+          lineUserId: lineUser?.userId || "",
+          cancelUrl: cancelUrl // 通知送信側で利用可能にする
         });
 
-        // ★ 移植：お客様向け確認メール送信
+        // ★ 移植：お客様向け確認メール送信（キャンセルURLをパラメータに追加）
         await supabase.functions.invoke('send-reservation-email', {
           body: {
             reservationId: resData[0].id,
@@ -148,7 +153,8 @@ function ConfirmReservation() {
             shopName: shop.business_name,
             shopEmail: shop.email_contact,
             startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
-            services: menuLabel
+            services: menuLabel,
+            cancelUrl: cancelUrl // メールテンプレート側で利用可能にする
           }
         });
 
@@ -188,7 +194,7 @@ function ConfirmReservation() {
           <img src={lineUser.pictureUrl} style={{ width: '40px', height: '40px', borderRadius: '50%' }} alt="LINE" />
           <div>
             <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#166534' }}>LINE連携済み：{lineUser.displayName} 様</div>
-            <div style={{ fontSize: '0.7rem', color: '#16a34a' }}>公式LINEから通知が届きます</div>
+            <div style={{ fontSize: '0.7rem', color: '#16a34a' }}>公式LINEからキャンセル・変更が可能です</div>
           </div>
         </div>
       )}
