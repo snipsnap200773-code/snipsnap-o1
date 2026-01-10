@@ -7,8 +7,6 @@ function Home() {
 
   useEffect(() => {
     const fetchShops = async () => {
-      // business_nameが設定されており、かつ is_suspended が false（中止されていない）店舗を取得
-      // 並び替えは「ふりがな順」
       const { data } = await supabase
         .from('profiles')
         .select('*')
@@ -22,89 +20,106 @@ function Home() {
   }, []);
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '600px', margin: '0 auto', backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '50px' }}>
-      <h2 style={{ fontSize: '1.4rem', color: '#1e293b', marginBottom: '20px', borderBottom: '2px solid #2563eb', paddingBottom: '10px' }}>
-        SnipSnap 総合ポータル
-      </h2>
+    <div style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', fontFamily: '"Hiragino Sans", "Meiryo", sans-serif', color: '#333' }}>
       
-      {shops.length === 0 ? (
-        <p style={{ color: '#64748b', textAlign: 'center', marginTop: '50px' }}>現在、予約可能な店舗はありません。</p>
-      ) : (
-        <div style={{ display: 'grid', gap: '20px' }}>
-          {shops.map(shop => (
-            <Link key={shop.id} to={`/shop/${shop.id}/reserve`} style={{ textDecoration: 'none', color: 'inherit' }}>
-              <div style={{ 
-                border: '1px solid #e2e8f0', 
-                padding: '20px', 
-                borderRadius: '16px', 
-                background: 'white',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                transition: 'all 0.2s ease',
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-3px)';
-                e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-              }}
-              >
-                {/* 店舗名 */}
-                <h3 style={{ margin: '0 0 8px 0', color: '#1e293b', fontSize: '1.2rem', fontWeight: 'bold' }}>{shop.business_name}</h3>
-                
-                {/* 店舗説明（メッセージ） */}
-                {shop.description && (
-                  <p style={{ 
-                    fontSize: '0.85rem', 
-                    color: '#64748b', 
-                    margin: '0 0 15px 0', 
-                    lineHeight: '1.5',
-                    display: '-webkit-box',
-                    WebkitBoxOrient: 'vertical',
-                    WebkitLineClamp: 2, // 2行以上は「...」で省略
-                    overflow: 'hidden'
-                  }}>
-                    {shop.description}
-                  </p>
-                )}
+      <div style={{ background: '#fff', padding: '15px 20px', borderBottom: '2px solid #e60012', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', alignItems: 'center' }}>
+          <h1 style={{ color: '#e60012', fontSize: '1.6rem', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>SnipSnap</h1>
+          <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '10px', marginTop: '5px' }}>予約ポータルサイト</span>
+        </div>
+      </div>
 
-                {/* 店舗詳細情報 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
-                  {shop.address && (
-                    <p style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'flex-start', gap: '8px', margin: 0 }}>
-                      <span style={{ fontSize: '1rem' }}>📍</span> 
-                      <span>{shop.address}</span>
-                    </p>
-                  )}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
-                    <p style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                      <span style={{ fontSize: '1rem' }}>📞</span> {shop.phone || '未設定'}
-                    </p>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+        
+        <div style={{ borderBottom: '1px solid #ddd', paddingBottom: '10px', marginBottom: '20px' }}>
+          <p style={{ fontSize: '0.9rem', color: '#333', margin: 0 }}>
+            現在掲載中の店舗：<b>{shops.length}</b> 件
+          </p>
+        </div>
+        
+        {shops.length === 0 ? (
+          <div style={{ padding: '80px 20px', textAlign: 'center', background: '#fff', borderRadius: '8px' }}>
+            <p style={{ color: '#999' }}>掲載店舗を準備中です。</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '20px' }}>
+            {shops.map(shop => (
+              <div key={shop.id} style={{ 
+                background: '#fff', 
+                border: '1px solid #ddd', 
+                display: 'flex', 
+                overflow: 'hidden',
+                borderRadius: '8px',
+                flexDirection: 'column'
+              }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
+                  {/* 左側：店舗画像 */}
+                  <div style={{ 
+                    width: '120px', 
+                    minWidth: '120px', 
+                    background: '#eeeeee',
+                    backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', 
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.7rem',
+                    color: '#ccc'
+                  }}>
+                    {!shop.image_url && 'NO IMAGE'}
+                  </div>
+
+                  {/* 右側：店舗情報 */}
+                  <div style={{ padding: '15px', flex: 1 }}>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', color: '#333', fontWeight: 'bold' }}>
+                      {shop.business_name}
+                    </h3>
+                    <div style={{ fontSize: '0.85rem', color: '#666', lineHeight: '1.5', marginBottom: '10px' }}>
+                      {shop.description || '店舗の詳細情報は準備中です。'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#999' }}>
+                      📍 {shop.address || '住所未登録'}
+                    </div>
                   </div>
                 </div>
 
-                {/* 予約ボタン風ラベル */}
-                <div style={{ marginTop: '20px', textAlign: 'right' }}>
-                  <span style={{ 
-                    fontSize: '0.8rem', 
-                    background: '#2563eb', 
-                    color: '#fff', 
-                    padding: '6px 16px', 
-                    borderRadius: '20px', 
-                    fontWeight: 'bold',
-                    boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)'
-                  }}>
-                    空き状況を確認・予約 →
-                  </span>
+                {/* 💡 3つのボタンエリア */}
+                <div style={{ display: 'flex', padding: '10px', gap: '8px', background: '#fafafa' }}>
+                  
+                  {/* LINEで予約ボタン */}
+                  {shop.line_official_url ? (
+                    <a href={shop.line_official_url} target="_blank" rel="noreferrer" style={{ flex: 1, textDecoration: 'none' }}>
+                      <div style={{ background: '#00b900', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>💬 LINE予約</div>
+                    </a>
+                  ) : (
+                    <div style={{ flex: 1, background: '#e2e8f0', color: '#94a3b8', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'not-allowed' }}>💬 LINE予約</div>
+                  )}
+
+                  {/* メールで予約（SnipSnapシステム内） */}
+                  <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1, textDecoration: 'none' }}>
+                    <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>✉️ メール予約</div>
+                  </Link>
+
+                  {/* オフィシャルサイトボタン */}
+                  {shop.official_url ? (
+                    <a href={shop.official_url} target="_blank" rel="noreferrer" style={{ flex: 1, textDecoration: 'none' }}>
+                      <div style={{ background: '#475569', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>🌐 公式サイト</div>
+                    </a>
+                  ) : (
+                    <div style={{ flex: 1, background: '#e2e8f0', color: '#94a3b8', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'not-allowed' }}>🌐 公式サイト</div>
+                  )}
+
                 </div>
               </div>
-            </Link>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999', fontSize: '0.7rem' }}>
+        © 2026 SnipSnap 予約ポータル
+      </div>
     </div>
   );
 }

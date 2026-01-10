@@ -1,16 +1,22 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'; // useLocationを追加
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+// 💡 追加：LINEログイン（LIFF）を操作するためのSDK
+import liff from '@line/liff';
 
 function ReservationForm() {
   const { shopId } = useParams();
   const navigate = useNavigate();
-  const location = useLocation(); // locationを取得
+  const location = useLocation();
   
   // 管理者画面からの「ねじ込み予約」データを取得
   const isAdminMode = location.state?.adminDate && location.state?.adminTime;
   const adminDate = location.state?.adminDate;
   const adminTime = location.state?.adminTime;
+
+  // 💡 追加：LINE経由（URLに ?source=line があるか）を判定
+  const queryParams = new URLSearchParams(location.search);
+  const isLineSource = queryParams.get('source') === 'line';
 
   // 基本データState
   const [shop, setShop] = useState(null);
@@ -23,13 +29,36 @@ function ReservationForm() {
   const [selectedOptions, setSelectedOptions] = useState({}); 
   
   const [loading, setLoading] = useState(true);
+  // 💡 追加：LINEユーザー情報を保持するState
+  const [lineUser, setLineUser] = useState(null);
 
   const categoryRefs = useRef({});
   const serviceRefs = useRef({});
 
   useEffect(() => {
     fetchData();
+    // 💡 追加：LINE経由ならLIFFを初期化する
+    if (isLineSource) {
+      initLiff();
+    }
   }, [shopId]);
+
+  // 💡 追加：LINEログイン（LIFF）初期化ロジック
+  const initLiff = async () => {
+    try {
+      // ⚠️ 三土手さんの LIFF ID をここに設定してください
+      await liff.init({ liffId: '2006764506-6mYjLBeP' }); 
+      if (liff.isLoggedIn()) {
+        const profile = await liff.getProfile();
+        setLineUser(profile);
+      } else {
+        // 未ログインなら、この時点で自動でログイン画面へ飛ばすことも可能です
+        // liff.login(); 
+      }
+    } catch (err) {
+      console.error('LIFF Initialization failed', err);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -58,10 +87,8 @@ function ReservationForm() {
     return selectedServices.every(s => {
       const cat = categories.find(c => c.name === s.category);
       if (!cat?.required_categories) return true;
-      
       const requiredNames = cat.required_categories.split(',').map(n => n.trim()).filter(n => n);
       if (requiredNames.length === 0) return true;
-
       return requiredNames.every(reqName => 
         selectedServices.some(ss => ss.category === reqName)
       );
@@ -143,23 +170,27 @@ function ReservationForm() {
 
   const handleNextStep = () => {
     window.scrollTo(0,0);
+    // 💡 修正：LINE経由の場合も state に lineUser 情報を乗せてリレーする
+    const commonState = { 
+      selectedServices, 
+      selectedOptions, 
+      totalSlotsNeeded,
+      lineUser // LINE情報があれば渡す
+    };
+
     if (isAdminMode) {
-      // 💡 管理者モード（ねじ込み）なら日時選択を飛ばして直接確認画面へリレー
       navigate(`/shop/${shopId}/confirm`, { 
         state: { 
-          selectedServices, 
-          selectedOptions, 
-          totalSlotsNeeded,
-          date: adminDate,    // 管理画面から受け取った日付を渡す
-          time: adminTime,    // 管理画面から受け取った時間を渡す
-          adminDate,          // ✅ 重要：ConfirmReservationへバトンを繋ぐ
-          adminTime           // ✅ 重要：ConfirmReservationへバトンを繋ぐ
+          ...commonState,
+          date: adminDate,
+          time: adminTime,
+          adminDate,
+          adminTime
         } 
       });
     } else {
-      // 通常モードなら日時選択画面へ
       navigate(`/shop/${shopId}/reserve/time`, { 
-        state: { selectedServices, selectedOptions, totalSlotsNeeded } 
+        state: commonState 
       });
     }
   };
@@ -188,6 +219,15 @@ function ReservationForm() {
       
       <div style={{ marginTop: '30px', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '20px' }}>
         <h2 style={{ margin: '0 0 10px 0', fontSize: '1.4rem' }}>{shop.business_name}</h2>
+        
+        {/* 💡 追加：LINEログイン済みの場合の挨拶 */}
+        {lineUser && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', padding: '10px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+            <img src={lineUser.pictureUrl} style={{ width: '30px', height: '30px', borderRadius: '50%' }} alt="LINE" />
+            <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#166534' }}>{lineUser.displayName} さん、こんにちは！</span>
+          </div>
+        )}
+
         {isAdminMode && (
           <div style={{ background: '#fef3c7', color: '#92400e', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '15px' }}>
             ⚠️ 管理者モード：{adminDate} {adminTime} の予約を作成中
@@ -203,7 +243,7 @@ function ReservationForm() {
       </div>
 
       <div>
-        <h3 style={{ fontSize: '1rem', borderLeft: '4px solid #2563eb', paddingLeft: '10px', marginBottom: '20px' }}>1. メメニューを選択</h3>
+        <h3 style={{ fontSize: '1rem', borderLeft: '4px solid #2563eb', paddingLeft: '10px', marginBottom: '20px' }}>1. メニューを選択</h3>
         {categories.map((cat, idx) => {
           const isDisabled = disabledCategoryNames.includes(cat.name);
           return (

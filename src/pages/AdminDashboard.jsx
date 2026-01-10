@@ -39,6 +39,11 @@ function AdminDashboard() {
   const [notes, setNotes] = useState(''); 
   const [businessHours, setBusinessHours] = useState({});
   const [maxLastSlots, setMaxLastSlots] = useState(2);
+  const [imageUrl, setImageUrl] = useState(''); // 画像URL
+
+  // 💡 追加：外部URL用State
+  const [officialUrl, setOfficialUrl] = useState('');
+  const [lineOfficialUrl, setLineOfficialUrl] = useState('');
 
   // 詳細予約ルールState
   const [slotIntervalMin, setSlotIntervalMin] = useState(15); 
@@ -51,7 +56,6 @@ function AdminDashboard() {
     fri: '金曜日', sat: '土曜日', sun: '日曜日'
   };
 
-  // 🔵 修正：まずパスワードを含む基本情報を読み込む
   useEffect(() => {
     fetchInitialShopData();
   }, [shopId]);
@@ -60,7 +64,6 @@ function AdminDashboard() {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', shopId).single();
     if (data) {
       setShopData(data);
-      // 入力フォーム用のStateも同期
       setAllowMultiple(data.allow_multiple_services);
       setPhone(data.phone || '');
       setEmailContact(data.email_contact || '');
@@ -73,10 +76,13 @@ function AdminDashboard() {
       setBufferPreparationMin(data.buffer_preparation_min || 0);
       setMinLeadTimeHours(data.min_lead_time_hours || 0);
       setAutoFillLogic(data.auto_fill_logic ?? true);
+      setImageUrl(data.image_url || '');
+      // 💡 追加：データベースからURLを読み込む
+      setOfficialUrl(data.official_url || '');
+      setLineOfficialUrl(data.line_official_url || '');
     }
   };
 
-  // 🔵 修正：認証後に詳細（メニューなど）を読み込む
   useEffect(() => {
     if (isAuthorized) {
       fetchMenuDetails();
@@ -98,7 +104,6 @@ function AdminDashboard() {
 
   const handleAuth = (e) => {
     e.preventDefault();
-    // 🔵 shopDataからパスワードを比較
     if (passwordInput === shopData?.admin_password) {
       setIsAuthorized(true);
     } else {
@@ -117,13 +122,17 @@ function AdminDashboard() {
   };
 
   const handleFinalSave = async () => {
+    // 💡 修正：新しいURLカラム（official_url, line_official_url）も含めて保存
     const { error } = await supabase
       .from('profiles')
       .update({
         phone, email_contact: emailContact, address, description, notes, business_hours: businessHours,
         allow_multiple_services: allowMultiple, max_last_slots: maxLastSlots,
         slot_interval_min: slotIntervalMin, buffer_preparation_min: bufferPreparationMin,
-        min_lead_time_hours: minLeadTimeHours, auto_fill_logic: autoFillLogic
+        min_lead_time_hours: minLeadTimeHours, auto_fill_logic: autoFillLogic,
+        image_url: imageUrl,
+        official_url: officialUrl, 
+        line_official_url: lineOfficialUrl
       })
       .eq('id', shopId);
 
@@ -235,7 +244,6 @@ function AdminDashboard() {
               </label>
             </section>
 
-            {/* 以前作成したカテゴリ・メニュー設定ロジックをすべて保持 */}
             <section style={{ marginBottom: '20px', background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #ddd' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📂 カテゴリ設定</h3>
               <form onSubmit={handleCategorySubmit} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
@@ -364,7 +372,20 @@ function AdminDashboard() {
         {activeTab === 'info' && (
           <section style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #ddd' }}>
             <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィールの設定</h3>
-            <label>店舗の説明</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ width: '100%', minHeight: 100 }} />
+            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像URL</label>
+            <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://.../photo.jpg" style={{ width: '100%', padding: '10px', marginBottom: 20, borderRadius: '6px', border: '1px solid #ddd' }} />
+            
+            {/* 💡 追加：URL設定セクション */}
+            <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#2563eb', display: 'block', marginBottom: '5px' }}>🌐 オフィシャルサイト URL</label>
+              <input type="url" value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://example.com" style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+              
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#00b900', display: 'block', marginBottom: '5px' }}>💬 LINE予約・公式アカウント URL</label>
+              <input type="url" value={lineOfficialUrl} onChange={(e) => setLineOfficialUrl(e.target.value)} placeholder="https://line.me/..." style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+              <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '8px' }}>※URLを入力するとホーム画面にボタンが表示されます</p>
+            </div>
+
+            <label>店舗の説明</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ width: '100%', minHeight: 100, marginBottom: 20 }} />
             <label>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: '100%', marginBottom: 20 }} />
             <label>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ width: '100%', marginBottom: 20 }} />
             <label>メール</label><input type="email" value={emailContact} onChange={(e) => setEmailContact(e.target.value)} style={{ width: '100%', marginBottom: 20 }} />

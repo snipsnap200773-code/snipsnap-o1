@@ -8,8 +8,8 @@ function ConfirmReservation() {
   const navigate = useNavigate();
 
   // 前の画面から引き継いだデータ
-  // 💡 adminDate / adminTime があれば「管理者のねじ込み」と判定
-  const { selectedServices, selectedOptions, totalSlotsNeeded, date, time, adminDate, adminTime } = location.state || {};
+  // 💡 lineUser（LINEプロフィール情報）を受け取る
+  const { selectedServices, selectedOptions, totalSlotsNeeded, date, time, adminDate, adminTime, lineUser } = location.state || {};
   const isAdminEntry = !!adminDate; 
 
   const [shop, setShop] = useState(null);
@@ -24,6 +24,12 @@ function ConfirmReservation() {
       navigate(`/shop/${shopId}/reserve`); 
       return;
     }
+
+    // 💡 修正点：LINEログイン済みの場合は、名前を自動でセットする
+    if (lineUser && lineUser.displayName) {
+      setCustomerName(lineUser.displayName);
+    }
+
     fetchShop();
   }, []);
 
@@ -69,7 +75,7 @@ function ConfirmReservation() {
     const { data: resData, error: dbError } = await supabase.from('reservations').insert([
       {
         shop_id: shopId,
-        // ねじ込みの場合は名前に印をつける（任意）
+        // ねじ込みの場合は名前に印をつける
         customer_name: isAdminEntry ? `${customerName} (店舗受付)` : customerName,
         customer_phone: customerPhone || '---',
         customer_email: customerEmail || 'admin@example.com',
@@ -78,7 +84,9 @@ function ConfirmReservation() {
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(), // ✅ インターバル込みで保存
         total_slots: totalSlotsNeeded,
-        res_type: isAdminEntry ? 'normal' : 'normal', // 必要なら種別を分ける
+        res_type: isAdminEntry ? 'normal' : 'normal',
+        // 💡 修正点：LINE IDがあれば保存する（将来の通知用）
+        line_user_id: lineUser?.userId || null,
         options: {
           services: selectedServices,
           options: selectedOptions
@@ -142,6 +150,17 @@ function ConfirmReservation() {
         {isAdminEntry ? '⚡ 店舗ねじ込み予約（入力短縮）' : '予約内容の確認'}
       </h2>
 
+      {/* 💡 修正点：LINEログイン中ならプロフィールを表示しておもてなし */}
+      {lineUser && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', padding: '12px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+          <img src={lineUser.pictureUrl} style={{ width: '40px', height: '40px', borderRadius: '50%' }} alt="LINE" />
+          <div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#166534' }}>LINE連携済み：{lineUser.displayName} 様</div>
+            <div style={{ fontSize: '0.7rem', color: '#16a34a' }}>連絡先のみ入力して完了です</div>
+          </div>
+        </div>
+      )}
+
       <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '15px', marginBottom: '25px', fontSize: '0.9rem', border: '1px solid #e2e8f0' }}>
         <p style={{ margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '1.2rem' }}>📅</span> <b>日時：</b> {displayDate} {displayTime} 〜
@@ -165,7 +184,6 @@ function ConfirmReservation() {
           <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="三土手 功真" style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} />
         </div>
 
-        {/* 💡 ねじ込みモードならメールと電話の入力を隠す */}
         {!isAdminEntry && (
           <>
             <div>

@@ -161,7 +161,7 @@ function SuperAdmin() {
                     <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{shop.business_name_kana}</div>
                     <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: '0.7rem', color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
-                           PW: <strong>{shop.admin_password || '未設定'}</strong>
+                            PW: <strong>{shop.admin_password || '未設定'}</strong>
                         </span>
                     </div>
                   </>
@@ -182,8 +182,19 @@ function SuperAdmin() {
                   <a href={`${window.location.origin}/admin/${shop.id}`} target="_blank" rel="noreferrer" style={{ padding: '8px 10px', fontSize: '0.7rem', borderRadius: '6px', background: '#2563eb', color: '#fff', textDecoration: 'none', textAlign: 'center' }}>開く</a>
                 </div>
               </div>
+              
+              {/* 💡 追加：LINEリッチメニュー用URL（source=lineを自動付与） */}
               <div>
-                <label style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold' }}>📅 お客様用予約</label>
+                <label style={{ fontSize: '0.7rem', color: '#00b900', fontWeight: 'bold' }}>💬 LINEリッチメニュー用URL</label>
+                <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
+                  <input readOnly value={`${window.location.origin}/shop/${shop.id}/reserve?source=line`} style={{ flex: 1, padding: '8px', fontSize: '0.7rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px' }} />
+                  <button onClick={() => copyToClipboard(`${window.location.origin}/shop/${shop.id}/reserve?source=line`)} style={{ padding: '8px 10px', fontSize: '0.7rem', borderRadius: '6px', border: '1px solid #00b900', color: '#00b900', background: '#fff' }}>コピー</button>
+                  <a href={`${window.location.origin}/shop/${shop.id}/reserve?source=line`} target="_blank" rel="noreferrer" style={{ padding: '8px 10px', fontSize: '0.7rem', borderRadius: '6px', background: '#00b900', color: '#fff', textDecoration: 'none', textAlign: 'center' }}>開く</a>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold' }}>📅 お客様用予約（一般Web用）</label>
                 <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
                   <input readOnly value={`${window.location.origin}/shop/${shop.id}/reserve`} style={{ flex: 1, padding: '8px', fontSize: '0.7rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px' }} />
                   <button onClick={() => copyToClipboard(`${window.location.origin}/shop/${shop.id}/reserve`)} style={{ padding: '8px 10px', fontSize: '0.7rem', borderRadius: '6px', border: '1px solid #059669', color: '#059669', background: '#fff' }}>コピー</button>
