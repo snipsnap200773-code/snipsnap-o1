@@ -14,8 +14,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // 🔵 3. フロントからデータを受け取る（shopEmailを追加）
-    const { customerEmail, customerName, shopName, startTime, services, shopEmail } = await req.json()
+    // 🔵 3. フロントからデータを受け取る（shopEmailに加えて cancelUrl を追加）
+    const { customerEmail, customerName, shopName, startTime, services, shopEmail, cancelUrl } = await req.json()
     
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
@@ -47,6 +47,14 @@ Deno.serve(async (req) => {
               <p style="margin: 5px 0;"><strong>📅 日時:</strong> ${startTime}</p>
               <p style="margin: 5px 0;"><strong>📋 メニュー:</strong> ${services}</p>
               <p style="margin: 5px 0;"><strong>👤 お客様名:</strong> ${customerName} 様</p>
+            </div>
+
+            <div style="background: #fff1f2; padding: 15px; border-radius: 10px; border: 1px solid #fecdd3; margin: 20px 0;">
+              <p style="margin: 0; font-weight: bold; color: #e11d48;">■ 予約のキャンセル・変更について</p>
+              <p style="margin: 10px 0 0 0; font-size: 0.9rem; color: #444;">
+                ご都合が悪くなった場合は、以下のリンクよりお手続きをお願いいたします。<br>
+                <a href="${cancelUrl || '#'}" style="display: inline-block; margin-top: 10px; color: #e11d48; text-decoration: underline; font-weight: bold;">予約をキャンセルする</a>
+              </p>
             </div>
             
             <p>ご確認のほど、よろしくお願いいたします。</p>
