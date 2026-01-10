@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-// 💡 追加：LINEログイン（LIFF）を操作するためのSDK
+// 💡 重要：LINEログイン（LIFF）を操作するためのSDK
 import liff from '@line/liff';
 
 function ReservationForm() {
@@ -9,14 +9,15 @@ function ReservationForm() {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // 管理者画面からの「ねじ込み予約」データを取得
+  // 管理者画面からの「ねじ込み予約」データ
   const isAdminMode = location.state?.adminDate && location.state?.adminTime;
   const adminDate = location.state?.adminDate;
   const adminTime = location.state?.adminTime;
 
-  // 💡 追加：LINE経由（URLに ?source=line があるか）を判定
+  // 💡 移植：LINE経由（URLに ?source=line があるか、またはLINEアプリ内か）を判定
   const queryParams = new URLSearchParams(location.search);
   const isLineSource = queryParams.get('source') === 'line';
+  const isLineApp = /Line/i.test(navigator.userAgent); // 以前の index.html からの移植
 
   // 基本データState
   const [shop, setShop] = useState(null);
@@ -29,7 +30,7 @@ function ReservationForm() {
   const [selectedOptions, setSelectedOptions] = useState({}); 
   
   const [loading, setLoading] = useState(true);
-  // 💡 追加：LINEユーザー情報を保持するState
+  // 💡 移植：LINEユーザー情報を保持するState
   const [lineUser, setLineUser] = useState(null);
 
   const categoryRefs = useRef({});
@@ -37,23 +38,25 @@ function ReservationForm() {
 
   useEffect(() => {
     fetchData();
-    // 💡 追加：LINE経由ならLIFFを初期化する
-    if (isLineSource) {
+    // 💡 移植：LINE経由またはLINEアプリ内ならLIFFを即時初期化
+    if (isLineSource || isLineApp) {
       initLiff();
     }
   }, [shopId]);
 
-  // 💡 追加：LINEログイン（LIFF）初期化ロジック
+  // 💡 移植：LINEログイン（LIFF）初期化・オートジャンプ・名前取得ロジック
   const initLiff = async () => {
     try {
-      // ⚠️ 三土手さんの LIFF ID をここに設定してください
-      await liff.init({ liffId: '2006764506-6mYjLBeP' }); 
+      // 三土手さんの LIFF ID (2008606267-eJadD70Z) を設定
+      await liff.init({ liffId: '2008606267-eJadD70Z' }); 
+      
       if (liff.isLoggedIn()) {
         const profile = await liff.getProfile();
         setLineUser(profile);
+        console.log("LINE Profile Fetched:", profile.displayName);
       } else {
-        // 未ログインなら、この時点で自動でログイン画面へ飛ばすことも可能です
-        // liff.login(); 
+        // 💡 移植：未ログインかつLINEアプリ内なら自動でログイン画面へ飛ばす
+        liff.login(); 
       }
     } catch (err) {
       console.error('LIFF Initialization failed', err);
@@ -78,11 +81,11 @@ function ReservationForm() {
     setLoading(false);
   };
 
-  // --- 計算ロジック：合計必要コマ数 ---
+  // 合計必要コマ数
   const totalSlotsNeeded = selectedServices.reduce((sum, s) => sum + s.slots, 0) + 
     Object.values(selectedOptions).reduce((sum, opt) => sum + (opt.additional_slots || 0), 0);
 
-  // --- 必須条件チェックロジック ---
+  // 必須条件チェック
   const checkRequiredMet = () => {
     return selectedServices.every(s => {
       const cat = categories.find(c => c.name === s.category);
@@ -98,7 +101,7 @@ function ReservationForm() {
   const isTotalTimeOk = totalSlotsNeeded > 0;
   const isRequiredMet = checkRequiredMet();
 
-  // --- UI制御ロジック ---
+  // UI制御
   const disabledCategoryNames = selectedServices.reduce((acc, s) => {
     const cat = categories.find(c => c.name === s.category);
     if (cat?.disable_categories) return [...acc, ...cat.disable_categories.split(',').map(n => n.trim())];
@@ -170,12 +173,12 @@ function ReservationForm() {
 
   const handleNextStep = () => {
     window.scrollTo(0,0);
-    // 💡 修正：LINE経由の場合も state に lineUser 情報を乗せてリレーする
+    // 💡 移植：LINE情報 (lineUser) を確実に state に乗せて次の画面へ渡す
     const commonState = { 
       selectedServices, 
       selectedOptions, 
       totalSlotsNeeded,
-      lineUser // LINE情報があれば渡す
+      lineUser 
     };
 
     if (isAdminMode) {
@@ -220,7 +223,7 @@ function ReservationForm() {
       <div style={{ marginTop: '30px', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '20px' }}>
         <h2 style={{ margin: '0 0 10px 0', fontSize: '1.4rem' }}>{shop.business_name}</h2>
         
-        {/* 💡 追加：LINEログイン済みの場合の挨拶 */}
+        {/* 💡 移植：LINEログイン済みの場合のバナー表示 */}
         {lineUser && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', padding: '10px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
             <img src={lineUser.pictureUrl} style={{ width: '30px', height: '30px', borderRadius: '50%' }} alt="LINE" />
