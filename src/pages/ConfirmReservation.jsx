@@ -8,7 +8,6 @@ function ConfirmReservation() {
   const navigate = useNavigate();
 
   // 前の画面から引き継いだデータ
-  // 💡 lineUser（LINEプロフィール情報）を受け取る
   const { selectedServices, selectedOptions, totalSlotsNeeded, date, time, adminDate, adminTime, lineUser } = location.state || {};
   const isAdminEntry = !!adminDate; 
 
@@ -18,6 +17,28 @@ function ConfirmReservation() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 💡 移植：旧システムから引き継いだ通知用設定
+  const SNIPSNAP_API_ENDPOINT = "https://glxvtemgkjutrpqszwdu.supabase.co/functions/v1/dynamic-worker";
+  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  // 💡 移植：LINE通知を飛ばすためのAPI共通関数
+  const callSnipSnapApi = async (type, payload) => {
+    try {
+      const res = await fetch(SNIPSNAP_API_ENDPOINT, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({ type, payload }),
+      });
+      return await res.json();
+    } catch (err) {
+      console.error("API Call Error:", err);
+      throw err;
+    }
+  };
+
   useEffect(() => {
     // 日付または管理用日付のどちらもなければリダイレクト
     if (!date && !adminDate) {
@@ -25,7 +46,7 @@ function ConfirmReservation() {
       return;
     }
 
-    // 💡 修正点：LINEログイン済みの場合は、名前を自動でセットする
+    // LINEログイン済みの場合は、名前を自動でセットする
     if (lineUser && lineUser.displayName) {
       setCustomerName(lineUser.displayName);
     }
@@ -39,7 +60,7 @@ function ConfirmReservation() {
   };
 
   const handleReserve = async () => {
-    // 💡 爆速判定：ねじ込みなら名前だけでOK、一般予約なら全項目チェック
+    // 爆速判定：ねじ込みなら名前だけでOK、一般予約なら全項目チェック
     if (isAdminEntry) {
       if (!customerName) {
         alert('お客様名を入力してください');
@@ -58,14 +79,14 @@ function ConfirmReservation() {
 
     setIsSubmitting(true);
 
-    // 💡 日時は adminDate があればそちらを優先
+    // 日時は adminDate があればそちらを優先
     const targetDate = adminDate || date;
     const targetTime = adminTime || time;
 
     const startDateTime = new Date(`${targetDate}T${targetTime}`);
     const interval = shop.slot_interval_min || 15;
     
-    // ✅ 内部計算：施術時間に「準備時間」を足して終了時間を決める
+    // 内部計算：施術時間に「準備時間」を足して終了時間を決める
     const buffer = shop.buffer_preparation_min || 0;
     const totalMinutes = (totalSlotsNeeded * interval) + buffer;
     
@@ -75,17 +96,15 @@ function ConfirmReservation() {
     const { data: resData, error: dbError } = await supabase.from('reservations').insert([
       {
         shop_id: shopId,
-        // ねじ込みの場合は名前に印をつける
         customer_name: isAdminEntry ? `${customerName} (店舗受付)` : customerName,
         customer_phone: customerPhone || '---',
         customer_email: customerEmail || 'admin@example.com',
         start_at: startDateTime.toISOString(),
         end_at: endDateTime.toISOString(),
         start_time: startDateTime.toISOString(),
-        end_time: endDateTime.toISOString(), // ✅ インターバル込みで保存
+        end_time: endDateTime.toISOString(), 
         total_slots: totalSlotsNeeded,
-        res_type: isAdminEntry ? 'normal' : 'normal',
-        // 💡 修正点：LINE IDがあれば保存する（将来の通知用）
+        res_type: 'normal',
         line_user_id: lineUser?.userId || null,
         options: {
           services: selectedServices,
@@ -101,10 +120,27 @@ function ConfirmReservation() {
       return;
     }
 
-    // 2. 成功したらメール送信（💡 ねじ込みモードなら送信自体をスキップ！）
+    // 2. 💡 移植：公式LINE通知 & メール送信（ねじ込みモードならスキップ）
     if (!isAdminEntry) {
+      const menuLabel = selectedServices.map(s => s.name).join(', ');
+      
       try {
-        const { error: funcError } = await supabase.functions.invoke('send-reservation-email', {
+        // ★ 移植：公式LINE通知の実行
+        await callSnipSnapApi("notify-reservation", {
+          date: targetDate,
+          startTime: targetTime,
+          headcount: 1, 
+          menuLabel: menuLabel,
+          totalMinutes: totalMinutes,
+          name: customerName,
+          contact: `${customerEmail} / ${customerPhone}`,
+          note: "SnipSnap Web予約",
+          source: "web-matrix",
+          lineUserId: lineUser?.userId || "" 
+        });
+
+        // ★ 移植：お客様向け確認メール送信
+        await supabase.functions.invoke('send-reservation-email', {
           body: {
             reservationId: resData[0].id,
             customerEmail: customerEmail,
@@ -112,22 +148,18 @@ function ConfirmReservation() {
             shopName: shop.business_name,
             shopEmail: shop.email_contact,
             startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
-            services: selectedServices.map(s => s.name).join(', ')
+            services: menuLabel
           }
         });
 
-        if (funcError) {
-          console.error("Mail Function Error:", funcError);
-          alert('予約は完了しましたが、確認メールの送信のみ失敗しました。');
-        }
       } catch (err) {
-        console.error("Function Call Error:", err);
+        console.error("Notification Error:", err);
       }
     }
 
-    alert(isAdminEntry ? '爆速ねじ込み完了！' : '予約が完了しました！');
+    alert(isAdminEntry ? '爆速ねじ込み完了！' : '予約が完了しました！通知を送信しました。');
     
-    // 💡 完了後の戻り先：ねじ込みなら管理画面へ、一般ならトップへ
+    // 完了後の戻り先：ねじ込みなら管理画面へ、一般ならトップへ
     if (isAdminEntry) {
       navigate(`/admin/${shopId}/reservations`);
     } else {
@@ -150,13 +182,13 @@ function ConfirmReservation() {
         {isAdminEntry ? '⚡ 店舗ねじ込み予約（入力短縮）' : '予約内容の確認'}
       </h2>
 
-      {/* 💡 修正点：LINEログイン中ならプロフィールを表示しておもてなし */}
+      {/* LINEログイン中ならプロフィールを表示 */}
       {lineUser && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', padding: '12px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
           <img src={lineUser.pictureUrl} style={{ width: '40px', height: '40px', borderRadius: '50%' }} alt="LINE" />
           <div>
             <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#166534' }}>LINE連携済み：{lineUser.displayName} 様</div>
-            <div style={{ fontSize: '0.7rem', color: '#16a34a' }}>連絡先のみ入力して完了です</div>
+            <div style={{ fontSize: '0.7rem', color: '#16a34a' }}>公式LINEから通知が届きます</div>
           </div>
         </div>
       )}
@@ -205,7 +237,7 @@ function ConfirmReservation() {
             cursor: isSubmitting ? 'not-allowed' : 'pointer', 
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' 
           }}>
-          {isSubmitting ? '予約処理中...' : (isAdminEntry ? '🚀 この内容でねじ込む' : 'この内容で予約を確定する')}
+          {isSubmitting ? '予約処理中...' : (isAdminEntry ? '🚀 この内容でねじ込む' : '予約を確定して通知を送る')}
         </button>
       </div>
     </div>
