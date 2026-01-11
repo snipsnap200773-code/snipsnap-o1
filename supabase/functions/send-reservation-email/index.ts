@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       shopResData = await shopRes.json();
     }
 
-    // 両方の結果をまとめて返す（少なくとも一方が成功していれば成功とする）
+    // 両方の結果をまとめて返す
     return new Response(JSON.stringify({ customer: customerResData, shop: shopResData }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
