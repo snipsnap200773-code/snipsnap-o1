@@ -110,7 +110,7 @@ function ConfirmReservation() {
         total_slots: totalSlotsNeeded,
         res_type: 'normal',
         line_user_id: lineUser?.userId || null,
-        cancel_token: cancelToken, // 💡 ここでDBに保存
+        cancel_token: cancelToken, // 💡 ここでDBに保存 [cite: 2025-12-03]
         options: {
           services: selectedServices,
           options: selectedOptions
@@ -131,6 +131,7 @@ function ConfirmReservation() {
       
       try {
         // --- ★ お客様本人へのLINE通知 (本人宛 / リンクあり) ---
+        // lineUserId がある（LINE経由の）場合のみ送信 [cite: 2025-12-03]
         if (lineUser?.userId) {
           await callSnipSnapApi("notify-reservation", {
             date: targetDate,
@@ -140,9 +141,9 @@ function ConfirmReservation() {
             totalMinutes: totalMinutes,
             name: customerName,
             contact: `${customerEmail} / ${customerPhone}`,
-            note: `ご予約ありがとうございます！\n\n▼キャンセルURL\n${cancelUrl}`, // 💡 お客様にはリンクを表示
+            note: `ご予約ありがとうございます！\n\n▼キャンセルURL\n${cancelUrl}`, // 💡 お客様にはリンクを表示 [cite: 2025-12-03]
             source: "web-matrix",
-            lineUserId: lineUser.userId // 💡 本人のLINE IDへ送信
+            lineUserId: lineUser.userId // 💡 本人のLINE IDへ送信 [cite: 2025-12-03]
           });
         }
 
@@ -156,9 +157,9 @@ function ConfirmReservation() {
             totalMinutes: totalMinutes,
             name: customerName,
             contact: `${customerEmail} / ${customerPhone}`,
-            note: "【新着予約】予約管理システム", // 💡 店舗用にはリンクを付けない
+            note: "【新着予約】予約管理システム", // 💡 店舗用にはリンクを付けない [cite: 2025-12-03]
             source: "web-matrix",
-            lineUserId: "" // 💡 ID空で店舗公式（Notify）へ送信
+            lineUserId: "" // 💡 ID空で店舗公式（Notify）へ送信 [cite: 2025-12-03]
           });
         }
 
@@ -171,7 +172,7 @@ function ConfirmReservation() {
             shopEmail: shop.email_contact,
             startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
             services: menuLabel,
-            cancelUrl: cancelUrl 
+            cancelUrl: cancelUrl // 💡 Edge Function内で送り分けを判定 [cite: 2025-12-03]
           }
         });
 
