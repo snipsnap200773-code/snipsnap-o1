@@ -92,7 +92,11 @@ function ConfirmReservation() {
     
     const endDateTime = new Date(startDateTime.getTime() + totalMinutes * 60000);
 
-    // 1. 予約データをテーブルに保存
+    // --- 💡 キャンセル用トークンとURLの生成 ---
+    const cancelToken = crypto.randomUUID();
+    const cancelUrl = `${window.location.origin}/cancel?token=${cancelToken}`;
+
+    // 1. 予約データをテーブルに保存 (cancel_tokenを追加)
     const { data: resData, error: dbError } = await supabase.from('reservations').insert([
       {
         shop_id: shopId,
@@ -106,6 +110,7 @@ function ConfirmReservation() {
         total_slots: totalSlotsNeeded,
         res_type: 'normal',
         line_user_id: lineUser?.userId || null,
+        cancel_token: cancelToken, // 💡 ここでDBに保存
         options: {
           services: selectedServices,
           options: selectedOptions
@@ -125,7 +130,7 @@ function ConfirmReservation() {
       const menuLabel = selectedServices.map(s => s.name).join(', ');
       
       try {
-        // ★ 移植：公式LINE通知の実行
+        // ★ 移植：公式LINE通知の実行 (キャンセルURLをメッセージに含める)
         await callSnipSnapApi("notify-reservation", {
           date: targetDate,
           startTime: targetTime,
@@ -134,12 +139,12 @@ function ConfirmReservation() {
           totalMinutes: totalMinutes,
           name: customerName,
           contact: `${customerEmail} / ${customerPhone}`,
-          note: "SnipSnap Web予約",
+          note: `SnipSnap Web予約\n\n▼キャンセルURL\n${cancelUrl}`, // 💡 LINE通知にリンクを合体
           source: "web-matrix",
           lineUserId: lineUser?.userId || "" 
         });
 
-        // ★ 移植：お客様向け確認メール送信
+        // ★ 移植：お客様向け確認メール送信 (cancelUrlを渡す)
         await supabase.functions.invoke('send-reservation-email', {
           body: {
             reservationId: resData[0].id,
@@ -148,7 +153,8 @@ function ConfirmReservation() {
             shopName: shop.business_name,
             shopEmail: shop.email_contact,
             startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
-            services: menuLabel
+            services: menuLabel,
+            cancelUrl: cancelUrl // 💡 Edge Function経由でメールにリンクが出る
           }
         });
 
