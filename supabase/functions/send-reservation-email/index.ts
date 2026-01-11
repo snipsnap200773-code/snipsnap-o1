@@ -16,10 +16,10 @@ Deno.serve(async (req) => {
     // 💡 金庫から最新の鍵を取り出す
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
-    // 宛先を整理（空欄チェック付き）
+    // 宛先を整理（💡 店主への同時送信を停止し、お客様のみに送るよう修正）
     const recipients = [];
     if (customerEmail) recipients.push(customerEmail);
-    if (shopEmail && shopEmail !== 'admin@example.com') recipients.push(shopEmail);
+    // if (shopEmail && shopEmail !== 'admin@example.com') recipients.push(shopEmail); // 店主への二重送信を停止
 
     if (recipients.length === 0) {
       throw new Error("宛先メールアドレスがありません");
@@ -32,9 +32,9 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'SnipSnapシステム <infec@snipsnap.biz>',
+        from: '予約管理システム <infec@snipsnap.biz>',
         to: recipients,
-        subject: `【SnipSnap】予約完了：${customerName} 様`,
+        subject: `予約完了：${customerName} 様`,
         html: `
           <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
             <h2 style="color: #2563eb;">予約完了のお知らせ</h2>
@@ -47,11 +47,11 @@ Deno.serve(async (req) => {
             </div>
 
             ${cancelUrl ? `
-            <div style="background: #fff1f2; padding: 15px; border-radius: 10px; border: 1px solid #fecdd3; margin: 20px 0;">
-              <p style="margin: 0; font-weight: bold; color: #e11d48;">■ 予約のキャンセル・変更について</p>
-              <p style="margin: 10px 0 0 0; font-size: 0.9rem;">
-                以下のリンクよりお手続きをお願いいたします。<br>
-                <a href="${cancelUrl}" style="color: #e11d48; font-weight: bold;">予約をキャンセルする</a>
+            <div style="background: #f1f5f9; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
+              <p style="margin: 0; font-weight: bold; color: #64748b;">■ ご予約のキャンセル・変更について</p>
+              <p style="margin: 10px 0 0 0; font-size: 0.85rem; color: #64748b;">
+                ご予定が変わられた場合は、以下のリンクよりお手続きをお願いいたします。<br>
+                <a href="${cancelUrl}" style="color: #2563eb; text-decoration: underline;">ご予約のキャンセルはこちら</a>
               </p>
             </div>` : ''}
             

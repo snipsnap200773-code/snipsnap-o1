@@ -45,6 +45,9 @@ function AdminDashboard() {
   const [officialUrl, setOfficialUrl] = useState('');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('');
 
+  // 💡 追加：LINE通知設定用State
+  const [notifyLineEnabled, setNotifyLineEnabled] = useState(true);
+
   // 詳細予約ルールState
   const [slotIntervalMin, setSlotIntervalMin] = useState(15); 
   const [bufferPreparationMin, setBufferPreparationMin] = useState(0); 
@@ -80,6 +83,8 @@ function AdminDashboard() {
       // 💡 追加：データベースからURLを読み込む
       setOfficialUrl(data.official_url || '');
       setLineOfficialUrl(data.line_official_url || '');
+      // 💡 追加：LINE通知設定を読み込む（デフォルトはtrue）
+      setNotifyLineEnabled(data.notify_line_enabled ?? true);
     }
   };
 
@@ -122,7 +127,7 @@ function AdminDashboard() {
   };
 
   const handleFinalSave = async () => {
-    // 💡 修正：新しいURLカラム（official_url, line_official_url）も含めて保存
+    // 💡 修正：notify_line_enabled も含めて保存
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -132,7 +137,8 @@ function AdminDashboard() {
         min_lead_time_hours: minLeadTimeHours, auto_fill_logic: autoFillLogic,
         image_url: imageUrl,
         official_url: officialUrl, 
-        line_official_url: lineOfficialUrl
+        line_official_url: lineOfficialUrl,
+        notify_line_enabled: notifyLineEnabled
       })
       .eq('id', shopId);
 
@@ -375,7 +381,7 @@ function AdminDashboard() {
             <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像URL</label>
             <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://.../photo.jpg" style={{ width: '100%', padding: '10px', marginBottom: 20, borderRadius: '6px', border: '1px solid #ddd' }} />
             
-            {/* 💡 追加：URL設定セクション */}
+            {/* 💡 外部URL設定セクション */}
             <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#2563eb', display: 'block', marginBottom: '5px' }}>🌐 オフィシャルサイト URL</label>
               <input type="url" value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://example.com" style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
@@ -383,6 +389,24 @@ function AdminDashboard() {
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#00b900', display: 'block', marginBottom: '5px' }}>💬 LINE予約・公式アカウント URL</label>
               <input type="url" value={lineOfficialUrl} onChange={(e) => setLineOfficialUrl(e.target.value)} placeholder="https://line.me/..." style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
               <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '8px' }}>※URLを入力するとホーム画面にボタンが表示されます</p>
+            </div>
+
+            {/* 💡 新着予約のLINE通知設定セクション */}
+            <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '10px', border: '1px solid #bbf7d0', marginBottom: '20px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={notifyLineEnabled} 
+                  onChange={(e) => setNotifyLineEnabled(e.target.checked)} 
+                  style={{ width: '22px', height: '22px', cursor: 'pointer' }} 
+                />
+                <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#166534' }}>
+                  📢 新着予約のLINE通知を受け取る
+                </span>
+              </label>
+              <p style={{ fontSize: '0.7rem', color: '#15803d', marginTop: '8px', marginLeft: '34px' }}>
+                ※ONにすると、お客様が予約した際に公式LINEへ通知が届きます。
+              </p>
             </div>
 
             <label>店舗の説明</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ width: '100%', minHeight: 100, marginBottom: 20 }} />

@@ -130,21 +130,39 @@ function ConfirmReservation() {
       const menuLabel = selectedServices.map(s => s.name).join(', ');
       
       try {
-        // ★ 移植：公式LINE通知の実行 (キャンセルURLをメッセージに含める)
-        await callSnipSnapApi("notify-reservation", {
-          date: targetDate,
-          startTime: targetTime,
-          headcount: 1, 
-          menuLabel: menuLabel,
-          totalMinutes: totalMinutes,
-          name: customerName,
-          contact: `${customerEmail} / ${customerPhone}`,
-          note: `SnipSnap Web予約\n\n▼キャンセルURL\n${cancelUrl}`, // 💡 LINE通知にリンクを合体
-          source: "web-matrix",
-          lineUserId: lineUser?.userId || "" 
-        });
+        // --- ★ お客様本人へのLINE通知 (文面維持＋キャンセルリンクあり) ---
+        if (lineUser?.userId) {
+          await callSnipSnapApi("notify-reservation", {
+            date: targetDate,
+            startTime: targetTime,
+            headcount: 1, 
+            menuLabel: menuLabel,
+            totalMinutes: totalMinutes,
+            name: customerName,
+            contact: `${customerEmail} / ${customerPhone}`,
+            note: `SnipSnap Web予約\n\n▼キャンセルURL\n${cancelUrl}`, 
+            source: "web-matrix",
+            lineUserId: lineUser.userId // 💡 本人のLINEに送信
+          });
+        }
 
-        // ★ 移植：お客様向け確認メール送信 (cancelUrlを渡す)
+        // --- ★ 店舗側へのLINE通知 (新着通知＋リンクなし＋ON/OFF連動) ---
+        if (shop.notify_line_enabled !== false) {
+          await callSnipSnapApi("notify-reservation", {
+            date: targetDate,
+            startTime: targetTime,
+            headcount: 1, 
+            menuLabel: menuLabel,
+            totalMinutes: totalMinutes,
+            name: customerName,
+            contact: `${customerEmail} / ${customerPhone}`,
+            note: "SnipSnap Web予約", // 💡 店舗用にはリンクを付けない
+            source: "web-matrix",
+            lineUserId: "" // 💡 ID空で店舗公式通知へ
+          });
+        }
+
+        // --- ★ お客様向け確認メール送信 ---
         await supabase.functions.invoke('send-reservation-email', {
           body: {
             reservationId: resData[0].id,
@@ -154,7 +172,7 @@ function ConfirmReservation() {
             shopEmail: shop.email_contact,
             startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
             services: menuLabel,
-            cancelUrl: cancelUrl // 💡 Edge Function経由でメールにリンクが出る
+            cancelUrl: cancelUrl 
           }
         });
 
