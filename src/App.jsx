@@ -7,7 +7,7 @@ import SuperAdmin from './pages/SuperAdmin';
 import TimeSelection from './pages/TimeSelection'; 
 import ConfirmReservation from './pages/ConfirmReservation';
 import AdminReservations from './pages/AdminReservations';
-// 💡 追加：キャンセル専用画面
+// 💡 追加：キャンセル画面を呼び出す合図
 import CancelReservation from './pages/CancelReservation';
 
 function App() {
@@ -32,7 +32,7 @@ function App() {
           {/* 3. 最終確認画面 */}
           <Route path="/shop/:shopId/confirm" element={<ConfirmReservation />} />
 
-          {/* 💡 追加：お客様用キャンセル画面 */}
+          {/* 💡 追加：キャンセル画面（メールのリンクから飛ぶ場所） */}
           <Route path="/cancel" element={<CancelReservation />} />
 
           {/* 店舗主用：予約一覧（台帳）画面 */}
