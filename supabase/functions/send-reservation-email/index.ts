@@ -1,24 +1,23 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// 💡 LINE通知用の定数（司令塔として追加）
-const LINE_CHANNEL_ACCESS_TOKEN = "SDDXvMI+SyF8djRDeitHhCM7jx0lFUBM/kXU9JNu3biqmm5T7zWhh8eqShoUC7avRG/lOQEjuC0P+VG3BBoOUsWt7VtksdJDqRdJhGXMvqm4SHuut5GYSwysbs3vr3em9tdorkFKC56hyLFozPPmvAdB04t89/1O/w1cDnyilFU=";
+// LINE通知用の定数（URLは共通）
 const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
-const LINE_ADMIN_USER_ID = "U471d8a27e1ea8430d65ac7dc0cc00546";
 
-// 💡 LINE送信用の共通関数（司令塔として追加）
-async function safePushToLine(to: string, text: string, targetName: string) {
-  if (!to) return null;
+// 💡 LINE送信用の共通関数（トークンを引数で受け取るように拡張）
+async function safePushToLine(to: string, text: string, token: string, targetName: string) {
+  if (!to || !token) return null;
   try {
     const res = await fetch(LINE_PUSH_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ to, messages: [{ type: 'text', text }] }),
     });
@@ -35,8 +34,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // 💡 受取パラメーターに LINE 関連を追加
+    // 💡 受取パラメーターに shopId を追加（DB検索用）
     const { 
+      shopId,             // 必須：店舗特定用
       customerEmail, 
       customerName, 
       shopName, 
@@ -44,19 +44,36 @@ Deno.serve(async (req) => {
       services, 
       shopEmail, 
       cancelUrl,
-      lineUserId,         // 追加
-      notifyLineEnabled   // 追加
+      lineUserId, 
+      notifyLineEnabled 
     } = await req.json()
     
-    // 💡 金庫から最新の鍵を取り出す
+    // 💡 環境変数からDB接続情報とメールキーを取得
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? "";
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? "";
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+
+    // 💡 Supabaseクライアントの初期化
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // 🚀 【重要】データベースから店舗ごとのLINE設定を取得
+    const { data: shopProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('line_channel_access_token, line_admin_user_id')
+      .eq('id', shopId)
+      .single();
+
+    // 店舗独自のトークンが設定されていなければ、三土手さんのトークンをデフォルトにする等の処理も可能ですが、
+    // ここでは取得したトークン（shopProfile.line_channel_access_token）を優先的に使用します。
+    const currentToken = shopProfile?.line_channel_access_token;
+    const currentAdminId = shopProfile?.line_admin_user_id;
 
     // --- 💡 共通のメール送信関数（文面・レイアウトは一切変更なし） ---
     const sendMail = async (to: string, isOwner: boolean) => {
       const subject = isOwner ? `【新着予約】${customerName} 様` : `予約完了のお知らせ：${customerName} 様`;
       const title = isOwner ? "新着予約のお知らせ（店舗控え）" : "予約完了のお知らせ";
       const greeting = isOwner ? `${shopName} 管理者様` : `${customerName} 様`;
-      const bodyPrefix = isOwner ? "以下の通り、新しい予約が入りました。" : `この度は ${shopName} をご利用いただきありがとうございます。`;
+      const bodyPrefix = isOwner ? "以下の通り, 新しい予約が入りました。" : `この度は ${shopName} をご利用いただきありがとうございます。`;
 
       return await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -96,37 +113,34 @@ Deno.serve(async (req) => {
       });
     };
 
-    // 1. お客様へのメール送信
+    // 1. メール送信処理
     let customerResData = null;
     if (customerEmail) {
       const customerRes = await sendMail(customerEmail, false);
       customerResData = await customerRes.json();
     }
-
-    // 2. 店主へのメール送信
     let shopResData = null;
     if (shopEmail && shopEmail !== 'admin@example.com') {
       const shopRes = await sendMail(shopEmail, true);
       shopResData = await shopRes.json();
     }
 
-    // --- 💡 LINE通知ロジック（司令塔として追加） ---
+    // 2. LINE通知処理（取得した動的トークンを使用）
     let customerLineSent = false;
     let shopLineSent = false;
 
-    // A. お客様本人へのLINE（lineUserIdがある場合のみ）
-    if (lineUserId) {
+    // A. お客様本人へのLINE
+    if (lineUserId && currentToken) {
       const customerMsg = `${customerName}様\n\nご予約ありがとうございます。\n以下の内容で承りました。\n\n📅 日時: ${startTime}〜\n📋 メニュー: ${services}\n\nご来店を心よりお待ちしております！\n\n■キャンセル・変更について\n以下のURLよりお手続きをお願いいたします。\n${cancelUrl}`;
-      customerLineSent = await safePushToLine(lineUserId, customerMsg, "CUSTOMER");
+      customerLineSent = await safePushToLine(lineUserId, customerMsg, currentToken, "CUSTOMER");
     }
 
-    // B. 店舗側へのLINE（管理者の通知設定が有効な場合のみ）
-    if (notifyLineEnabled !== false) {
+    // B. 店舗側へのLINE（その店舗の店長IDへ、その店舗のトークンで送る）
+    if (notifyLineEnabled !== false && currentToken && currentAdminId) {
       const shopMsg = `【新着予約】\n\n👤 お客様: ${customerName} 様\n📅 日時: ${startTime}〜\n📋 メニュー: ${services}\n\nご確認をお願いいたします。`;
-      shopLineSent = await safePushToLine(LINE_ADMIN_USER_ID, shopMsg, "SHOP_OWNER");
+      shopLineSent = await safePushToLine(currentAdminId, shopMsg, currentToken, "SHOP_OWNER");
     }
 
-    // 結果をまとめて返す
     return new Response(JSON.stringify({ 
       customerEmail: customerResData, 
       shopEmail: shopResData,

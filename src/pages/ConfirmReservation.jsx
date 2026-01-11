@@ -104,9 +104,10 @@ function ConfirmReservation() {
       const menuLabel = selectedServices.map(s => s.name).join(', ');
       
       try {
-        // メールとLINEの全通知処理をこのエッジ関数が引き受ける
+        // 🚀 shopId を含めてエッジ関数を呼び出し
         await supabase.functions.invoke('send-reservation-email', {
           body: {
+            shopId: shopId, // 💡 ここを追加：店舗別の設定を読み込むために必須
             customerEmail: customerEmail,
             customerName: customerName,
             shopName: shop.business_name,
@@ -114,7 +115,6 @@ function ConfirmReservation() {
             startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
             services: menuLabel,
             cancelUrl: cancelUrl,
-            // 司令塔に必要な LINE 情報もここで渡す
             lineUserId: lineUser?.userId || null,
             notifyLineEnabled: shop.notify_line_enabled
           }
