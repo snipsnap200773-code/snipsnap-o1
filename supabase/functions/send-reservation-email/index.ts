@@ -16,53 +16,67 @@ Deno.serve(async (req) => {
     // 💡 金庫から最新の鍵を取り出す
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
-    // 宛先を整理（💡 店主への同時送信を停止し、お客様のみに送るよう修正）
-    const recipients = [];
-    if (customerEmail) recipients.push(customerEmail);
-    // if (shopEmail && shopEmail !== 'admin@example.com') recipients.push(shopEmail); // 店主への二重送信を停止
+    // --- 💡 共通のメール送信関数（宛先によって文面を切り替える） ---
+    const sendMail = async (to: string, isOwner: boolean) => {
+      const subject = isOwner ? `【新着予約】${customerName} 様` : `予約完了のお知らせ：${customerName} 様`;
+      const title = isOwner ? "新着予約のお知らせ（店舗控え）" : "予約完了のお知らせ";
+      const greeting = isOwner ? `${shopName} 管理者様` : `${customerName} 様`;
+      const bodyPrefix = isOwner ? "以下の通り、新しい予約が入りました。" : `この度は ${shopName} をご利用いただきありがとうございます。`;
 
-    if (recipients.length === 0) {
-      throw new Error("宛先メールアドレスがありません");
+      return await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: '予約管理システム <infec@snipsnap.biz>',
+          to: [to],
+          subject: subject,
+          html: `
+            <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
+              <h2 style="color: #2563eb;">${title}</h2>
+              <p><strong>${greeting}</strong></p>
+              <p>${bodyPrefix}</p>
+              
+              <div style="background: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
+                <p style="margin: 5px 0;">👤 <strong>お客様:</strong> ${customerName} 様</p>
+                <p style="margin: 5px 0;">📅 <strong>日時:</strong> ${startTime}</p>
+                <p style="margin: 5px 0;">📋 <strong>メニュー:</strong> ${services}</p>
+              </div>
+
+              ${(!isOwner && cancelUrl) ? `
+              <div style="background: #f1f5f9; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
+                <p style="margin: 0; font-weight: bold; color: #64748b;">■ ご予約のキャンセル・変更について</p>
+                <p style="margin: 10px 0 0 0; font-size: 0.85rem; color: #64748b;">
+                  ご予定が変わられた場合は、以下のリンクよりお手続きをお願いいたします。<br>
+                  <a href="${cancelUrl}" style="color: #2563eb; text-decoration: underline;">ご予約のキャンセルはこちら</a>
+                </p>
+              </div>` : ''}
+              
+              <p>ご確認のほど、よろしくお願いいたします。</p>
+            </div>
+          `,
+        }),
+      });
+    };
+
+    // 1. お客様への送信（予約完了文面・キャンセルリンクあり）
+    let customerResData = null;
+    if (customerEmail) {
+      const customerRes = await sendMail(customerEmail, false);
+      customerResData = await customerRes.json();
     }
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: '予約管理システム <infec@snipsnap.biz>',
-        to: recipients,
-        subject: `予約完了：${customerName} 様`,
-        html: `
-          <div style="font-family: sans-serif; color: #333; line-height: 1.6;">
-            <h2 style="color: #2563eb;">予約完了のお知らせ</h2>
-            <p><strong>${customerName} 様</strong></p>
-            <p>この度は ${shopName} をご利用いただきありがとうございます。</p>
-            
-            <div style="background: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
-              <p style="margin: 5px 0;">📅 <strong>日時:</strong> ${startTime}</p>
-              <p style="margin: 5px 0;">📋 <strong>メニュー:</strong> ${services}</p>
-            </div>
+    // 2. 店主への送信（新着予約文面・キャンセルリンクなし）
+    let shopResData = null;
+    if (shopEmail && shopEmail !== 'admin@example.com') {
+      const shopRes = await sendMail(shopEmail, true);
+      shopResData = await shopRes.json();
+    }
 
-            ${cancelUrl ? `
-            <div style="background: #f1f5f9; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
-              <p style="margin: 0; font-weight: bold; color: #64748b;">■ ご予約のキャンセル・変更について</p>
-              <p style="margin: 10px 0 0 0; font-size: 0.85rem; color: #64748b;">
-                ご予定が変わられた場合は、以下のリンクよりお手続きをお願いいたします。<br>
-                <a href="${cancelUrl}" style="color: #2563eb; text-decoration: underline;">ご予約のキャンセルはこちら</a>
-              </p>
-            </div>` : ''}
-            
-            <p>ご確認のほど、よろしくお願いいたします。</p>
-          </div>
-        `,
-      }),
-    })
-
-    const data = await res.json()
-    return new Response(JSON.stringify(data), {
+    // 両方の結果をまとめて返す（少なくとも一方が成功していれば成功とする）
+    return new Response(JSON.stringify({ customer: customerResData, shop: shopResData }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

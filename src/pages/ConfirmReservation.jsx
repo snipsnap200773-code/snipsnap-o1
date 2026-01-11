@@ -130,7 +130,7 @@ function ConfirmReservation() {
       const menuLabel = selectedServices.map(s => s.name).join(', ');
       
       try {
-        // --- ★ お客様本人へのLINE通知 (文面維持＋キャンセルリンクあり) ---
+        // --- ★ お客様本人へのLINE通知 (本人宛 / リンクあり) ---
         if (lineUser?.userId) {
           await callSnipSnapApi("notify-reservation", {
             date: targetDate,
@@ -140,13 +140,13 @@ function ConfirmReservation() {
             totalMinutes: totalMinutes,
             name: customerName,
             contact: `${customerEmail} / ${customerPhone}`,
-            note: `SnipSnap Web予約\n\n▼キャンセルURL\n${cancelUrl}`, 
+            note: `ご予約ありがとうございます！\n\n▼キャンセルURL\n${cancelUrl}`, // 💡 お客様にはリンクを表示
             source: "web-matrix",
-            lineUserId: lineUser.userId // 💡 本人のLINEに送信
+            lineUserId: lineUser.userId // 💡 本人のLINE IDへ送信
           });
         }
 
-        // --- ★ 店舗側へのLINE通知 (新着通知＋リンクなし＋ON/OFF連動) ---
+        // --- ★ 店舗側へのLINE通知 (店舗公式宛 / リンクなし / ON/OFF連動) ---
         if (shop.notify_line_enabled !== false) {
           await callSnipSnapApi("notify-reservation", {
             date: targetDate,
@@ -156,16 +156,15 @@ function ConfirmReservation() {
             totalMinutes: totalMinutes,
             name: customerName,
             contact: `${customerEmail} / ${customerPhone}`,
-            note: "SnipSnap Web予約", // 💡 店舗用にはリンクを付けない
+            note: "【新着予約】予約管理システム", // 💡 店舗用にはリンクを付けない
             source: "web-matrix",
-            lineUserId: "" // 💡 ID空で店舗公式通知へ
+            lineUserId: "" // 💡 ID空で店舗公式（Notify）へ送信
           });
         }
 
-        // --- ★ お客様向け確認メール送信 ---
+        // --- ★ メール送信 (お客様は「予約完了」、店主は「新着予約」が届く) ---
         await supabase.functions.invoke('send-reservation-email', {
           body: {
-            reservationId: resData[0].id,
             customerEmail: customerEmail,
             customerName: customerName,
             shopName: shop.business_name,
