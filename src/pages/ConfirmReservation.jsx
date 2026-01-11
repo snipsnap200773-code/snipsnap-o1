@@ -17,28 +17,6 @@ function ConfirmReservation() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 💡 移植：旧システムから引き継いだ通知用設定
-  const SNIPSNAP_API_ENDPOINT = "https://glxvtemgkjutrpqszwdu.supabase.co/functions/v1/dynamic-worker";
-  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-  // 💡 移植：LINE通知を飛ばすためのAPI共通関数
-  const callSnipSnapApi = async (type, payload) => {
-    try {
-      const res = await fetch(SNIPSNAP_API_ENDPOINT, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({ type, payload }),
-      });
-      return await res.json();
-    } catch (err) {
-      console.error("API Call Error:", err);
-      throw err;
-    }
-  };
-
   useEffect(() => {
     // 日付または管理用日付のどちらもなければリダイレクト
     if (!date && !adminDate) {
@@ -60,7 +38,7 @@ function ConfirmReservation() {
   };
 
   const handleReserve = async () => {
-    // 爆速判定：ねじ込みなら名前だけでOK、一般予約なら全項目チェック
+    // --- 💡 1. バリデーション ---
     if (isAdminEntry) {
       if (!customerName) {
         alert('お客様名を入力してください');
@@ -79,24 +57,20 @@ function ConfirmReservation() {
 
     setIsSubmitting(true);
 
-    // 日時は adminDate があればそちらを優先
+    // --- 💡 2. 日時・時間の計算 ---
     const targetDate = adminDate || date;
     const targetTime = adminTime || time;
-
     const startDateTime = new Date(`${targetDate}T${targetTime}`);
     const interval = shop.slot_interval_min || 15;
-    
-    // 内部計算：施術時間に「準備時間」を足して終了時間を決める
     const buffer = shop.buffer_preparation_min || 0;
     const totalMinutes = (totalSlotsNeeded * interval) + buffer;
-    
     const endDateTime = new Date(startDateTime.getTime() + totalMinutes * 60000);
 
-    // --- 💡 キャンセル用トークンとURLの生成 ---
+    // --- 💡 3. キャンセル用URLの生成 ---
     const cancelToken = crypto.randomUUID();
     const cancelUrl = `${window.location.origin}/cancel?token=${cancelToken}`;
 
-    // 1. 予約データをテーブルに保存 (cancel_tokenを追加)
+    // --- 💡 4. 予約データをテーブルに保存 ---
     const { data: resData, error: dbError } = await supabase.from('reservations').insert([
       {
         shop_id: shopId,
@@ -110,7 +84,7 @@ function ConfirmReservation() {
         total_slots: totalSlotsNeeded,
         res_type: 'normal',
         line_user_id: lineUser?.userId || null,
-        cancel_token: cancelToken, // 💡 ここでDBに保存 [cite: 2025-12-03]
+        cancel_token: cancelToken,
         options: {
           services: selectedServices,
           options: selectedOptions
@@ -125,45 +99,12 @@ function ConfirmReservation() {
       return;
     }
 
-    // 2. 💡 移植：公式LINE通知 & メール送信（ねじ込みモードならスキップ）
+    // --- 💡 5. 通知処理 (司令塔 send-reservation-email 一箇所に集約) ---
     if (!isAdminEntry) {
       const menuLabel = selectedServices.map(s => s.name).join(', ');
       
       try {
-        // --- ★ お客様本人へのLINE通知 (本人宛 / リンクあり) ---
-        // lineUserId がある（LINE経由の）場合のみ送信 [cite: 2025-12-03]
-        if (lineUser?.userId) {
-          await callSnipSnapApi("notify-reservation", {
-            date: targetDate,
-            startTime: targetTime,
-            headcount: 1, 
-            menuLabel: menuLabel,
-            totalMinutes: totalMinutes,
-            name: customerName,
-            contact: `${customerEmail} / ${customerPhone}`,
-            note: `ご予約ありがとうございます！\n\n▼キャンセルURL\n${cancelUrl}`, // 💡 お客様にはリンクを表示 [cite: 2025-12-03]
-            source: "web-matrix",
-            lineUserId: lineUser.userId // 💡 本人のLINE IDへ送信 [cite: 2025-12-03]
-          });
-        }
-
-        // --- ★ 店舗側へのLINE通知 (店舗公式宛 / リンクなし / ON/OFF連動) ---
-        if (shop.notify_line_enabled !== false) {
-          await callSnipSnapApi("notify-reservation", {
-            date: targetDate,
-            startTime: targetTime,
-            headcount: 1, 
-            menuLabel: menuLabel,
-            totalMinutes: totalMinutes,
-            name: customerName,
-            contact: `${customerEmail} / ${customerPhone}`,
-            note: "【新着予約】予約管理システム", // 💡 店舗用にはリンクを付けない [cite: 2025-12-03]
-            source: "web-matrix",
-            lineUserId: "" // 💡 ID空で店舗公式（Notify）へ送信 [cite: 2025-12-03]
-          });
-        }
-
-        // --- ★ メール送信 (お客様は「予約完了」、店主は「新着予約」が届く) ---
+        // メールとLINEの全通知処理をこのエッジ関数が引き受ける
         await supabase.functions.invoke('send-reservation-email', {
           body: {
             customerEmail: customerEmail,
@@ -172,10 +113,12 @@ function ConfirmReservation() {
             shopEmail: shop.email_contact,
             startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
             services: menuLabel,
-            cancelUrl: cancelUrl // 💡 Edge Function内で送り分けを判定 [cite: 2025-12-03]
+            cancelUrl: cancelUrl,
+            // 司令塔に必要な LINE 情報もここで渡す
+            lineUserId: lineUser?.userId || null,
+            notifyLineEnabled: shop.notify_line_enabled
           }
         });
-
       } catch (err) {
         console.error("Notification Error:", err);
       }
@@ -183,7 +126,7 @@ function ConfirmReservation() {
 
     alert(isAdminEntry ? '爆速ねじ込み完了！' : '予約が完了しました！通知を送信しました。');
     
-    // 完了後の戻り先：ねじ込みなら管理画面へ、一般ならトップへ
+    // --- 💡 6. 後処理 ---
     if (isAdminEntry) {
       navigate(`/admin/${shopId}/reservations`);
     } else {
@@ -206,7 +149,7 @@ function ConfirmReservation() {
         {isAdminEntry ? '⚡ 店舗ねじ込み予約（入力短縮）' : '予約内容の確認'}
       </h2>
 
-      {/* LINEログイン中ならプロフィールを表示 */}
+      {/* LINEログイン中のプロフィール表示 */}
       {lineUser && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', padding: '12px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
           <img src={lineUser.pictureUrl} style={{ width: '40px', height: '40px', borderRadius: '50%' }} alt="LINE" />
@@ -217,6 +160,7 @@ function ConfirmReservation() {
         </div>
       )}
 
+      {/* 予約内容サマリーカード */}
       <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '15px', marginBottom: '25px', fontSize: '0.9rem', border: '1px solid #e2e8f0' }}>
         <p style={{ margin: '0 0 12px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '1.2rem' }}>📅</span> <b>日時：</b> {displayDate} {displayTime} 〜
@@ -234,6 +178,7 @@ function ConfirmReservation() {
         </p>
       </div>
 
+      {/* 入力フォームエリア */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div>
           <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>お客様名 (必須)</label>

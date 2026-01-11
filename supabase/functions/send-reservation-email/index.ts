@@ -5,18 +5,53 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// 💡 LINE通知用の定数（司令塔として追加）
+const LINE_CHANNEL_ACCESS_TOKEN = "SDDXvMI+SyF8djRDeitHhCM7jx0lFUBM/kXU9JNu3biqmm5T7zWhh8eqShoUC7avRG/lOQEjuC0P+VG3BBoOUsWt7VtksdJDqRdJhGXMvqm4SHuut5GYSwysbs3vr3em9tdorkFKC56hyLFozPPmvAdB04t89/1O/w1cDnyilFU=";
+const LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push";
+const LINE_ADMIN_USER_ID = "U471d8a27e1ea8430d65ac7dc0cc00546";
+
+// 💡 LINE送信用の共通関数（司令塔として追加）
+async function safePushToLine(to: string, text: string, targetName: string) {
+  if (!to) return null;
+  try {
+    const res = await fetch(LINE_PUSH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify({ to, messages: [{ type: 'text', text }] }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error(`[${targetName}] LINE Push Error:`, err);
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { customerEmail, customerName, shopName, startTime, services, shopEmail, cancelUrl } = await req.json()
+    // 💡 受取パラメーターに LINE 関連を追加
+    const { 
+      customerEmail, 
+      customerName, 
+      shopName, 
+      startTime, 
+      services, 
+      shopEmail, 
+      cancelUrl,
+      lineUserId,         // 追加
+      notifyLineEnabled   // 追加
+    } = await req.json()
     
     // 💡 金庫から最新の鍵を取り出す
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
-    // --- 💡 共通のメール送信関数（宛先によって文面を切り替える） ---
+    // --- 💡 共通のメール送信関数（文面・レイアウトは一切変更なし） ---
     const sendMail = async (to: string, isOwner: boolean) => {
       const subject = isOwner ? `【新着予約】${customerName} 様` : `予約完了のお知らせ：${customerName} 様`;
       const title = isOwner ? "新着予約のお知らせ（店舗控え）" : "予約完了のお知らせ";
@@ -54,29 +89,50 @@ Deno.serve(async (req) => {
                 </p>
               </div>` : ''}
               
-              <p>ご確認のほど、よろしくお願いいたします。</p>
+              <p>ご確認のほど, よろしくお願いいたします。</p>
             </div>
           `,
         }),
       });
     };
 
-    // 1. お客様への送信（予約完了文面・キャンセルリンクあり）
+    // 1. お客様へのメール送信
     let customerResData = null;
     if (customerEmail) {
       const customerRes = await sendMail(customerEmail, false);
       customerResData = await customerRes.json();
     }
 
-    // 2. 店主への送信（新着予約文面・キャンセルリンクなし）
+    // 2. 店主へのメール送信
     let shopResData = null;
     if (shopEmail && shopEmail !== 'admin@example.com') {
       const shopRes = await sendMail(shopEmail, true);
       shopResData = await shopRes.json();
     }
 
-    // 両方の結果をまとめて返す
-    return new Response(JSON.stringify({ customer: customerResData, shop: shopResData }), {
+    // --- 💡 LINE通知ロジック（司令塔として追加） ---
+    let customerLineSent = false;
+    let shopLineSent = false;
+
+    // A. お客様本人へのLINE（lineUserIdがある場合のみ）
+    if (lineUserId) {
+      const customerMsg = `${customerName}様\n\nご予約ありがとうございます。\n以下の内容で承りました。\n\n📅 日時: ${startTime}〜\n📋 メニュー: ${services}\n\nご来店を心よりお待ちしております！\n\n■キャンセル・変更について\n以下のURLよりお手続きをお願いいたします。\n${cancelUrl}`;
+      customerLineSent = await safePushToLine(lineUserId, customerMsg, "CUSTOMER");
+    }
+
+    // B. 店舗側へのLINE（管理者の通知設定が有効な場合のみ）
+    if (notifyLineEnabled !== false) {
+      const shopMsg = `【新着予約】\n\n👤 お客様: ${customerName} 様\n📅 日時: ${startTime}〜\n📋 メニュー: ${services}\n\nご確認をお願いいたします。`;
+      shopLineSent = await safePushToLine(LINE_ADMIN_USER_ID, shopMsg, "SHOP_OWNER");
+    }
+
+    // 結果をまとめて返す
+    return new Response(JSON.stringify({ 
+      customerEmail: customerResData, 
+      shopEmail: shopResData,
+      customerLine: customerLineSent,
+      shopLine: shopLineSent
+    }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
