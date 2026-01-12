@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 function SuperAdmin() {
   const [newShopName, setNewShopName] = useState('');
   const [newShopKana, setNewShopKana] = useState('');
-  // 💡 追加：新規作成用のLINE設定State
+  // 💡 新規作成用のLINE設定State
   const [newLineToken, setNewLineToken] = useState('');
   const [newLineAdminId, setNewLineAdminId] = useState('');
 
@@ -16,7 +16,7 @@ function SuperAdmin() {
   const [editName, setEditName] = useState('');
   const [editKana, setEditKana] = useState('');
   const [editPassword, setEditPassword] = useState('');
-  // 💡 追加：編集用のLINE設定State
+  // 💡 編集用：入力欄を空に保つことで漏洩を防ぐ
   const [editLineToken, setEditLineToken] = useState('');
   const [editLineAdminId, setEditLineAdminId] = useState('');
 
@@ -47,17 +47,16 @@ function SuperAdmin() {
         business_name: newShopName, 
         business_name_kana: newShopKana,
         admin_password: newPass,
-        // 💡 データベースの新カラムに保存
         line_channel_access_token: newLineToken,
         line_admin_user_id: newLineAdminId,
-        notify_line_enabled: true // 初期値は有効
+        notify_line_enabled: true 
       }]);
 
     if (error) {
       alert('作成に失敗しました');
     } else {
       setNewShopName(''); setNewShopKana('');
-      setNewLineToken(''); setNewLineAdminId(''); // 入力クリア
+      setNewLineToken(''); setNewLineAdminId(''); 
       fetchCreatedShops();
       alert(`「${newShopName}」を作成しました！\n初期パスワードは 【 ${newPass} 】 です。`);
     }
@@ -66,20 +65,25 @@ function SuperAdmin() {
   const updateShopInfo = async (id) => {
     if (!editName || !editKana || !editPassword) return alert('全項目入力してください');
     
+    // 💡 既存のデータを取得（トークンの変更がない場合に備えて）
+    const targetShop = createdShops.find(s => s.id === id);
+
     const { error } = await supabase
       .from('profiles')
       .update({ 
         business_name: editName, 
         business_name_kana: editKana,
         admin_password: editPassword,
-        // 💡 編集内容を更新
-        line_channel_access_token: editLineToken,
-        line_admin_user_id: editLineAdminId
+        // 💡 空欄の場合は元のトークンを維持し、入力がある場合のみ上書きする
+        line_channel_access_token: editLineToken || targetShop.line_channel_access_token,
+        line_admin_user_id: editLineAdminId || targetShop.line_admin_user_id
       })
       .eq('id', id);
 
     if (!error) {
       setEditingShopId(null);
+      setEditLineToken(''); // クリア
+      setEditLineAdminId(''); // クリア
       fetchCreatedShops();
       alert('店舗情報を更新しました');
     } else {
@@ -134,7 +138,6 @@ function SuperAdmin() {
           <input value={newShopName} onChange={(e) => setNewShopName(e.target.value)} placeholder="店舗名" style={{ padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1' }} />
           <input value={newShopKana} onChange={(e) => setNewShopKana(e.target.value)} placeholder="ふりがな" style={{ padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1' }} />
           
-          {/* 💡 追加：LINE設定入力 */}
           <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <label style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold' }}>💬 個別LINE通知設定 (任意)</label>
             <input value={newLineToken} onChange={(e) => setNewLineToken(e.target.value)} placeholder="LINE Channel Access Token" style={{ width: '100%', marginTop: '5px', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem' }} />
@@ -170,11 +173,24 @@ function SuperAdmin() {
                         <label style={{ fontSize: '0.65rem', fontWeight: 'bold', display: 'block' }}>管理画面パスワード</label>
                         <input value={editPassword || ""} onChange={(e) => setEditPassword(e.target.value)} style={{ width: '100%', padding: '5px', border: '1px solid #d97706', borderRadius: '4px', fontSize: '0.9rem' }} />
                     </div>
-                    {/* 💡 追加：編集用LINE設定入力 */}
-                    <div style={{ background: '#f0fdf4', padding: '8px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                    {/* 💡 改善：編集画面での機密情報隠匿 */}
+                    <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
                         <label style={{ fontSize: '0.65rem', fontWeight: 'bold', display: 'block', color: '#166534' }}>LINE通知キー設定</label>
-                        <input value={editLineToken || ""} onChange={(e) => setEditLineToken(e.target.value)} style={{ width: '100%', marginTop: '4px', padding: '5px', border: '1px solid #16a34a', borderRadius: '4px', fontSize: '0.75rem' }} placeholder="Access Token" />
-                        <input value={editLineAdminId || ""} onChange={(e) => setEditLineAdminId(e.target.value)} style={{ width: '100%', marginTop: '4px', padding: '5px', border: '1px solid #16a34a', borderRadius: '4px', fontSize: '0.75rem' }} placeholder="Admin User ID" />
+                        <div style={{ fontSize: '0.7rem', color: '#16a34a', marginBottom: '5px' }}>
+                          {shop.line_channel_access_token ? "✅ 設定済み（変更時のみ入力）" : "⚠️ 未設定"}
+                        </div>
+                        <input 
+                          value={editLineToken} 
+                          onChange={(e) => setEditLineToken(e.target.value)} 
+                          style={{ width: '100%', marginTop: '4px', padding: '5px', border: '1px solid #16a34a', borderRadius: '4px', fontSize: '0.75rem' }} 
+                          placeholder={shop.line_channel_access_token ? "●●●●●●●●●●" : "新規入力：Access Token"} 
+                        />
+                        <input 
+                          value={editLineAdminId} 
+                          onChange={(e) => setEditLineAdminId(e.target.value)} 
+                          style={{ width: '100%', marginTop: '4px', padding: '5px', border: '1px solid #16a34a', borderRadius: '4px', fontSize: '0.75rem' }} 
+                          placeholder={shop.line_admin_user_id ? "ユーザーIDを更新する場合は入力" : "新規入力：Admin User ID"} 
+                        />
                     </div>
                     <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
                       <button onClick={() => updateShopInfo(shop.id)} style={{ padding: '6px 15px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>保存</button>
@@ -192,7 +208,6 @@ function SuperAdmin() {
                         <span style={{ fontSize: '0.7rem', color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
                             PW: <strong>{shop.admin_password || '未設定'}</strong>
                         </span>
-                        {/* 💡 LINE設定済みのバッジ表示 */}
                         {shop.line_channel_access_token && (
                           <span style={{ fontSize: '0.6rem', color: '#16a34a', background: '#f0fdf4', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bbf7d0' }}>
                             LINE通知連携済み
@@ -208,9 +223,9 @@ function SuperAdmin() {
                   setEditName(shop.business_name || ""); 
                   setEditKana(shop.business_name_kana || ""); 
                   setEditPassword(shop.admin_password || ""); 
-                  // 💡 編集開始時に既存値をセット
-                  setEditLineToken(shop.line_channel_access_token || "");
-                  setEditLineAdminId(shop.line_admin_user_id || "");
+                  // 💡 重要：編集開始時にトークンとIDは空文字にする（表示させない）
+                  setEditLineToken("");
+                  setEditLineAdminId("");
                 }} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px' }}>編集</button>
                 <button onClick={() => deleteShop(shop)} style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', cursor: 'pointer', fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px' }}>消去</button>
               </div>
