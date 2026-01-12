@@ -39,13 +39,13 @@ function AdminDashboard() {
   const [notes, setNotes] = useState(''); 
   const [businessHours, setBusinessHours] = useState({});
   const [maxLastSlots, setMaxLastSlots] = useState(2);
-  const [imageUrl, setImageUrl] = useState(''); // 画像URL
+  const [imageUrl, setImageUrl] = useState('');
 
-  // 💡 追加：外部URL用State
+  // 外部URL用State
   const [officialUrl, setOfficialUrl] = useState('');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('');
 
-  // 💡 追加：LINE通知設定用State
+  // LINE通知設定用State
   const [notifyLineEnabled, setNotifyLineEnabled] = useState(true);
 
   // 詳細予約ルールState
@@ -80,10 +80,8 @@ function AdminDashboard() {
       setMinLeadTimeHours(data.min_lead_time_hours || 0);
       setAutoFillLogic(data.auto_fill_logic ?? true);
       setImageUrl(data.image_url || '');
-      // 💡 追加：データベースからURLを読み込む
       setOfficialUrl(data.official_url || '');
       setLineOfficialUrl(data.line_official_url || '');
-      // 💡 追加：LINE通知設定を読み込む（デフォルトはtrue）
       setNotifyLineEnabled(data.notify_line_enabled ?? true);
     }
   };
@@ -127,7 +125,6 @@ function AdminDashboard() {
   };
 
   const handleFinalSave = async () => {
-    // 💡 修正：notify_line_enabled も含めて保存
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -376,45 +373,84 @@ function AdminDashboard() {
         )}
 
         {activeTab === 'info' && (
-          <section style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #ddd' }}>
-            <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィールの設定</h3>
-            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像URL</label>
-            <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://.../photo.jpg" style={{ width: '100%', padding: '10px', marginBottom: 20, borderRadius: '6px', border: '1px solid #ddd' }} />
-            
-            {/* 💡 外部URL設定セクション */}
-            <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#2563eb', display: 'block', marginBottom: '5px' }}>🌐 オフィシャルサイト URL</label>
-              <input type="url" value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://example.com" style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <section style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #ddd' }}>
+              <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィールの設定</h3>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像URL</label>
+              <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://.../photo.jpg" style={{ width: '100%', padding: '10px', marginBottom: 20, borderRadius: '6px', border: '1px solid #ddd' }} />
               
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#00b900', display: 'block', marginBottom: '5px' }}>💬 LINE予約・公式アカウント URL</label>
-              <input type="url" value={lineOfficialUrl} onChange={(e) => setLineOfficialUrl(e.target.value)} placeholder="https://line.me/..." style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-              <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '8px' }}>※URLを入力するとホーム画面にボタンが表示されます</p>
-            </div>
+              <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#2563eb', display: 'block', marginBottom: '5px' }}>🌐 オフィシャルサイト URL</label>
+                <input type="url" value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://example.com" style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#00b900', display: 'block', marginBottom: '5px' }}>💬 LINE予約・公式アカウント URL</label>
+                <input type="url" value={lineOfficialUrl} onChange={(e) => setLineOfficialUrl(e.target.value)} placeholder="https://line.me/..." style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '8px' }}>※URLを入力するとホーム画面にボタンが表示されます</p>
+              </div>
 
-            {/* 💡 新着予約のLINE通知設定セクション */}
-            <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '10px', border: '1px solid #bbf7d0', marginBottom: '20px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={notifyLineEnabled} 
-                  onChange={(e) => setNotifyLineEnabled(e.target.checked)} 
-                  style={{ width: '22px', height: '22px', cursor: 'pointer' }} 
-                />
-                <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#166534' }}>
-                  📢 新着予約のLINE通知を受け取る
-                </span>
-              </label>
-              <p style={{ fontSize: '0.7rem', color: '#15803d', marginTop: '8px', marginLeft: '34px' }}>
-                ※ONにすると、お客様が予約した際に公式LINEへ通知が届きます。
+              <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '10px', border: '1px solid #bbf7d0', marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={notifyLineEnabled} 
+                    onChange={(e) => setNotifyLineEnabled(e.target.checked)} 
+                    style={{ width: '22px', height: '22px', cursor: 'pointer' }} 
+                  />
+                  <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#166534' }}>
+                    📢 新着予約のLINE通知を受け取る
+                  </span>
+                </label>
+                <p style={{ fontSize: '0.7rem', color: '#15803d', marginTop: '8px', marginLeft: '34px' }}>
+                  ※ONにすると、お客様が予約した際に公式LINEへ通知が届きます。
+                </p>
+              </div>
+
+              <label>店舗の説明</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ width: '100%', minHeight: 100, marginBottom: 20 }} />
+              <label>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: '100%', marginBottom: 20 }} />
+              <label>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ width: '100%', marginBottom: 20 }} />
+              <label>メール</label><input type="email" value={emailContact} onChange={(e) => setEmailContact(e.target.value)} style={{ width: '100%', marginBottom: 20 }} />
+              <label>注意事項</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: '100%', border: '2px solid #ef4444' }} />
+            </section>
+
+            {/* 💡 統合：LINE公式アカウント連携ガイド */}
+            <section style={{ background: '#fff', padding: '25px', borderRadius: '12px', border: '1px solid #00b900' }}>
+              <h3 style={{ marginTop: 0, fontSize: '1.1rem', color: '#00b900', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span>💬</span> LINE公式アカウント連携ガイド
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '20px', lineHeight: '1.5' }}>
+                公式LINEと連携すると、予約が入った際に店長様のLINEへ通知が届くようになります。以下の手順で設定を行ってください。
               </p>
-            </div>
 
-            <label>店舗の説明</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ width: '100%', minHeight: 100, marginBottom: 20 }} />
-            <label>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: '100%', marginBottom: 20 }} />
-            <label>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ width: '100%', marginBottom: 20 }} />
-            <label>メール</label><input type="email" value={emailContact} onChange={(e) => setEmailContact(e.target.value)} style={{ width: '100%', marginBottom: 20 }} />
-            <label>注意事項</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: '100%', border: '2px solid #ef4444' }} />
-          </section>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {[
+                  { step: '1', title: '公式アカウントの作成', desc: 'LINE公式アカウントマネージャーからアカウントを開設します。' },
+                  { step: '2', title: 'Messaging APIの有効化', desc: '設定 ＞ Messaging API から「APIを利用する」を有効にします。' },
+                  { step: '3', title: 'アクセストークンの取得', desc: 'LINE Developersにて「チャネルアクセストークン」を発行します。' },
+                  { step: '4', title: 'ユーザーIDの確認', desc: 'LINE Developersの基本設定にて、店長様の「ユーザーID(U...)」を確認します。' },
+                  { step: '5', title: '運営への連絡', desc: '取得したトークンとIDをシステム運営者（三土手）へお伝えください。' },
+                  { step: '6', title: 'リッチメニューの設定', desc: 'LINEのリッチメニューに、当システムの予約URLを貼り付けて完了です！' }
+                ].map((item) => (
+                  <div key={item.step} style={{ display: 'flex', gap: '15px', padding: '15px', background: '#f0fdf4', borderRadius: '10px' }}>
+                    <div style={{ 
+                      width: '28px', height: '28px', background: '#00b900', color: '#fff', 
+                      borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                      fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0 
+                    }}>{item.step}</div>
+                    <div>
+                      <h4 style={{ margin: '0 0 5px 0', fontSize: '0.9rem', color: '#166534' }}>{item.title}</h4>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#4b5563', lineHeight: '1.4' }}>{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: '20px', padding: '15px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fcd34d' }}>
+                <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400e', fontWeight: 'bold' }}>
+                  ⚠️ 注意：設定が不安な場合は、ステップ2まで完了した状態で運営担当までご相談ください。代行設定も承ります。
+                </p>
+              </div>
+            </section>
+          </div>
         )}
       </div>
 
