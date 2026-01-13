@@ -26,8 +26,9 @@ function App() {
           {/* ポータル（ホーム）画面 */}
           <Route path="/" element={<Home />} />
 
-          {/* 店舗主用：設定画面 */}
+          {/* 💡 修正：店舗主用設定画面（Dashboard直打ちにも対応） */}
           <Route path="/admin/:shopId" element={<AdminDashboard />} />
+          <Route path="/admin/:shopId/dashboard" element={<AdminDashboard />} />
 
           {/* ユーザー用：予約プロセス（3ステップ分割ロジック） */}
           {/* 1. メニュー選択画面 */}

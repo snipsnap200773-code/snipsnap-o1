@@ -58,7 +58,8 @@ function TrialRegistration() {
           type: 'welcome',
           shopName: formData.shopName, // index.ts側の変数名と一致させる
           owner_email: formData.email,
-          dashboard_url: `${baseUrl}/admin/${data.id}/dashboard`,
+          // 💡 修正：メール内のURLからも /dashboard を削除
+          dashboard_url: `${baseUrl}/admin/${data.id}`,
           reservations_url: `${baseUrl}/admin/${data.id}/reservations`,
           reserve_url: `${baseUrl}/shop/${data.id}/reserve`,
           password: formData.password
@@ -67,8 +68,8 @@ function TrialRegistration() {
 
       alert(`おめでとうございます！「${formData.shopName}」の登録が完了し、メールを送信しました。`);
 
-      // 3. 管理画面へ直接案内
-      navigate(`/admin/${data.id}/dashboard`);
+      // 💡 修正 3. 管理画面へ直接案内（/dashboardを削除して本来のパスへ）
+      navigate(`/admin/${data.id}`);
 
     } catch (err) {
       console.error(err);
