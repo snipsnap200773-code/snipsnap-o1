@@ -6,6 +6,7 @@ function AdminReservations() {
   const { shopId } = useParams();
   const navigate = useNavigate();
 
+  // --- 状態管理 ---
   const [shop, setShop] = useState(null);
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +53,6 @@ function AdminReservations() {
     return days;
   }, [startDate]);
 
-  // 💡 設定時間に基づく厳密な時間軸の生成
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
     let minH = 9, maxH = 20;
@@ -65,7 +65,7 @@ function AdminReservations() {
       }
     });
     const slots = [];
-    for (let i = minH - 1; i <= maxH + 1; i++) { // 上下に1時間だけ余裕を持たせる
+    for (let i = minH - 1; i <= maxH + 1; i++) {
       slots.push(`${String(i).padStart(2, '0')}:00`);
       slots.push(`${String(i).padStart(2, '0')}:30`);
     }
@@ -100,7 +100,7 @@ function AdminReservations() {
   };
 
   const deleteRes = async (id) => {
-    if (window.confirm('この予約を消去しますか？')) {
+    if (window.confirm('この予約を削除しますか？')) {
       await supabase.from('reservations').delete().eq('id', id);
       setShowDetailModal(false); fetchData();
     }
@@ -129,16 +129,16 @@ function AdminReservations() {
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#fff', overflow: 'hidden', position: 'fixed', inset: 0 }}>
       
-      {/* 💻 PC用サイドバー (スマホでは非表示) */}
+      {/* --- 左サイドバー（PC専用） --- */}
       {isPC && (
-        <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #ddd', padding: '25px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#fff' }}>
+        <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #ddd', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px', background: '#fff' }}>
           <h1 style={{ color: '#2563eb', fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>SnipSnap Admin</h1>
           <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '15px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' }}>
               {viewMonth.getFullYear()}年 {viewMonth.getMonth() + 1}月
               <div>
-                <button onClick={() => setViewMonth(new Date(viewMonth.setMonth(viewMonth.getMonth() - 1)))}>＜</button>
-                <button onClick={() => setViewMonth(new Date(viewMonth.setMonth(viewMonth.getMonth() + 1)))}>＞</button>
+                <button onClick={() => setViewMonth(new Date(viewMonth.setMonth(viewMonth.getMonth() - 1)))} style={miniBtnStyle}>＜</button>
+                <button onClick={() => setViewMonth(new Date(viewMonth.setMonth(viewMonth.getMonth() + 1)))} style={miniBtnStyle}>＞</button>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', fontSize: '0.8rem' }}>
@@ -151,39 +151,39 @@ function AdminReservations() {
             </div>
           </div>
           <div style={{ position: 'relative' }}>
-            <input type="text" placeholder="ユーザーを検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '8px', border: '1px solid #ddd' }} />
+            <input type="text" placeholder="ユーザーを検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '8px', border: '1px solid #ddd', background: '#f8fafc' }} />
             <span style={{ position: 'absolute', left: '12px', top: '12px' }}>👥</span>
           </div>
           <button onClick={() => navigate(`/admin/${shopId}`)} style={{ marginTop: 'auto', padding: '15px', background: '#fff', border: '1px solid #ddd', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>店舗設定へ</button>
         </div>
       )}
 
-      {/* 📱💻 メイングリッドエリア */}
+      {/* --- メインコンテンツ（週グリッド） --- */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
-        {/* ヘッダー：PC/スマホ共通の切り替えボタン */}
-        <div style={{ padding: '10px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* ヘッダー */}
+        <div style={{ padding: '10px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
           <div style={{ display: 'flex', gap: '5px' }}>
             <button onClick={() => setStartDate(new Date())} style={headerBtnStyle}>今日</button>
-            <button onClick={() => setStartDate(new Date(startDate.setDate(startDate.getDate() - (isPC ? 7 : 1))))} style={headerBtnStyle}>{isPC ? '前週' : '前日'}</button>
-            <button onClick={() => setStartDate(new Date(startDate.setDate(startDate.getDate() + (isPC ? 7 : 1))))} style={headerBtnStyle}>{isPC ? '次週' : '次日'}</button>
+            <button onClick={() => setStartDate(new Date(startDate.setDate(startDate.getDate() - 7)))} style={headerBtnStyle}>前週</button>
+            <button onClick={() => setStartDate(new Date(startDate.setDate(startDate.getDate() + 7)))} style={headerBtnStyle}>次週</button>
           </div>
           <h2 style={{ fontSize: '1rem', margin: 0 }}>{startDate.getFullYear()}年 {startDate.getMonth() + 1}月</h2>
           {!isPC && <button onClick={() => navigate(`/admin/${shopId}`)} style={{ background: 'none', border: 'none', fontSize: '1.2rem' }}>⚙️</button>}
         </div>
 
-        {/* グリッド本体 */}
+        {/* グリッド本体（モバイルでも1週間分表示するために minWidth を設定） */}
         <div style={{ flex: 1, overflow: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: isPC ? '900px' : '100%' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: '900px' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff' }}>
               <tr>
-                <th style={{ width: isPC ? '80px' : '50px', borderBottom: '1px solid #ddd', borderRight: '1px solid #eee', color: '#999', fontSize: '0.7rem' }}>GMT+09</th>
-                {(isPC ? weekDays : [startDate]).map(date => {
+                <th style={{ width: '80px', borderBottom: '1px solid #ddd', borderRight: '1px solid #eee', color: '#999', fontSize: '0.7rem' }}>GMT+09</th>
+                {weekDays.map(date => {
                   const isToday = getJapanDateStr(new Date()) === getJapanDateStr(date);
                   return (
                     <th key={date.toString()} style={{ padding: '10px 0', borderBottom: '1px solid #ddd' }}>
-                      <div style={{ fontSize: '0.7rem', color: '#666' }}>{['日','月','火','水','木','金','土'][date.getDay()]}</div>
-                      <div style={{ fontSize: isPC ? '1.6rem' : '1.2rem', fontWeight: 'bold', color: isToday ? '#fff' : '#333', background: isToday ? '#2563eb' : 'none', width: isPC ? '40px' : '30px', height: isPC ? '40px' : '30px', borderRadius: '50%', margin: '5px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ fontSize: '0.75rem', color: isToday ? '#2563eb' : '#666' }}>{['日','月','火','水','木','金','土'][date.getDay()]}</div>
+                      <div style={{ fontSize: '1.6rem', fontWeight: 'bold', color: isToday ? '#fff' : '#333', background: isToday ? '#2563eb' : 'none', width: '40px', height: '40px', borderRadius: '50%', margin: '5px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {date.getDate()}
                       </div>
                     </th>
@@ -193,37 +193,44 @@ function AdminReservations() {
             </thead>
             <tbody>
               {timeSlots.map(time => (
-                <tr key={time} style={{ height: isPC ? '55px' : '65px' }}>
-                  <td style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', textAlign: 'center', fontSize: '0.7rem', color: '#94a3b8' }}>
+                <tr key={time} style={{ height: '60px' }}>
+                  <td style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8' }}>
                     {time.endsWith(':00') ? time : ''}
                   </td>
-                  {(isPC ? weekDays : [startDate]).map(date => {
+                  {weekDays.map(date => {
                     const dStr = getJapanDateStr(date);
                     const res = getStatusAt(dStr, time);
-                    
-                    // 💡 「予約継続中」や「清掃中」の判定ロジック
-                    const isStartTime = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) === time;
+                    const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) === time;
                     const intervalWidth = shop?.slot_interval_min || 15;
                     const treatmentEndTime = res ? new Date(new Date(res.start_time).getTime() + res.total_slots * intervalWidth * 60000) : null;
-                    const isBufferTime = res && !isStartTime && new Date(`${dStr}T${time}`) >= treatmentEndTime;
+                    const isBuffer = res && !isStart && new Date(`${dStr}T${time}`) >= treatmentEndTime;
 
                     return (
-                      <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res){ openDetail(res); } else { setShowMenuModal(true); } }}
-                        style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
+                      <td 
+                        key={`${dStr}-${time}`} 
+                        onClick={() => {
+                          setSelectedDate(dStr); setTargetTime(time);
+                          if (res && isStart) { openDetail(res); } // 名前枠のみ詳細ポップアップ
+                          else { setShowMenuModal(true); } // 継続・空き枠はねじ込み予約
+                        }}
+                        style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}
+                      >
                         {res && (
                           <div style={{ 
-                            position: 'absolute', inset: '2px', background: res.res_type === 'blocked' ? '#f1f1f1' : (isStartTime ? '#f9a825' : (isBufferTime ? '#f8fafc' : '#fef3c7')), 
-                            color: isStartTime ? '#fff' : '#94a3b8', borderRadius: '4px', padding: '4px 6px', fontSize: '0.7rem', zIndex: 5, overflow: 'hidden', 
-                            borderLeft: `4px solid ${res.res_type === 'blocked' ? '#999' : (isStartTime ? '#ef6c00' : (isBufferTime ? '#e2e8f0' : '#f9a825'))}`
+                            position: 'absolute', inset: '2px', 
+                            background: isStart ? '#BAE6FD' : (isBuffer ? '#F3F4F6' : '#F3F4F6'), 
+                            color: isStart ? '#451a03' : '#94a3b8', 
+                            padding: '6px 8px', borderRadius: '4px', fontSize: '0.75rem', zIndex: 5, overflow: 'hidden', 
+                            borderLeft: `4px solid ${isStart ? '#0284c7' : '#d1d5db'}`
                           }}>
-                            {isStartTime ? (
+                            {isStart ? (
                               <>
                                 <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{res.customer_name} 様</div>
-                                <div style={{ fontSize: '0.65rem', opacity: 0.9 }}>{res.options?.services?.map(s => s.name).join(', ')}</div>
+                                <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>{res.options?.services?.map(s => s.name).join(', ')}</div>
                               </>
                             ) : (
-                              <div style={{ fontStyle: 'italic', fontSize: '0.6rem' }}>
-                                {isBufferTime ? "🧹 清掃・準備中" : "予約継続中..."}
+                              <div style={{ fontStyle: 'italic', fontSize: '0.65rem', marginTop: '10px' }}>
+                                {isBuffer ? "清掃・準備中" : "予約継続中..."}
                               </div>
                             )}
                           </div>
@@ -238,13 +245,12 @@ function AdminReservations() {
         </div>
       </div>
 
-      {/* --- モーダル (維持) --- */}
+      {/* --- モーダル（共通） --- */}
       {showDetailModal && selectedRes && (
         <div onClick={() => setShowDetailModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={modalContentStyle}>
             <h3 style={{ marginTop: 0, fontSize: '1.4rem' }}>{selectedRes.customer_name} 様</h3>
-            <p style={{ color: '#2563eb', fontWeight: 'bold' }}>{selectedRes.options?.services?.map(s => s.name).join(' / ')}</p>
-            <p style={{ fontSize: '0.9rem', color: '#64748b' }}>📅 {new Date(selectedRes.start_time).toLocaleString('ja-JP')}</p>
+            <p style={{ color: '#0369a1', fontWeight: 'bold' }}>{selectedRes.options?.services?.map(s => s.name).join(' / ')}</p>
             <div style={{ marginBottom: '20px' }}>
               <p style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8' }}>🕒 過去の履歴</p>
               {customerHistory.map(h => <div key={h.id} style={{ fontSize: '0.8rem', padding: '5px 0', borderBottom: '1px solid #f1f1f1' }}><b>{new Date(h.start_time).toLocaleDateString()}</b>: {h.options?.services?.map(s => s.name).join(', ')}</div>)}
@@ -264,7 +270,7 @@ function AdminReservations() {
             <p style={{ fontWeight: '900', color: '#2563eb', fontSize: '2rem', margin: '0 0 30px 0' }}>{targetTime}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <button onClick={() => navigate(`/shop/${shopId}/reserve`, { state: { adminDate: selectedDate, adminTime: targetTime } })} style={{ padding: '22px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: '900', fontSize: '1.2rem' }}>📝 予約を入れる</button>
-              <button onClick={handleBlockTime} style={{ padding: '20px', background: '#fff', color: '#ef4444', border: '2px solid #ef4444', borderRadius: '20px', fontWeight: 'bold' }}>✕ 予約不可にする</button>
+              <button onClick={handleBlockTime} style={{ padding: '20px', background: '#fff', color: '#ef4444', border: '2px solid #ef4444', borderRadius: '20px', fontWeight: 'bold', fontSize: '1.1rem' }}>✕ 予約不可にする</button>
               <button onClick={() => setShowMenuModal(false)} style={{ padding: '15px', border: 'none', background: 'none', color: '#94a3b8' }}>キャンセル</button>
             </div>
           </div>
@@ -275,7 +281,7 @@ function AdminReservations() {
 }
 
 const headerBtnStyle = { padding: '8px 15px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', fontSize: '0.85rem', cursor: 'pointer' };
-const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', fontSize: '1rem', color: '#2563eb', padding: '0 10px' };
+const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', fontSize: '1rem', color: '#2563eb', padding: '0 5px' };
 const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(8px)' };
 const modalContentStyle = { background: '#fff', width: '100%', maxWidth: '400px', borderRadius: '25px', padding: '30px', position: 'relative' };
 
