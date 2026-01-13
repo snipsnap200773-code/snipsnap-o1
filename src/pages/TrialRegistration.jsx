@@ -6,7 +6,6 @@ function TrialRegistration() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 入力フォームのState
   const [formData, setFormData] = useState({
     ownerName: '',
     ownerNameKana: '',
@@ -24,8 +23,6 @@ function TrialRegistration() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // バリデーション
     if (formData.password.length < 4) {
       return alert('パスワードは4文字以上で設定してください');
     }
@@ -47,22 +44,35 @@ function TrialRegistration() {
           admin_password: formData.password,
           is_suspended: false,
           notify_line_enabled: true,
-          slot_interval_min: 15 // デフォルト値
+          slot_interval_min: 15
         }])
         .select()
         .single();
 
       if (error) throw error;
 
-      // 2. 完了通知
-      alert(`おめでとうございます！「${formData.shopName}」の登録が完了しました。`);
+      // 🚀 💡 2. 司令塔（index.ts）を呼び出して歓迎メールを送信
+      const baseUrl = window.location.origin;
+      await supabase.functions.invoke('send-reservation-email', {
+        body: {
+          type: 'welcome',
+          shopName: formData.shopName, // index.ts側の変数名と一致させる
+          owner_email: formData.email,
+          dashboard_url: `${baseUrl}/admin/${data.id}/dashboard`,
+          reservations_url: `${baseUrl}/admin/${data.id}/reservations`,
+          reserve_url: `${baseUrl}/shop/${data.id}/reserve`,
+          password: formData.password
+        }
+      });
+
+      alert(`おめでとうございます！「${formData.shopName}」の登録が完了し、メールを送信しました。`);
 
       // 3. 管理画面へ直接案内
       navigate(`/admin/${data.id}/dashboard`);
 
     } catch (err) {
       console.error(err);
-      alert('登録に失敗しました。時間をおいて再度お試しください。');
+      alert('登録に失敗しました。');
     } finally {
       setIsSubmitting(false);
     }
@@ -77,7 +87,6 @@ function TrialRegistration() {
           <p style={{ color: '#64748b', fontSize: '0.9rem', fontWeight: 'bold' }}>🚀 1ヶ月無料トライアル申し込み</p>
         </div>
 
-        {/* 💡 追加：LINE連携に関する安心説明メッセージ */}
         <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '12px', border: '1px solid #bbf7d0', marginBottom: '25px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
             <span style={{ fontSize: '1.2rem' }}>💬</span>
@@ -89,7 +98,6 @@ function TrialRegistration() {
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
           <section>
             <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', display: 'block', marginBottom: '8px' }}>👤 代表者様情報</label>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
@@ -102,7 +110,6 @@ function TrialRegistration() {
             <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', display: 'block', marginBottom: '8px' }}>🏪 店舗情報</label>
             <input name="shopName" placeholder="店舗名" onChange={handleChange} required style={{ ...inputStyle, marginBottom: '10px' }} />
             <input name="shopNameKana" placeholder="店舗名のふりがな" onChange={handleChange} required style={{ ...inputStyle, marginBottom: '10px' }} />
-            
             <select name="businessType" onChange={handleChange} required style={{ ...inputStyle, appearance: 'none' }}>
               <option value="">-- 業種を選択してください --</option>
               <option value="美容室・理容室">美容室・理容室</option>
@@ -125,22 +132,7 @@ function TrialRegistration() {
             </div>
           </section>
 
-          <button 
-            type="submit" 
-            disabled={isSubmitting}
-            style={{ 
-              marginTop: '10px', 
-              padding: '18px', 
-              background: isSubmitting ? '#94a3b8' : '#2563eb', 
-              color: '#fff', 
-              border: 'none', 
-              borderRadius: '12px', 
-              fontWeight: 'bold', 
-              fontSize: '1.1rem', 
-              cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
-            }}
-          >
+          <button type="submit" disabled={isSubmitting} style={{ ...buttonStyle, background: isSubmitting ? '#94a3b8' : '#2563eb' }}>
             {isSubmitting ? '登録処理中...' : '無料で利用を開始する 🚀'}
           </button>
         </form>
@@ -153,13 +145,7 @@ function TrialRegistration() {
   );
 }
 
-const inputStyle = {
-  width: '100%',
-  padding: '12px',
-  borderRadius: '10px',
-  border: '1px solid #cbd5e1',
-  fontSize: '1rem',
-  boxSizing: 'border-box'
-};
+const inputStyle = { width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' };
+const buttonStyle = { marginTop: '10px', padding: '18px', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' };
 
 export default TrialRegistration;
