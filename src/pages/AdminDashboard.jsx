@@ -250,7 +250,6 @@ function AdminDashboard() {
   return (
     <div style={{ fontFamily: 'sans-serif', maxWidth: '700px', margin: '0 auto', paddingBottom: '120px' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', borderBottom: '1px solid #eee', padding: '10px' }}>
-        {/* 💡 修正：ヘッダーボタンを撤去し、タブのみの構成に */}
         <div style={{ display: 'flex', gap: '5px' }}>
           {['menu', 'hours', 'info'].map(tab => (
             <button key={tab} onClick={() => changeTab(tab)} style={{ flex: 1, padding: '12px 5px', border: 'none', borderRadius: '8px', background: activeTab === tab ? '#2563eb' : '#f1f5f9', color: activeTab === tab ? '#fff' : '#475569', fontWeight: 'bold', fontSize: '0.85rem' }}>
@@ -322,6 +321,7 @@ function AdminDashboard() {
                 ))}
               </div>
             </section>
+
             <section style={{ marginBottom: '30px', background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メニュー登録・編集</h3>
               <form onSubmit={handleServiceSubmit}>
@@ -339,6 +339,7 @@ function AdminDashboard() {
                 <button type="submit" style={{ width: '100%', padding: '15px', background: editingServiceId ? '#f97316' : '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>メニューを保存</button>
               </form>
             </section>
+
             {categories.map((cat) => (
               <div key={cat.id} style={{ marginBottom: '25px' }}>
                 <h4 style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '10px', borderLeft: '4px solid #cbd5e1', paddingLeft: '8px' }}>{cat.name}</h4>
@@ -359,15 +360,6 @@ function AdminDashboard() {
                         <button onClick={() => deleteService(s.id)}>×</button>
                       </div>
                     </div>
-                    {activeServiceForOptions?.id === s.id && (
-                      <div style={{ padding: '15px', borderTop: '1px solid #eee', background: '#f9fafb' }}>
-                        <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <div style={{ display: 'flex', gap: 8 }}><input placeholder="グループ名" value={optGroupName} onChange={(e) => setOptGroupName(e.target.value)} required /><input placeholder="名称" value={optName} onChange={(e) => setOptName(e.target.value)} required /></div>
-                          <div style={{ display: 'flex', gap: 8 }}><input type="number" value={optSlots} onChange={(e) => setOptSlots(parseInt(e.target.value))} min="0" /><button type="submit">追加</button></div>
-                        </form>
-                        {options.filter(o => o.service_id === s.id).map(o => (<div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', fontSize: '0.8rem' }}><span>{o.group_name}: {o.option_name} (+{o.additional_slots * slotIntervalMin}分)</span><button onClick={() => deleteOption(o.id)}>削除</button></div>))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -385,7 +377,6 @@ function AdminDashboard() {
               <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>当日予約の制限</label><select value={minLeadTimeHours} onChange={(e) => setMinLeadTimeHours(parseInt(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc' }}><option value={0}>制限なし</option><option value={1}>1時間後</option><option value={3}>3時間後</option><option value={24}>前日まで</option></select></div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><input type="checkbox" checked={autoFillLogic} onChange={(e) => setAutoFillLogic(e.target.checked)} style={{ width: '20px', height: '20px' }} /><b>自動詰め機能を有効にする</b></label>
             </section>
-            
             <section style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #ddd' }}>
               <h3 style={{ marginTop: 0 }}>⏰ 基本営業時間</h3>
               {Object.keys(dayMap).map(day => (
@@ -419,7 +410,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- 💡 店舗情報タブ (大幅アップデート) --- */}
+        {/* --- 💡 店舗情報タブ (究極最適化版) --- */}
         {activeTab === 'info' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             
@@ -432,19 +423,19 @@ function AdminDashboard() {
                   </label>
                   <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
                     <input readOnly value={`${window.location.origin}/admin/${shopId}`} style={{ flex: 1, padding: '10px', fontSize: '0.8rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-                    <button onClick={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #2563eb', color: '#2563eb', background: '#fff', fontWeight: 'bold' }}>コピー</button>
-                    <a href={`${window.location.origin}/admin/${shopId}`} target="_blank" rel="noreferrer" style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', background: '#2563eb', color: '#fff', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold' }}>開く</a>
+                    <button onClick={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #2563eb', color: '#2563eb', background: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>コピー</button>
+                    <a href={`${window.location.origin}/admin/${shopId}/reservations`} target="_blank" rel="noreferrer" style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', background: '#2563eb', color: '#fff', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold' }}>予約台帳</a>
                   </div>
                 </div>
 
                 <div>
                   <label style={{ fontSize: '0.75rem', color: '#00b900', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    💬 LINEリッチメニュー用URL
+                    💬 LINEリッチメニュー用URL（読込爆速）
                   </label>
                   <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
-                    <input readOnly value={`${window.location.origin}/shop/${shopId}/reserve?source=line`} style={{ flex: 1, padding: '10px', fontSize: '0.8rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }} />
-                    <button onClick={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?source=line`)} style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #00b900', color: '#00b900', background: '#fff', fontWeight: 'bold' }}>コピー</button>
-                    <a href={`${window.location.origin}/shop/${shopId}/reserve?source=line`} target="_blank" rel="noreferrer" style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', background: '#00b900', color: '#fff', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold' }}>開く</a>
+                    <input readOnly value={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} style={{ flex: 1, padding: '10px', fontSize: '0.8rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }} />
+                    <button onClick={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #00b900', color: '#00b900', background: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>コピー</button>
+                    <a href={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} target="_blank" rel="noreferrer" style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', background: '#00b900', color: '#fff', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold' }}>確認</a>
                   </div>
                 </div>
 
@@ -454,8 +445,8 @@ function AdminDashboard() {
                   </label>
                   <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
                     <input readOnly value={`${window.location.origin}/shop/${shopId}/reserve`} style={{ flex: 1, padding: '10px', fontSize: '0.8rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-                    <button onClick={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #059669', color: '#059669', background: '#fff', fontWeight: 'bold' }}>コピー</button>
-                    <a href={`${window.location.origin}/shop/${shopId}/reserve`} target="_blank" rel="noreferrer" style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', background: '#059669', color: '#fff', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold' }}>開く</a>
+                    <button onClick={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', border: '1px solid #059669', color: '#059669', background: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>コピー</button>
+                    <a href={`${window.location.origin}/shop/${shopId}/reserve`} target="_blank" rel="noreferrer" style={{ padding: '10px 15px', fontSize: '0.8rem', borderRadius: '8px', background: '#059669', color: '#fff', textDecoration: 'none', textAlign: 'center', fontWeight: 'bold' }}>確認</a>
                   </div>
                 </div>
               </div>
@@ -495,7 +486,6 @@ function AdminDashboard() {
                 <input type="url" value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://..." style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
                 <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#00b900', display: 'block', marginBottom: '5px' }}>💬 LINE予約・公式アカウント URL</label>
                 <input type="url" value={lineOfficialUrl} onChange={(e) => setLineOfficialUrl(e.target.value)} placeholder="https://line.ee/..." style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-                <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '8px' }}>※URLを入力するとホーム画面にボタンが表示されます</p>
               </div>
 
               <label>店舗の説明</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ width: '100%', minHeight: 100, marginBottom: 20, padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
@@ -517,7 +507,7 @@ function AdminDashboard() {
                   { step: '3', title: 'アクセストークンの取得', desc: 'LINE Developersにて「チャネルアクセストークン」を発行します。' },
                   { step: '4', title: 'ユーザーIDの確認', desc: 'LINE Developersの基本設定にて、店長様の「ユーザーID(U...)」を確認します。' },
                   { step: '5', title: '設定画面への入力', desc: '取得したトークンとIDを下の「LINE通知設定」欄に入力して保存します。' },
-                  { step: '6', title: 'リッチメニューの設定', desc: 'LINEのリッチメニューに下の【LINEリッチメニュー専用】予約URLを貼り付けて完了です！' }
+                  { step: '6', title: 'リッチメニューの設定', desc: 'LINEのリッチメニューに【 LINEリッチメニュー用URL 】を貼り付けて完了です！' }
                 ].map((item) => (
                   <React.Fragment key={item.step}>
                     <div style={{ display: 'flex', gap: '15px', padding: '15px', background: '#f0fdf4', borderRadius: '10px' }}>
@@ -540,21 +530,6 @@ function AdminDashboard() {
                           <input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} placeholder="アクセストークンを貼り付け" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '10px' }} />
                           <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#15803d', display: 'block', marginBottom: '5px' }}>🆔 通知先 LINE User ID (U...)</label>
                           <input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} placeholder="Uxxxxxxxx..." style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bbf7d0' }} />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 💡 ⑥番の直下に 爆速URL表示枠 (image_1296ea.png 形式) */}
-                    {item.step === '6' && (
-                      <div style={{ marginLeft: '43px', marginTop: '-5px' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#166534', marginBottom: '5px' }}>【LINEリッチメニュー専用】（読込が爆速になります）</p>
-                        <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0', overflow: 'hidden' }}>
-                          <code style={{ fontSize: '0.75rem', color: '#2563eb', wordBreak: 'break-all', display: 'block' }}>
-                            {`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`}
-                          </code>
-                          <button onClick={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} style={{ marginTop: '8px', padding: '4px 10px', fontSize: '0.7rem', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '4px', cursor: 'pointer' }}>
-                            このURLをコピーする
-                          </button>
                         </div>
                       </div>
                     )}
