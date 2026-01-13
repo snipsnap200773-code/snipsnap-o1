@@ -162,28 +162,28 @@ function AdminReservations() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
         {/* ヘッダー */}
-        <div style={{ padding: '8px 12px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
+        <div style={{ padding: isPC ? '10px 20px' : '8px 10px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button onClick={() => setStartDate(new Date())} style={headerBtnStyle}>今日</button>
             <button onClick={() => setStartDate(new Date(startDate.setDate(startDate.getDate() - 7)))} style={headerBtnStyle}>前週</button>
             <button onClick={() => setStartDate(new Date(startDate.setDate(startDate.getDate() + 7)))} style={headerBtnStyle}>次週</button>
           </div>
-          <h2 style={{ fontSize: '0.9rem', margin: 0, fontWeight: 'bold' }}>{startDate.getFullYear()}年 {startDate.getMonth() + 1}月</h2>
+          <h2 style={{ fontSize: isPC ? '1rem' : '0.85rem', margin: 0, fontWeight: 'bold' }}>{startDate.getFullYear()}年 {startDate.getMonth() + 1}月</h2>
           {!isPC && <button onClick={() => navigate(`/admin/${shopId}`)} style={{ background: 'none', border: 'none', fontSize: '1.2rem' }}>⚙️</button>}
         </div>
 
-        {/* 1画面凝縮グリッド本体 */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        {/* グリッド本体 */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: isPC ? 'auto' : 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: isPC ? '900px' : '100%' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff' }}>
               <tr>
-                <th style={{ width: isPC ? '60px' : '30px', borderBottom: '1px solid #ddd', fontSize: '0.6rem', color: '#999' }}>時</th>
+                <th style={{ width: isPC ? '80px' : '32px', borderBottom: '1px solid #ddd', fontSize: '0.6rem', color: '#999' }}>{isPC ? 'GMT+09' : ''}</th>
                 {weekDays.map(date => {
                   const isToday = getJapanDateStr(new Date()) === getJapanDateStr(date);
                   return (
-                    <th key={date.toString()} style={{ padding: '4px 0', borderBottom: '1px solid #ddd', textAlign: 'center' }}>
+                    <th key={date.toString()} style={{ padding: '4px 0', borderBottom: '1px solid #ddd' }}>
                       <div style={{ fontSize: '0.6rem', color: isToday ? '#2563eb' : '#666' }}>{['日','月','火','水','木','金','土'][date.getDay()]}</div>
-                      <div style={{ fontSize: isPC ? '1.2rem' : '0.9rem', fontWeight: 'bold', color: isToday ? '#fff' : '#333', background: isToday ? '#2563eb' : 'none', width: isPC ? '30px' : '22px', height: isPC ? '30px' : '22px', borderRadius: '50%', margin: '2px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ fontSize: isPC ? '1.6rem' : '0.9rem', fontWeight: 'bold', color: isToday ? '#fff' : '#333', background: isToday ? '#2563eb' : 'none', width: isPC ? '40px' : '22px', height: isPC ? '40px' : '22px', borderRadius: '50%', margin: '2px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {date.getDate()}
                       </div>
                     </th>
@@ -193,14 +193,19 @@ function AdminReservations() {
             </thead>
             <tbody>
               {timeSlots.map(time => {
-                const hour = time.split(':')[0];
-                const min = time.split(':')[1];
+                const [hour, min] = time.split(':');
                 return (
                   <tr key={time} style={{ height: isPC ? '60px' : '50px' }}>
-                    {/* 💡 三土手さん案：時間の縦積み表示 */}
+                    {/* 💡 三土手さん案：時間の縦積み（スマホ時） */}
                     <td style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', textAlign: 'center', lineHeight: '1.1' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#444' }}>{hour}</div>
-                      <div style={{ fontSize: '0.55rem', color: '#999' }}>{min}</div>
+                      {isPC ? (
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{time.endsWith(':00') ? time : ''}</span>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#444' }}>{hour}</span>
+                          <span style={{ fontSize: '0.55rem', color: '#999' }}>{min}</span>
+                        </div>
+                      )}
                     </td>
                     {weekDays.map(date => {
                       const dStr = getJapanDateStr(date);
@@ -215,8 +220,8 @@ function AdminReservations() {
                           key={`${dStr}-${time}`} 
                           onClick={() => {
                             setSelectedDate(dStr); setTargetTime(time);
-                            if (res && isStart) { openDetail(res); }
-                            else { setShowMenuModal(true); }
+                            if (res && isStart) { openDetail(res); } 
+                            else { setShowMenuModal(true); } 
                           }}
                           style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}
                         >
@@ -224,23 +229,33 @@ function AdminReservations() {
                             <div style={{ 
                               position: 'absolute', inset: '1px', 
                               background: isStart ? '#BAE6FD' : '#F3F4F6', 
-                              color: isStart ? '#451a03' : '#cbd5e1', 
-                              padding: '2px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', 
-                              borderLeft: `2px solid ${isStart ? '#0284c7' : '#e5e7eb'}`,
-                              display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center'
+                              color: isStart ? '#451a03' : '#94a3b8', 
+                              padding: isPC ? '6px 8px' : '2px 4px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', 
+                              borderLeft: `2px solid ${isStart ? '#0284c7' : '#d1d5db'}`,
+                              display: 'flex', flexDirection: 'column', justifyContent: 'center'
                             }}>
                               {isStart ? (
-                                <div style={{ 
-                                  fontSize: isPC ? '0.75rem' : '0.6rem', 
-                                  fontWeight: 'bold', 
-                                  writingMode: isPC ? 'horizontal-tb' : 'vertical-rl', // 💡 スマホ時は縦書きでスペース確保
-                                  textAlign: 'center',
-                                  whiteSpace: 'nowrap'
-                                }}>
-                                  {res.customer_name.slice(0, 4)}
-                                </div>
+                                <>
+                                  <div style={{ 
+                                    fontWeight: 'bold', 
+                                    fontSize: isPC ? '0.85rem' : '0.65rem', 
+                                    whiteSpace: isPC ? 'nowrap' : 'normal',
+                                    wordBreak: 'break-all',
+                                    maxHeight: isPC ? 'none' : '40px'
+                                  }}>
+                                    {res.customer_name} 様
+                                  </div>
+                                  {/* 💡 PC版のみメニューを表示 */}
+                                  {isPC && (
+                                    <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '2px' }}>
+                                      {res.options?.services?.map(s => s.name).join(', ')}
+                                    </div>
+                                  )}
+                                </>
                               ) : (
-                                <div style={{ fontSize: '0.4rem', opacity: 0.5 }}>・</div>
+                                <div style={{ fontStyle: 'italic', fontSize: '0.6rem', textAlign: 'center' }}>
+                                  {isPC ? (isBuffer ? "清掃・準備中" : "予約継続中...") : "・"}
+                                </div>
                               )}
                             </div>
                           )}
@@ -255,7 +270,7 @@ function AdminReservations() {
         </div>
       </div>
 
-      {/* --- モーダル（既存ロジック・レイアウト維持） --- */}
+      {/* --- モーダル類 (以前の完璧なロジックを継承) --- */}
       {showDetailModal && selectedRes && (
         <div onClick={() => setShowDetailModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={modalContentStyle}>
@@ -263,12 +278,10 @@ function AdminReservations() {
             <p style={{ color: '#0369a1', fontWeight: 'bold' }}>{selectedRes.options?.services?.map(s => s.name).join(' / ')}</p>
             <div style={{ marginBottom: '20px' }}>
               <p style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8' }}>🕒 過去の履歴</p>
-              <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                {customerHistory.map(h => <div key={h.id} style={{ fontSize: '0.8rem', padding: '5px 0', borderBottom: '1px solid #f1f1f1' }}><b>{new Date(h.start_time).toLocaleDateString()}</b>: {h.options?.services?.map(s => s.name).join(', ')}</div>)}
-              </div>
+              {customerHistory.map(h => <div key={h.id} style={{ fontSize: '0.8rem', padding: '5px 0', borderBottom: '1px solid #f1f1f1' }}><b>{new Date(h.start_time).toLocaleDateString()}</b>: {h.options?.services?.map(s => s.name).join(', ')}</div>)}
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => deleteRes(selectedRes.id)} style={{ flex: 1, padding: '15px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>削除</button>
+              <button onClick={() => deleteRes(selectedRes.id)} style={{ flex: 1, padding: '15px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>予約を消去</button>
               <button onClick={() => setShowDetailModal(false)} style={{ flex: 1, padding: '15px', background: '#f1f5f9', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>閉じる</button>
             </div>
           </div>
@@ -277,13 +290,13 @@ function AdminReservations() {
 
       {showMenuModal && (
         <div onClick={() => setShowMenuModal(false)} style={overlayStyle}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '30px', borderRadius: '30px', width: '90%', maxWidth: '340px', textAlign: 'center' }}>
-            <h3 style={{ margin: '0 0 5px 0', color: '#64748b', fontSize: '0.9rem' }}>{selectedDate}</h3>
-            <p style={{ fontWeight: '900', color: '#2563eb', fontSize: '1.8rem', margin: '0 0 20px 0' }}>{targetTime}</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button onClick={() => navigate(`/shop/${shopId}/reserve`, { state: { adminDate: selectedDate, adminTime: targetTime } })} style={{ padding: '18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '15px', fontWeight: 'bold', fontSize: '1.1rem' }}>📝 予約を入れる</button>
-              <button onClick={handleBlockTime} style={{ padding: '18px', background: '#fff', color: '#ef4444', border: '2px solid #ef4444', borderRadius: '15px', fontWeight: 'bold' }}>✕ 予約不可にする</button>
-              <button onClick={() => setShowMenuModal(false)} style={{ padding: '10px', color: '#94a3b8', border: 'none', background: 'none' }}>キャンセル</button>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '35px', borderRadius: '30px', width: '90%', maxWidth: '360px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 10px 0', color: '#64748b', fontSize: '1rem' }}>{selectedDate.replace(/-/g, '/')}</h3>
+            <p style={{ fontWeight: '900', color: '#2563eb', fontSize: '2rem', margin: '0 0 20px 0' }}>{targetTime}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <button onClick={() => navigate(`/shop/${shopId}/reserve`, { state: { adminDate: selectedDate, adminTime: targetTime } })} style={{ padding: '22px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: '900', fontSize: '1.2rem' }}>📝 予約を入れる</button>
+              <button onClick={handleBlockTime} style={{ padding: '20px', background: '#fff', color: '#ef4444', border: '2px solid #ef4444', borderRadius: '20px', fontWeight: 'bold', fontSize: '1.1rem' }}>✕ 予約不可にする</button>
+              <button onClick={() => setShowMenuModal(false)} style={{ padding: '15px', border: 'none', background: 'none', color: '#94a3b8' }}>キャンセル</button>
             </div>
           </div>
         </div>
@@ -295,6 +308,6 @@ function AdminReservations() {
 const headerBtnStyle = { padding: '5px 8px', borderRadius: '6px', border: '1px solid #ddd', background: '#fff', fontSize: '0.7rem', cursor: 'pointer' };
 const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', fontSize: '1rem', color: '#2563eb', padding: '0 5px' };
 const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px', backdropFilter: 'blur(8px)' };
-const modalContentStyle = { background: '#fff', width: '100%', maxWidth: '380px', borderRadius: '25px', padding: '25px', position: 'relative' };
+const modalContentStyle = { background: '#fff', width: '100%', maxWidth: '400px', borderRadius: '25px', padding: '25px', position: 'relative' };
 
 export default AdminReservations;
