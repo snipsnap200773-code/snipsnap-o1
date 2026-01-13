@@ -13,7 +13,7 @@ function AdminReservations() {
   const [startDate, setStartDate] = useState(new Date()); 
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
-    return d.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+    return d.toLocaleDateString('sv-SE'); // YYYY-MM-DD形式
   }); 
   
   const [showMenuModal, setShowMenuModal] = useState(false);
@@ -44,29 +44,11 @@ function AdminReservations() {
     setLoading(false);
   };
 
-  const openDetail = (res) => {
-    setSelectedRes(res);
-    // 💡 テーブル画像に基づき、customer_email または customer_phone で過去の履歴を特定
-    const history = reservations
-      .filter(r => 
-        r.res_type === 'normal' && 
-        r.id !== res.id && // 今回の予約自身は除外
-        ((r.customer_email === res.customer_email && res.customer_email !== 'admin@example.com') || 
-         (r.customer_phone === res.customer_phone && res.customer_phone !== '---')) &&
-        new Date(r.start_time) < new Date(res.start_time)
-      )
-      .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
-      .slice(0, 5); // 直近5回分
-    
-    setCustomerHistory(history);
-    setShowDetailModal(true);
-  };
-
   const weekDays = useMemo(() => {
     const days = [];
     const base = new Date(startDate);
     const dayOfWeek = base.getDay(); 
-    base.setDate(base.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)); 
+    base.setDate(base.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)); // 月曜始まり
     for (let i = 0; i < 7; i++) {
       const d = new Date(base);
       d.setDate(d.getDate() + i);
@@ -75,21 +57,42 @@ function AdminReservations() {
     return days;
   }, [startDate]);
 
+  // 💡 【最重要修正】設定された営業時間にピッタリ合わせるロジック
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
-    let minH = 9, maxH = 20;
+    
+    let minTotalMinutes = 24 * 60; // 1440
+    let maxTotalMinutes = 0;
+    let hasOpenDay = false;
+
+    // 全曜日のうち、一番早い開始と一番遅い終了を探す
     Object.values(shop.business_hours).forEach(h => {
-      if (!h.is_closed) {
-        const op = parseInt(h.open.split(':')[0]);
-        const cl = parseInt(h.close.split(':')[0]);
-        if (op < minH) minH = op;
-        if (cl > maxH) maxH = cl;
+      if (!h.is_closed && h.open && h.close) {
+        hasOpenDay = true;
+        const [openH, openM] = h.open.split(':').map(Number);
+        const [closeH, closeM] = h.close.split(':').map(Number);
+        
+        const openTotal = openH * 60 + openM;
+        const closeTotal = closeH * 60 + closeM;
+        
+        if (openTotal < minTotalMinutes) minTotalMinutes = openTotal;
+        if (closeTotal > maxTotalMinutes) maxTotalMinutes = closeTotal;
       }
     });
+
+    // 営業日が設定されていない場合のデフォルト
+    if (!hasOpenDay) {
+      minTotalMinutes = 9 * 60;
+      maxTotalMinutes = 18 * 60;
+    }
+
     const slots = [];
-    for (let i = minH; i <= maxH; i++) {
-      slots.push(`${String(i).padStart(2, '0')}:00`);
-      slots.push(`${String(i).padStart(2, '0')}:30`);
+    const interval = shop.slot_interval_min || 30; // 通常30分
+
+    for (let m = minTotalMinutes; m <= maxTotalMinutes; m += interval) {
+      const h = Math.floor(m / 60);
+      const mm = m % 60;
+      slots.push(`${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
     }
     return slots;
   }, [shop]);
@@ -105,13 +108,31 @@ function AdminReservations() {
       return currentSlotStart >= start && currentSlotStart < end;
     });
     if (matches.length === 0) return null;
+
+    // 優先順位: 1.開始枠 2.ブロック(✕) 3.継続中
     const exact = matches.find(r => new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) === timeStr);
     if (exact) return exact;
     return matches.find(r => r.res_type === 'blocked') || matches[0];
   };
 
+  const openDetail = (res) => {
+    setSelectedRes(res);
+    const history = reservations
+      .filter(r => 
+        r.res_type === 'normal' && 
+        r.id !== res.id &&
+        ((r.customer_email === res.customer_email && res.customer_email !== 'admin@example.com') || 
+         (r.customer_phone === res.customer_phone && res.customer_phone !== '---')) &&
+        new Date(r.start_time) < new Date(res.start_time)
+      )
+      .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+      .slice(0, 5);
+    setCustomerHistory(history);
+    setShowDetailModal(true);
+  };
+
   const deleteRes = async (id) => {
-    if (window.confirm('このデータを完全に削除しますか？')) {
+    if (window.confirm('このデータを消去して予約を「可能」に戻しますか？')) {
       await supabase.from('reservations').delete().eq('id', id);
       setShowDetailModal(false); fetchData();
     }
@@ -120,7 +141,7 @@ function AdminReservations() {
   const handleBlockTime = async () => {
     const startTimeStr = `${selectedDate}T${targetTime}:00`;
     const startTime = new Date(startTimeStr);
-    const endTime = new Date(startTime.getTime() + (shop.slot_interval_min || 15) * 60000);
+    const endTime = new Date(startTime.getTime() + (shop.slot_interval_min || 30) * 60000);
     
     const insertData = { 
       shop_id: shopId, 
@@ -171,26 +192,26 @@ function AdminReservations() {
                 <button onClick={() => setViewMonth(new Date(viewMonth.setMonth(viewMonth.getMonth() + 1)))} style={miniBtnStyle}>＞</button>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center', fontSize: '0.8rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', fontSize: '0.8rem' }}>
               {['月','火','水','木','金','土','日'].map(d => <div key={d} style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 'bold' }}>{d}</div>)}
               {miniCalendarDays.map((date, i) => {
                 if (!date) return <div key={i} />;
                 const dStr = getJapanDateStr(date);
-                return <div key={i} onClick={() => { setStartDate(date); setSelectedDate(dStr); }} style={{ cursor: 'pointer', padding: '5px', borderRadius: '50%', background: dStr === selectedDate ? '#2563eb' : 'none', color: dStr === selectedDate ? '#fff' : '#475569' }}>{date.getDate()}</div>;
+                return <div key={i} onClick={() => { setStartDate(date); setSelectedDate(dStr); }} style={{ padding: '8px 0', cursor: 'pointer', borderRadius: '50%', background: dStr === selectedDate ? '#2563eb' : 'none', color: dStr === selectedDate ? '#fff' : '#475569' }}>{date.getDate()}</div>;
               })}
             </div>
           </div>
           <div style={{ position: 'relative' }}>
-            <input type="text" placeholder="ユーザーを検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} />
-            <span style={{ position: 'absolute', left: '12px', top: '12px' }}>👥</span>
+            <input type="text" placeholder="ユーザーを検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '15px 15px 15px 45px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} />
+            <span style={{ position: 'absolute', left: '15px', top: '15px' }}>🔍</span>
           </div>
           <button onClick={() => navigate(`/admin/${shopId}`)} style={{ marginTop: 'auto', padding: '15px', background: '#fff', border: '1px solid #ddd', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>店舗設定へ</button>
         </div>
       )}
 
-      {/* 📱💻 メインコンテンツ */}
+      {/* 📱💻 メイングリッドエリア */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: isPC ? '10px 20px' : '8px 10px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
+        <div style={{ padding: isPC ? '10px 20px' : '8px 12px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
           <div style={{ display: 'flex', gap: '4px' }}>
             <button onClick={() => setStartDate(new Date())} style={headerBtnStyle}>今日</button>
             <button onClick={() => setStartDate(new Date(startDate.setDate(startDate.getDate() - 7)))} style={headerBtnStyle}>前週</button>
@@ -238,9 +259,6 @@ function AdminReservations() {
                       const dStr = getJapanDateStr(date);
                       const res = getStatusAt(dStr, time);
                       const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) === time;
-                      const intervalWidth = shop?.slot_interval_min || 15;
-                      const treatmentEndTime = res ? new Date(new Date(res.start_time).getTime() + res.total_slots * intervalWidth * 60000) : null;
-                      const isBuffer = res && !isStart && new Date(`${dStr}T${time}`) >= treatmentEndTime;
 
                       return (
                         <td key={`${dStr}-${time}`} 
@@ -250,7 +268,7 @@ function AdminReservations() {
                           {res && (
                             <div style={{ 
                               position: 'absolute', inset: '1px', 
-                              background: res.res_type === 'blocked' ? '#fee2e2' : (isStart ? '#BAE6FD' : (isBuffer ? '#F3F4F6' : '#F3F4F6')), 
+                              background: res.res_type === 'blocked' ? '#fee2e2' : (isStart ? '#BAE6FD' : '#F3F4F6'), 
                               color: res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#451a03' : '#cbd5e1'), 
                               padding: isPC ? '6px 8px' : '2px 4px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#0284c7' : '#d1d5db')}`,
                               display: 'flex', flexDirection: 'column', justifyContent: 'center'
@@ -276,7 +294,7 @@ function AdminReservations() {
         </div>
       </div>
 
-      {/* --- 詳細ポップアップ (顧客詳細・履歴表示： image_2032ad.png 形式を反映) --- */}
+      {/* --- 詳細ポップアップ --- */}
       {showDetailModal && selectedRes && (
         <div onClick={() => setShowDetailModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalContentStyle, maxWidth: '450px' }}>
@@ -301,7 +319,6 @@ function AdminReservations() {
               )}
             </div>
 
-            {/* 🆕 過去5回分の来店履歴エリア */}
             {selectedRes.res_type === 'normal' && (
               <div style={{ marginBottom: '25px' }}>
                 <p style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#94a3b8', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>🕒 過去5回分の履歴</p>
@@ -328,7 +345,7 @@ function AdminReservations() {
         </div>
       )}
 
-      {/* ねじ込み予約モーダル (維持) */}
+      {/* ねじ込み予約モーダル */}
       {showMenuModal && (
         <div onClick={() => setShowMenuModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '35px', borderRadius: '30px', width: '90%', maxWidth: '340px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
