@@ -44,6 +44,24 @@ function AdminReservations() {
     setLoading(false);
   };
 
+  const openDetail = (res) => {
+    setSelectedRes(res);
+    // 💡 テーブル画像に基づき、customer_email または customer_phone で過去の履歴を特定
+    const history = reservations
+      .filter(r => 
+        r.res_type === 'normal' && 
+        r.id !== res.id && // 今回の予約自身は除外
+        ((r.customer_email === res.customer_email && res.customer_email !== 'admin@example.com') || 
+         (r.customer_phone === res.customer_phone && res.customer_phone !== '---')) &&
+        new Date(r.start_time) < new Date(res.start_time)
+      )
+      .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+      .slice(0, 5); // 直近5回分
+    
+    setCustomerHistory(history);
+    setShowDetailModal(true);
+  };
+
   const weekDays = useMemo(() => {
     const days = [];
     const base = new Date(startDate);
@@ -93,7 +111,7 @@ function AdminReservations() {
   };
 
   const deleteRes = async (id) => {
-    if (window.confirm('この枠を予約可能な状態（◎）に戻しますか？')) {
+    if (window.confirm('このデータを完全に削除しますか？')) {
       await supabase.from('reservations').delete().eq('id', id);
       setShowDetailModal(false); fetchData();
     }
@@ -104,7 +122,6 @@ function AdminReservations() {
     const startTime = new Date(startTimeStr);
     const endTime = new Date(startTime.getTime() + (shop.slot_interval_min || 15) * 60000);
     
-    // 💡 image_2d5dcb.png で確認した全カラムにデータを投入
     const insertData = { 
       shop_id: shopId, 
       customer_name: '管理者によるブロック', 
@@ -164,8 +181,8 @@ function AdminReservations() {
             </div>
           </div>
           <div style={{ position: 'relative' }}>
-            <input type="text" placeholder="ユーザーを検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '15px 15px 15px 45px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} />
-            <span style={{ position: 'absolute', left: '15px', top: '15px' }}>🔍</span>
+            <input type="text" placeholder="ユーザーを検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} />
+            <span style={{ position: 'absolute', left: '12px', top: '12px' }}>👥</span>
           </div>
           <button onClick={() => navigate(`/admin/${shopId}`)} style={{ marginTop: 'auto', padding: '15px', background: '#fff', border: '1px solid #ddd', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>店舗設定へ</button>
         </div>
@@ -204,7 +221,6 @@ function AdminReservations() {
                 const [hour, min] = time.split(':');
                 return (
                   <tr key={time} style={{ height: '60px' }}>
-                    {/* 💡 修正：時間表示の完全出し分け */}
                     <td style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', textAlign: 'center', lineHeight: '1.1' }}>
                       {isPC ? (
                         <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>{time}</span>
@@ -228,7 +244,7 @@ function AdminReservations() {
 
                       return (
                         <td key={`${dStr}-${time}`} 
-                          onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ setSelectedRes(res); setShowDetailModal(true); } else { setShowMenuModal(true); } }}
+                          onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }}
                           style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}
                         >
                           {res && (
@@ -260,31 +276,67 @@ function AdminReservations() {
         </div>
       </div>
 
-      {/* --- モーダル（共通） --- */}
+      {/* --- 詳細ポップアップ (顧客詳細・履歴表示： image_2032ad.png 形式を反映) --- */}
       {showDetailModal && selectedRes && (
         <div onClick={() => setShowDetailModal(false)} style={overlayStyle}>
-          <div onClick={(e) => e.stopPropagation()} style={modalContentStyle}>
-            <h3 style={{ marginTop: 0 }}>{selectedRes.res_type === 'blocked' ? '予約不可の解除' : `${selectedRes.customer_name} 様`}</h3>
-            <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', marginBottom: '20px' }}>
-              <p style={{ fontWeight: 'bold', color: '#2563eb' }}>{selectedRes.res_type === 'blocked' ? 'この枠を再び予約可能にしますか？' : selectedRes.options?.services?.map(s => s.name).join(' / ')}</p>
-              <p>📅 {new Date(selectedRes.start_time).toLocaleString('ja-JP')}</p>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalContentStyle, maxWidth: '450px' }}>
+            <h3 style={{ marginTop: 0, color: '#1e293b' }}>
+              {selectedRes.res_type === 'blocked' ? '予約不可設定' : `${selectedRes.customer_name} 様`}
+            </h3>
+            
+            <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '16px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
+              {selectedRes.res_type === 'blocked' ? (
+                <p style={{ fontWeight: 'bold', color: '#ef4444', margin: 0 }}>🚫 この枠は現在ブロックされています。</p>
+              ) : (
+                <>
+                  <div style={{ color: '#0369a1', fontWeight: '900', fontSize: '1.1rem', marginBottom: '10px' }}>
+                    ✂️ {selectedRes.options?.services?.map(s => s.name).join(' / ') || 'メニュー未指定'}
+                  </div>
+                  <div style={{ fontSize: '0.9rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span>📅 <b>日時:</b> {new Date(selectedRes.start_time).toLocaleString('ja-JP', {month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
+                    <span>📞 <b>電話:</b> {selectedRes.customer_phone === '---' ? '未登録' : selectedRes.customer_phone}</span>
+                    <span>✉️ <b>メール:</b> {selectedRes.customer_email === 'admin@example.com' ? '未登録' : selectedRes.customer_email}</span>
+                  </div>
+                </>
+              )}
             </div>
+
+            {/* 🆕 過去5回分の来店履歴エリア */}
+            {selectedRes.res_type === 'normal' && (
+              <div style={{ marginBottom: '25px' }}>
+                <p style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#94a3b8', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>🕒 過去5回分の履歴</p>
+                <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
+                  {customerHistory.length > 0 ? customerHistory.map(h => (
+                    <div key={h.id} style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
+                      <div style={{ fontWeight: 'bold', color: '#475569' }}>{new Date(h.start_time).toLocaleDateString('ja-JP')}</div>
+                      <div style={{ color: '#64748b', marginTop: '4px' }}>{h.options?.services?.map(s => s.name).join(', ')}</div>
+                    </div>
+                  )) : (
+                    <div style={{ padding: '20px', textAlign: 'center', color: '#cbd5e1', fontSize: '0.85rem' }}>履歴はありません</div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => deleteRes(selectedRes.id)} style={{ flex: 1, padding: '15px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>{selectedRes.res_type === 'blocked' ? '解除（◎にする）' : '削除する'}</button>
-              <button onClick={() => setShowDetailModal(false)} style={{ flex: 1, padding: '15px', background: '#f1f5f9', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>閉じる</button>
+              <button onClick={() => deleteRes(selectedRes.id)} style={{ flex: 1, padding: '15px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
+                {selectedRes.res_type === 'blocked' ? 'ブロック解除' : '予約を消去'}
+              </button>
+              <button onClick={() => setShowDetailModal(false)} style={{ flex: 1, padding: '15px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>閉じる</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ねじ込み予約モーダル (維持) */}
       {showMenuModal && (
         <div onClick={() => setShowMenuModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '35px', borderRadius: '30px', width: '90%', maxWidth: '340px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ margin: '0 0 10px 0', color: '#64748b' }}>{selectedDate.replace(/-/g, '/')}</h3>
+            <h3 style={{ margin: '0 0 10px 0', color: '#64748b', fontSize: '1rem' }}>{selectedDate.replace(/-/g, '/')}</h3>
             <p style={{ fontWeight: '900', color: '#2563eb', fontSize: '1.8rem', margin: '0 0 20px 0' }}>{targetTime}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button onClick={() => navigate(`/shop/${shopId}/reserve`, { state: { adminDate: selectedDate, adminTime: targetTime } })} style={{ padding: '18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '15px', fontWeight: 'bold', fontSize: '1.1rem' }}>📝 予約を入れる</button>
-              <button onClick={handleBlockTime} style={{ padding: '18px', background: '#fff', color: '#ef4444', border: '2px solid #ef4444', borderRadius: '15px', fontWeight: 'bold' }}>✕ 予約不可にする</button>
+              <button onClick={handleBlockTime} style={{ padding: '18px', background: '#fff', color: '#ef4444', border: '2px solid #ef4444', borderRadius: '15px', fontWeight: 'bold', fontSize: '1.1rem' }}>✕ 予約不可にする</button>
               <button onClick={() => setShowMenuModal(false)} style={{ padding: '10px', color: '#94a3b8', border: 'none', background: 'none' }}>キャンセル</button>
             </div>
           </div>
