@@ -41,7 +41,9 @@ function AdminDashboard() {
   const [maxLastSlots, setMaxLastSlots] = useState(2);
   const [imageUrl, setImageUrl] = useState('');
 
-  // 💡 追加：オーナー・業種情報State
+  // 💡 追加：店舗名・オーナー・業種情報State
+  const [businessName, setBusinessName] = useState('');
+  const [businessNameKana, setBusinessNameKana] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [ownerNameKana, setOwnerNameKana] = useState('');
   const [businessType, setBusinessType] = useState('');
@@ -90,11 +92,15 @@ function AdminDashboard() {
       setOfficialUrl(data.official_url || '');
       setLineOfficialUrl(data.line_official_url || '');
       setNotifyLineEnabled(data.notify_line_enabled ?? true);
-      // 💡 追加：オーナー・業種情報のセット
+      
+      // 💡 店舗名・オーナー情報のセット
+      setBusinessName(data.business_name || '');
+      setBusinessNameKana(data.business_name_kana || '');
       setOwnerName(data.owner_name || '');
       setOwnerNameKana(data.owner_name_kana || '');
       setBusinessType(data.business_type || '');
-      // 💡 追加：LINE連携情報のセット
+      
+      // 💡 LINE連携情報のセット
       setLineToken(data.line_channel_access_token || '');
       setLineAdminId(data.line_admin_user_id || '');
     }
@@ -139,10 +145,11 @@ function AdminDashboard() {
   };
 
   const handleFinalSave = async () => {
-    // 💡 修正：オーナー情報、LINE連携情報も含めて保存
     const { error } = await supabase
       .from('profiles')
       .update({
+        business_name: businessName,
+        business_name_kana: businessNameKana,
         phone, email_contact: emailContact, address, description, notes, business_hours: businessHours,
         allow_multiple_services: allowMultiple, max_last_slots: maxLastSlots,
         slot_interval_min: slotIntervalMin, buffer_preparation_min: bufferPreparationMin,
@@ -318,7 +325,7 @@ function AdminDashboard() {
             </section>
 
             <section style={{ marginBottom: '30px', background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メメニュー登録・編集</h3>
+              <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メニュー登録・編集</h3>
               <form onSubmit={handleServiceSubmit}>
                 <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ccc' }} required>
                   <option value="">-- カテゴリ選択 --</option>
@@ -397,13 +404,20 @@ function AdminDashboard() {
             <section style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #ddd' }}>
               <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィールの設定</h3>
 
-              {/* 💡 オーナー・業種設定セクション */}
+              {/* 💡 修正：最上部に店舗名・ふりがな入力欄を設置 */}
               <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '15px', marginBottom: '15px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗名</label>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                  <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="店舗名" style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
+                  <input value={businessNameKana} onChange={(e) => setBusinessNameKana(e.target.value)} placeholder="店舗名のふりがな" style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
+                </div>
+
                 <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>代表者名</label>
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
                   <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="氏名" style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
                   <input value={ownerNameKana} onChange={(e) => setOwnerNameKana(e.target.value)} placeholder="ふりがな" style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
                 </div>
+
                 <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>業種</label>
                 <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}>
                   <option value="">-- 業種を選択 --</option>
@@ -422,43 +436,21 @@ function AdminDashboard() {
               <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#2563eb', display: 'block', marginBottom: '5px' }}>🌐 オフィシャルサイト URL</label>
                 <input type="url" value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} placeholder="https://example.com" style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-                
                 <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#00b900', display: 'block', marginBottom: '5px' }}>💬 LINE予約・公式アカウント URL</label>
                 <input type="url" value={lineOfficialUrl} onChange={(e) => setLineOfficialUrl(e.target.value)} placeholder="https://line.me/..." style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-                <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '8px' }}>※URLを入力するとホーム画面にボタンが表示されます</p>
               </div>
 
               {/* 💡 個別LINE通知設定セクション */}
               <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '10px', border: '1px solid #bbf7d0', marginBottom: '20px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', marginBottom: '15px' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={notifyLineEnabled} 
-                    onChange={(e) => setNotifyLineEnabled(e.target.checked)} 
-                    style={{ width: '22px', height: '22px', cursor: 'pointer' }} 
-                  />
-                  <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#166534' }}>
-                    📢 新着予約のLINE通知を受け取る
-                  </span>
+                  <input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '22px', height: '22px' }} />
+                  <span style={{ fontSize: '0.95rem', fontWeight: 'bold', color: '#166534' }}>📢 新着予約のLINE通知を受け取る</span>
                 </label>
-
                 <div style={{ borderTop: '1px solid #bbf7d0', paddingTop: '10px' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#15803d', display: 'block', marginBottom: '5px' }}>💬 LINE Channel Access Token</label>
-                  <input 
-                    type="password" 
-                    value={lineToken} 
-                    onChange={(e) => setLineToken(e.target.value)} 
-                    placeholder="アクセストークンを貼り付け" 
-                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '10px' }} 
-                  />
-                  
+                  <input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} placeholder="アクセストークンを貼り付け" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '10px' }} />
                   <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#15803d', display: 'block', marginBottom: '5px' }}>🆔 通知先 LINE User ID (U...)</label>
-                  <input 
-                    value={lineAdminId} 
-                    onChange={(e) => setLineAdminId(e.target.value)} 
-                    placeholder="Uxxxxxxxx..." 
-                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bbf7d0' }} 
-                  />
+                  <input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} placeholder="Uxxxxxxxx..." style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bbf7d0' }} />
                 </div>
               </div>
 
@@ -469,15 +461,11 @@ function AdminDashboard() {
               <label>注意事項</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: '100%', border: '2px solid #ef4444' }} />
             </section>
 
-            {/* LINE公式アカウント連携ガイド */}
+            {/* ガイドセクション (維持) */}
             <section style={{ background: '#fff', padding: '25px', borderRadius: '12px', border: '1px solid #00b900' }}>
               <h3 style={{ marginTop: 0, fontSize: '1.1rem', color: '#00b900', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span>💬</span> LINE公式アカウント連携ガイド
               </h3>
-              <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '20px', lineHeight: '1.5' }}>
-                公式LINEと連携すると、予約が入った際に店長様のLINEへ通知が届くようになります。以下の手順で設定を行ってください。
-              </p>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 {[
                   { step: '1', title: '公式アカウントの作成', desc: 'LINE公式アカウントマネージャーからアカウントを開設します。' },
@@ -488,23 +476,10 @@ function AdminDashboard() {
                   { step: '6', title: 'リッチメニューの設定', desc: 'LINEのリッチメニューに、当システムの予約URLを貼り付けて完了です！' }
                 ].map((item) => (
                   <div key={item.step} style={{ display: 'flex', gap: '15px', padding: '15px', background: '#f0fdf4', borderRadius: '10px' }}>
-                    <div style={{ 
-                      width: '28px', height: '28px', background: '#00b900', color: '#fff', 
-                      borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                      fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0 
-                    }}>{item.step}</div>
-                    <div>
-                      <h4 style={{ margin: '0 0 5px 0', fontSize: '0.9rem', color: '#166534' }}>{item.title}</h4>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#4b5563', lineHeight: '1.4' }}>{item.desc}</p>
-                    </div>
+                    <div style={{ width: '28px', height: '28px', background: '#00b900', color: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0 }}>{item.step}</div>
+                    <div><h4 style={{ margin: '0 0 5px 0', fontSize: '0.9rem', color: '#166534' }}>{item.title}</h4><p style={{ margin: 0, fontSize: '0.75rem', color: '#4b5563', lineHeight: '1.4' }}>{item.desc}</p></div>
                   </div>
                 ))}
-              </div>
-
-              <div style={{ marginTop: '20px', padding: '15px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fcd34d' }}>
-                <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400e', fontWeight: 'bold' }}>
-                  💡 連携には「チャネルアクセストークン」と「ユーザーID」が必要です。ガイドに沿って設定を進めてください。
-                </p>
               </div>
             </section>
           </div>
