@@ -175,6 +175,7 @@ function AdminDashboard() {
   const deleteService = async (id) => { if (window.confirm('削除しますか？')) { await supabase.from('services').delete().eq('id', id); fetchMenuDetails(); } };
   const deleteOption = async (id) => { await supabase.from('service_options').delete().eq('id', id); fetchMenuDetails(); };
 
+  // --- 🔒 パスワード認証画面 ---
   if (!isAuthorized) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', fontFamily: 'sans-serif' }}>
@@ -189,7 +190,7 @@ function AdminDashboard() {
     );
   }
 
-  // 💡 スマホ最適化スタイル：はみ出しと余白のちぐはぐを根絶
+  // 💡 スマホ最適化スタイル定数
   const cardStyle = { marginBottom: '20px', background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', boxSizing: 'border-box', width: '100%', overflow: 'hidden' };
   const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box', fontSize: '1rem', background: '#fff' };
 
@@ -242,21 +243,21 @@ function AdminDashboard() {
                       <button onClick={async () => { await supabase.from('service_categories').update({ allow_multiple_in_category: !c.allow_multiple_in_category }).eq('id', c.id); fetchMenuDetails(); }} style={{ fontSize: '0.7rem', padding: '4px 8px', background: c.allow_multiple_in_category ? '#2563eb' : '#fff', color: c.allow_multiple_in_category ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '15px' }}>{c.allow_multiple_in_category ? '複数選択可' : '1つのみ選択'}</button>
                       <button onClick={() => setEditingDisableCatId(editingDisableCatId === c.id ? null : c.id)} style={{ fontSize: '0.7rem', padding: '4px 8px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '15px' }}>🔗 連動設定</button>
                     </div>
-                    {/* 💡 カテゴリ連動設定エリア (必須化の復元) */}
+                    {/* 💡 カテゴリ連動設定 (無効化＆必須化の復元) */}
                     {editingDisableCatId === c.id && (
                       <div style={{ marginTop: '10px', padding: '12px', background: '#fff', borderRadius: '12px', border: '1px solid #2563eb' }}>
-                        <p style={{ fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '8px', color: '#ef4444' }}>🚫 選択時に無効化するカテゴリ：</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '12px' }}>
+                        <p style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#ef4444' }}>🚫 選択時に無効化するカテゴリ：</p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
                           {categories.filter(t => t.id !== c.id).map(t => {
                             const isDis = c.disable_categories?.split(',').includes(t.name);
-                            return <button key={t.id} onClick={() => handleToggleDisableCat(c.id, t.name)} style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '15px', border: '1px solid', borderColor: isDis ? '#ef4444' : '#ccc', background: isDis ? '#fee2e2' : '#fff' }}>{t.name}</button>
+                            return <button key={t.id} onClick={() => handleToggleDisableCat(c.id, t.name)} style={{ fontSize: '0.65rem', padding: '4px 8px', borderRadius: '15px', border: '1px solid', borderColor: isDis ? '#ef4444' : '#ccc', background: isDis ? '#fee2e2' : '#fff' }}>{t.name}</button>
                           })}
                         </div>
-                        <p style={{ fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '8px', color: '#2563eb' }}>✅ 選択時に必須となるカテゴリ：</p>
+                        <p style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#2563eb' }}>✅ 選択時に必須となるカテゴリ：</p>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                           {categories.filter(t => t.id !== c.id).map(t => {
                             const isReq = c.required_categories?.split(',').includes(t.name);
-                            return <button key={t.id} onClick={() => handleToggleRequiredCat(c.id, t.name)} style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '15px', border: '1px solid', borderColor: isReq ? '#2563eb' : '#ccc', background: isReq ? '#dbeafe' : '#fff' }}>{t.name}</button>
+                            return <button key={t.id} onClick={() => handleToggleRequiredCat(c.id, t.name)} style={{ fontSize: '0.65rem', padding: '4px 8px', borderRadius: '15px', border: '1px solid', borderColor: isReq ? '#2563eb' : '#ccc', background: isReq ? '#dbeafe' : '#fff' }}>{t.name}</button>
                           })}
                         </div>
                       </div>
@@ -303,13 +304,16 @@ function AdminDashboard() {
                         <button onClick={() => deleteService(s.id)}>×</button>
                       </div>
                     </div>
-                    {/* 💡 多段枝分かれ設定エリア (修正完了：メニュー名枠とコマ数枠を2段で配置) */}
+                    {/* 💡 多段枝分かれ設定エリア (改善版UI) */}
                     {activeServiceForOptions?.id === s.id && (
-                      <div style={{ marginTop: '15px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #eee' }}>
+                      <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
                         <p style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '10px' }}>🌿 枝分かれ（条件分岐）の設定</p>
                         <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
+                          {/* 1段目: カテゴリ名 */}
                           <input placeholder="枝カテゴリ名（例：ブリーチ）" value={optGroupName} onChange={(e) => setOptGroupName(e.target.value)} style={inputStyle} />
-                          <input placeholder="枝メニュー名（例：1回、2回）" value={optName} onChange={(e) => setOptName(e.target.value)} style={inputStyle} />
+                          {/* 2段目: メニュー名 */}
+                          <input placeholder="選択メニュー名（例：1回、2回）" value={optName} onChange={(e) => setOptName(e.target.value)} style={inputStyle} />
+                          {/* 3段目: コマ数 ＋ 追加ボタン */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#666', whiteSpace: 'nowrap' }}>追加コマ:</label>
                             <input type="number" value={optSlots} onChange={(e) => setOptSlots(parseInt(e.target.value))} style={{ width: '80px', ...inputStyle }} />
@@ -336,17 +340,19 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- ⏰ 営業時間タブ (予約制限の強化) --- */}
+        {/* --- ⏰ 営業時間タブ (予約制限の刷新) --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
               <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#2563eb' }}>⚙️ 詳細予約エンジンの設定</h3>
-              <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>1コマの単位</label><div style={{ display: 'flex', gap: '10px' }}>{[15, 30].map(min => (<button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? '#2563eb' : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '8px' }}>{min}分</button>))}</div></div>
+              <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>1コマの単位</label><div style={{ display: 'flex', gap: '10px' }}>{[15, 30].map(min => (<button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? '#2563eb' : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc' }}>{min}分</button>))}</div></div>
               <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>準備時間（インターバル）</label><select value={bufferPreparationMin} onChange={(e) => setBufferPreparationMin(parseInt(e.target.value))} style={inputStyle}><option value={0}>なし</option><option value={15}>15分</option><option value={30}>30分</option></select></div>
-              <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>当日予約の制限</label>
+              <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>当日〜3日後までの予約制限</label>
                 <select value={minLeadTimeHours} onChange={(e) => setMinLeadTimeHours(parseInt(e.target.value))} style={inputStyle}>
-                  <option value={0}>制限なし</option><option value={1}>1時間後</option><option value={3}>3時間後</option>
-                  <option value={24}>1日後まで (前日まで)</option><option value={48}>2日後まで</option><option value={72}>3日後まで</option>
+                  <option value={0}>当日予約OK（制限なし）</option>
+                  <option value={24}>1日後まで不可（前日まで）</option>
+                  <option value={48}>2日後まで不可</option>
+                  <option value={72}>3日後まで不可</option>
                 </select>
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><input type="checkbox" checked={autoFillLogic} onChange={(e) => setAutoFillLogic(e.target.checked)} style={{ width: '22px', height: '22px' }} /><b>自動詰め機能を有効にする</b></label>
@@ -365,13 +371,13 @@ function AdminDashboard() {
                   </div>
                   {!businessHours[day]?.is_closed && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 15, padding: '10px', background: '#f8fafc', borderRadius: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: '0.8rem', width: '35px' }}>営業</span>
                         <input type="time" value={businessHours[day]?.open || '09:00'} onChange={(e) => setBusinessHours({...businessHours, [day]: {...businessHours[day], open: e.target.value}})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
                         <span>〜</span>
                         <input type="time" value={businessHours[day]?.close || '18:00'} onChange={(e) => setBusinessHours({...businessHours, [day]: {...businessHours[day], close: e.target.value}})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: '0.8rem', width: '35px' }}>休憩</span>
                         <input type="time" value={businessHours[day]?.rest_start || ''} onChange={(e) => setBusinessHours({...businessHours, [day]: { ...businessHours[day], rest_start: e.target.value }})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
                         <span>〜</span>
@@ -398,13 +404,13 @@ function AdminDashboard() {
 
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィールの設定</h3>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗名 / ふりがな</label>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗名 / かな</label>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={inputStyle} /><input value={businessNameKana} onChange={(e) => setBusinessNameKana(e.target.value)} style={inputStyle} /></div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>代表者名 / ふりがな</label>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>代表者名 / かな</label>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} style={inputStyle} /><input value={ownerNameKana} onChange={(e) => setOwnerNameKana(e.target.value)} style={inputStyle} /></div>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>業種</label>
               <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}><option value="美容室・理容室">美容室・理容室</option><option value="その他">その他</option></select>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗画像URL</label>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗画像URL (復元完了)</label>
               <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="https://..." />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
