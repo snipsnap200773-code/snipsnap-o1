@@ -13,7 +13,7 @@ function AdminReservations() {
   const [startDate, setStartDate] = useState(new Date()); 
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
-    return d.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+    return d.toLocaleDateString('sv-SE'); 
   }); 
   
   const [showMenuModal, setShowMenuModal] = useState(false);
@@ -43,6 +43,21 @@ function AdminReservations() {
     setReservations(resData || []);
     setLoading(false);
   };
+
+  // 💡 【新機能】検索ワードに該当する過去1年間のユーザー履歴を計算
+  const searchResults = useMemo(() => {
+    if (!searchTerm) return [];
+    const oneYearAgo = new Date();
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+    return reservations
+      .filter(r => 
+        r.res_type === 'normal' && 
+        r.customer_name?.includes(searchTerm) &&
+        new Date(r.start_time) >= oneYearAgo
+      )
+      .sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+  }, [searchTerm, reservations]);
 
   const weekDays = useMemo(() => {
     const days = [];
@@ -91,7 +106,6 @@ function AdminReservations() {
     const matches = reservations.filter(r => {
       const start = new Date(r.start_time).getTime();
       const end = new Date(r.end_time).getTime();
-      if (searchTerm && r.customer_name && !r.customer_name.includes(searchTerm)) return false;
       return currentSlotStart >= start && currentSlotStart < end;
     });
     if (matches.length === 0) return null;
@@ -127,9 +141,7 @@ function AdminReservations() {
     const startTime = new Date(startTimeStr);
     const endTime = new Date(startTime.getTime() + (shop.slot_interval_min || 30) * 60000);
     const insertData = { 
-      shop_id: shopId, 
-      customer_name: '管理者によるブロック', 
-      res_type: 'blocked', 
+      shop_id: shopId, customer_name: '管理者によるブロック', res_type: 'blocked', 
       start_at: startTime.toISOString(), end_at: endTime.toISOString(),
       start_time: startTime.toISOString(), end_time: endTime.toISOString(),
       total_slots: 1, customer_email: 'admin@example.com', customer_phone: '---', options: { services: [] }
@@ -150,7 +162,6 @@ function AdminReservations() {
     return days;
   }, [viewMonth]);
 
-  // ナビゲーション処理
   const goPrev = () => setStartDate(new Date(startDate.setDate(startDate.getDate() - 7)));
   const goNext = () => setStartDate(new Date(startDate.setDate(startDate.getDate() + 7)));
   const goToday = () => setStartDate(new Date());
@@ -162,11 +173,12 @@ function AdminReservations() {
       
       {/* 💻 PC用サイドバー */}
       {isPC && (
-        <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #e2e8f0', padding: '25px', display: 'flex', flexDirection: 'column', gap: '30px', background: '#fff', zIndex: 100 }}>
+        <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #e2e8f0', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px', background: '#fff', zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '35px', height: '35px', background: '#2563eb', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>S</div>
             <h1 style={{ fontSize: '1.2rem', fontWeight: '900', margin: 0, color: '#1e293b' }}>SnipSnap Admin</h1>
           </div>
+
           <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '15px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' }}>
               {viewMonth.getFullYear()}年 {viewMonth.getMonth() + 1}月
@@ -184,18 +196,35 @@ function AdminReservations() {
               })}
             </div>
           </div>
+
+          {/* 🔍 ユーザー検索枠 */}
           <div style={{ position: 'relative' }}>
-            <input type="text" placeholder="ユーザーを検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '15px 15px 15px 45px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc' }} />
+            <input type="text" placeholder="ユーザーを検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '15px 15px 15px 45px', borderRadius: '15px', border: '1px solid #e2e8f0', background: '#f8fafc', boxSizing: 'border-box' }} />
             <span style={{ position: 'absolute', left: '15px', top: '15px' }}>🔍</span>
           </div>
+
+          {/* 💡 【新機能】検索結果リスト（最近来た順・過去1年） */}
+          {searchTerm && (
+            <div style={{ flex: 1, overflowY: 'auto', marginTop: '-10px' }}>
+              <p style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', marginBottom: '10px' }}>検索結果（過去1年）</p>
+              {searchResults.length > 0 ? searchResults.map(r => (
+                <div key={r.id} onClick={() => openDetail(r)} style={{ padding: '12px', background: '#fff', border: '1px solid #eee', borderRadius: '12px', marginBottom: '8px', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#1e293b' }}>{r.customer_name} 様</div>
+                  <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>📅 {new Date(r.start_time).toLocaleDateString('ja-JP')}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '2px', fontWeight: 'bold' }}>✂️ {r.options?.services?.map(s => s.name).join(', ')}</div>
+                </div>
+              )) : (
+                <div style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '0.8rem', padding: '20px' }}>該当する履歴はありません</div>
+              )}
+            </div>
+          )}
+
           <button onClick={() => navigate(`/admin/${shopId}`)} style={{ marginTop: 'auto', padding: '15px', background: '#fff', border: '1px solid #ddd', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>店舗設定へ</button>
         </div>
       )}
 
       {/* 📱💻 メイングリッドエリア */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: isPC ? 0 : '80px' }}>
-        
-        {/* 💡 ヘッダー：西暦と月を大きく、左右ボタンを配置 */}
         <div style={{ padding: isPC ? '15px 25px' : '15px 10px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
           {isPC ? (
             <>
@@ -209,9 +238,7 @@ function AdminReservations() {
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', gap: '15px' }}>
               <button onClick={goPrev} style={mobileArrowBtnStyle}>◀</button>
-              <h2 style={{ fontSize: '1.3rem', margin: 0, fontWeight: '900', color: '#1e293b', letterSpacing: '-0.5px' }}>
-                {startDate.getFullYear()}年 {startDate.getMonth() + 1}月
-              </h2>
+              <h2 style={{ fontSize: '1.3rem', margin: 0, fontWeight: '900', color: '#1e293b' }}>{startDate.getFullYear()}年 {startDate.getMonth() + 1}月</h2>
               <button onClick={goNext} style={mobileArrowBtnStyle}>▶</button>
             </div>
           )}
@@ -240,15 +267,9 @@ function AdminReservations() {
                 return (
                   <tr key={time} style={{ height: '60px' }}>
                     <td style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', textAlign: 'center', lineHeight: '1.1' }}>
-                      {isPC ? (
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>{time}</span>
-                      ) : (
+                      {isPC ? <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>{time}</span> : (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          {min === '00' ? (
-                            <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#444' }}>{parseInt(hour)}</span>
-                          ) : (
-                            <span style={{ fontSize: '0.65rem', color: '#999', marginTop: '2px' }}>{min}</span>
-                          )}
+                          {min === '00' ? <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#444' }}>{parseInt(hour)}</span> : <span style={{ fontSize: '0.65rem', color: '#999' }}>{min}</span>}
                         </div>
                       )}
                     </td>
@@ -256,31 +277,11 @@ function AdminReservations() {
                       const dStr = getJapanDateStr(date);
                       const res = getStatusAt(dStr, time);
                       const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) === time;
-                      const intervalWidth = shop?.slot_interval_min || 15;
-                      const trEnd = res ? new Date(new Date(res.start_time).getTime() + res.total_slots * intervalWidth * 60000) : null;
-                      const isBuf = res && !isStart && new Date(`${dStr}T${time}`) >= trEnd;
-
                       return (
-                        <td key={`${dStr}-${time}`} 
-                          onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }}
-                          style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}
-                        >
+                        <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                           {res && (
-                            <div style={{ 
-                              position: 'absolute', inset: '1px', 
-                              background: res.res_type === 'blocked' ? '#fee2e2' : (isStart ? '#BAE6FD' : (isBuf ? '#F3F4F6' : '#F3F4F6')), 
-                              color: res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#451a03' : '#cbd5e1'), 
-                              padding: isPC ? '6px 8px' : '2px 4px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#0284c7' : '#d1d5db')}`,
-                              display: 'flex', flexDirection: 'column', justifyContent: 'center'
-                            }}>
-                              {res.res_type === 'blocked' ? <div style={{fontWeight:'bold',textAlign:'center'}}>✕</div> : (
-                                isStart ? (
-                                  <>
-                                    <div style={{ fontWeight: 'bold', fontSize: isPC ? '0.85rem' : '0.65rem', wordBreak: 'break-all' }}>{res.customer_name} 様</div>
-                                    {isPC && <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>{res.options?.services?.map(s => s.name).join(', ')}</div>}
-                                  </>
-                                ) : <div style={{ fontStyle: 'italic', fontSize: '0.4rem', textAlign: 'center' }}>・</div>
-                              )}
+                            <div style={{ position: 'absolute', inset: '1px', background: res.res_type === 'blocked' ? '#fee2e2' : (isStart ? '#BAE6FD' : '#F3F4F6'), color: res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#451a03' : '#cbd5e1'), padding: isPC ? '6px 8px' : '2px 4px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#0284c7' : '#d1d5db')}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              {res.res_type === 'blocked' ? <div style={{fontWeight:'bold',textAlign:'center'}}>✕</div> : (isStart ? <><div style={{ fontWeight: 'bold', fontSize: isPC ? '0.85rem' : '0.65rem', wordBreak: 'break-all' }}>{res.customer_name} 様</div>{isPC && <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>{res.options?.services?.map(s => s.name).join(', ')}</div>}</> : <div style={{ fontStyle: 'italic', fontSize: '0.4rem', textAlign: 'center' }}>・</div>)}
                             </div>
                           )}
                         </td>
@@ -294,27 +295,25 @@ function AdminReservations() {
         </div>
       </div>
 
-      {/* 💡 スマホ用：指が届く位置に浮いている「◀ 今日 ▶」ボタン */}
+      {/* 💡 スマホ用フローティングナビ */}
       {!isPC && (
-        <div style={{ position: 'fixed', bottom: '25px', left: '50%', transform: 'translateX(-50%)', width: '280px', height: '60px', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', borderRadius: '30px', display: 'flex', alignItems: 'center', justifyContent: 'space-around', boxShadow: '0 8px 30px rgba(0,0,0,0.15)', zIndex: 2000, border: '1px solid #eee', padding: '0 10px' }}>
+        <div style={{ position: 'fixed', bottom: '25px', left: '50%', transform: 'translateX(-50%)', width: '280px', height: '60px', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', borderRadius: '30px', display: 'flex', alignItems: 'center', justifyContent: 'space-around', boxShadow: '0 8px 30px rgba(0,0,0,0.15)', zIndex: 2000, border: '1px solid #eee' }}>
           <button onClick={goPrev} style={floatingBtnStyle}>◀</button>
           <button onClick={goToday} style={{ ...floatingBtnStyle, fontSize: '1rem', width: '80px', color: '#2563eb' }}>今日</button>
           <button onClick={goNext} style={floatingBtnStyle}>▶</button>
         </div>
       )}
 
-      {/* モーダル類 */}
+      {/* 詳細ポップアップ */}
       {showDetailModal && selectedRes && (
         <div onClick={() => setShowDetailModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalContentStyle, maxWidth: '450px' }}>
             <h3 style={{ marginTop: 0 }}>{selectedRes.res_type === 'blocked' ? '予約不可の解除' : `${selectedRes.customer_name} 様`}</h3>
             <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '16px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
-              {selectedRes.res_type === 'blocked' ? (
-                <p style={{ fontWeight: 'bold', color: '#ef4444', margin: 0 }}>🚫 この枠を予約可能に戻しますか？</p>
-              ) : (
+              {selectedRes.res_type === 'blocked' ? <p style={{ fontWeight: 'bold', color: '#ef4444', margin: 0 }}>🚫 この枠を予約可能に戻しますか？</p> : (
                 <>
                   <div style={{ color: '#0369a1', fontWeight: '900', fontSize: '1.1rem', marginBottom: '10px' }}>✂️ {selectedRes.options?.services?.map(s => s.name).join(' / ')}</div>
-                  <div style={{ fontSize: '0.9rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '0.9rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <span>📅 <b>日時:</b> {new Date(selectedRes.start_time).toLocaleString('ja-JP', {month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
                     <span>📞 <b>電話:</b> {selectedRes.customer_phone === '---' ? '未登録' : selectedRes.customer_phone}</span>
                     <span>✉️ <b>メール:</b> {selectedRes.customer_email === 'admin@example.com' ? '未登録' : selectedRes.customer_email}</span>
@@ -336,13 +335,14 @@ function AdminReservations() {
               </div>
             )}
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => deleteRes(selectedRes.id)} style={{ flex: 1, padding: '15px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>{selectedRes.res_type === 'blocked' ? '解除（◎にする）' : '予約を消去'}</button>
-              <button onClick={() => setShowDetailModal(false)} style={{ flex: 1, padding: '15px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>閉じる</button>
+              <button onClick={() => deleteRes(selectedRes.id)} style={{ flex: 1, padding: '15px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>消去</button>
+              <button onClick={() => setShowDetailModal(false)} style={{ flex: 1, padding: '15px', background: '#f1f5f9', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>閉じる</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ねじ込み予約モーダル */}
       {showMenuModal && (
         <div onClick={() => setShowMenuModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '35px', borderRadius: '30px', width: '90%', maxWidth: '340px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
@@ -360,10 +360,9 @@ function AdminReservations() {
   );
 }
 
-// 💡 スタイル定義
 const headerBtnStylePC = { padding: '12px 24px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' };
-const mobileArrowBtnStyle = { background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1rem', color: '#1e293b', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
-const floatingBtnStyle = { background: 'none', border: 'none', fontSize: '1.4rem', fontWeight: 'bold', color: '#475569', cursor: 'pointer', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const mobileArrowBtnStyle = { background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1rem', color: '#1e293b', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const floatingBtnStyle = { background: 'none', border: 'none', fontSize: '1.4rem', fontWeight: 'bold', color: '#475569', cursor: 'pointer', padding: '10px' };
 const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', fontSize: '1rem', color: '#2563eb', padding: '0 5px' };
 const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px', backdropFilter: 'blur(8px)' };
 const modalContentStyle = { background: '#fff', width: '100%', maxWidth: '400px', borderRadius: '25px', padding: '30px' };
