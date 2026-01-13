@@ -25,7 +25,6 @@ function TimeSelection() {
     if (profile) setShop(profile);
 
     try {
-      // 🔵 既存予約を取得して、後で比較できるようにする
       const { data: resData, error } = await supabase
         .from('reservations')
         .select('start_time, end_time')
@@ -77,14 +76,11 @@ function TimeSelection() {
     return slots;
   }, [shop]);
 
-  // 🔵 予約済みかどうかを判定する関数
   const isTimeBooked = (targetDateTime, durationMin) => {
     const potentialEnd = new Date(targetDateTime.getTime() + durationMin * 60000);
-    
     return existingReservations.some(res => {
       const resStart = new Date(res.start_time);
       const resEnd = new Date(res.end_time);
-      // 新しい予約の時間が、既存の予約の時間と重なっているかチェック
       return (targetDateTime < resEnd && potentialEnd > resStart);
     });
   };
@@ -93,6 +89,12 @@ function TimeSelection() {
     if (!shop || !shop.business_hours) return { status: 'none' };
     const dayOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()];
     const hours = shop.business_hours[dayOfWeek];
+
+    // 💡 修正：日本時間の今日の日付を確実に取得（toISOString()の不具合を解消）
+    const getJapanDateStr = (d) => d.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+    const dateStr = getJapanDateStr(date);
+    const now = new Date();
+    const todayStr = getJapanDateStr(now);
 
     // 定休日・営業時間外チェック
     if (!hours || hours.is_closed) return { status: 'closed', label: '休' };
@@ -103,12 +105,24 @@ function TimeSelection() {
       if (timeStr >= hours.rest_start && timeStr < hours.rest_end) return { status: 'rest', label: '休' };
     }
 
-    const targetDateTime = new Date(`${date.toISOString().split('T')[0]}T${timeStr}`);
+    const targetDateTime = new Date(`${dateStr}T${timeStr}:00`);
     
-    // 過去の時間・リードタイム制限
-    const now = new Date();
-    const limitTime = new Date(now.getTime() + (shop.min_lead_time_hours || 0) * 60 * 60 * 1000);
-    if (targetDateTime < limitTime) return { status: 'past', label: '－' };
+    // 💡 修正：予約制限（当日〜3日後）のロジック刷新
+    // minLeadTimeHours が 24(1日), 48(2日), 72(3日) などの場合
+    const limitDays = Math.floor((shop.min_lead_time_hours || 0) / 24);
+    const limitDate = new Date(now);
+    limitDate.setHours(0, 0, 0, 0);
+    limitDate.setDate(limitDate.getDate() + limitDays);
+
+    // 今日（0日前）なら現在時刻より前の枠を「－」にする
+    if (dateStr === todayStr && targetDateTime < now) {
+      return { status: 'past', label: '－' };
+    }
+
+    // 設定された日数より前の日付を「－」にする
+    if (new Date(dateStr) < limitDate) {
+      return { status: 'past', label: '－' };
+    }
 
     const interval = shop.slot_interval_min || 15;
     const totalMinRequired = (totalSlotsNeeded * interval);
@@ -116,19 +130,17 @@ function TimeSelection() {
 
     // 営業時間内に収まるか（終了時間チェック）
     const [closeH, closeM] = hours.close.split(':').map(Number);
-    const closeDateTime = new Date(date);
-    closeDateTime.setHours(closeH, closeM, 0, 0);
+    const closeDateTime = new Date(`${dateStr}T${String(closeH).padStart(2,'0')}:${String(closeM).padStart(2,'0')}:00`);
     if (potentialEndTime > closeDateTime) return { status: 'short', label: '△' };
 
     // 休憩時間にかぶらないか
     if (hours.rest_start) {
-      const restDateTime = new Date(date);
       const [rH, rM] = hours.rest_start.split(':').map(Number);
-      restDateTime.setHours(rH, rM, 0, 0);
-      if (targetDateTime < restDateTime && potentialEndTime > restDateTime) return { status: 'short', label: '△' };
+      const restStartDateTime = new Date(`${dateStr}T${String(rH).padStart(2,'0')}:${String(rM).padStart(2,'0')}:00`);
+      if (targetDateTime < restStartDateTime && potentialEndTime > restStartDateTime) return { status: 'short', label: '△' };
     }
 
-    // 🔵 既存の予約と重なっているかチェック（ここが重要！）
+    // 既存予約重複チェック
     if (isTimeBooked(targetDateTime, totalMinRequired)) {
       return { status: 'booked', label: '×' };
     }
@@ -155,35 +167,13 @@ function TimeSelection() {
         <button style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #ddd', background: '#fff', fontSize: '0.8rem' }} onClick={() => { const d = new Date(startDate); d.setDate(d.getDate() + 7); setStartDate(d); }}>次週</button>
       </div>
 
-      <div style={{ 
-        overflow: 'auto', 
-        maxHeight: '65vh', 
-        border: '1px solid #e2e8f0', 
-        position: 'relative',
-        margin: '0 5px',
-        borderRadius: '8px'
-      }}>
-        <table style={{ 
-          width: '100%', 
-          borderCollapse: 'separate', 
-          borderSpacing: 0, 
-          tableLayout: 'fixed' 
-        }}>
+      <div style={{ overflow: 'auto', maxHeight: '65vh', border: '1px solid #e2e8f0', position: 'relative', margin: '0 5px', borderRadius: '8px' }}>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th style={{ 
-                width: '14%', 
-                background: '#f8fafc', borderRight: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0',
-                position: 'sticky', top: 0, left: 0, zIndex: 50 
-              }}></th>
+              <th style={{ width: '14%', background: '#f8fafc', borderRight: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, left: 0, zIndex: 50 }}></th>
               {weekDays.map(date => (
-                <th key={date.toString()} style={{ 
-                  width: '12.28%',
-                  padding: '8px 0', 
-                  background: date.getDay() === 0 ? '#fff1f2' : date.getDay() === 6 ? '#eff6ff' : '#f8fafc', 
-                  borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #e2e8f0',
-                  position: 'sticky', top: 0, zIndex: 40 
-                }}>
+                <th key={date.toString()} style={{ width: '12.28%', padding: '8px 0', background: date.getDay() === 0 ? '#fff1f2' : date.getDay() === 6 ? '#eff6ff' : '#f8fafc', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 40 }}>
                   <div style={{ fontSize: '0.55rem', color: '#64748b' }}>{['日', '月', '火', '水', '木', '金', '土'][date.getDay()]}</div>
                   <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{date.getDate()}</div>
                 </th>
@@ -193,31 +183,15 @@ function TimeSelection() {
           <tbody>
             {timeSlots.map(time => (
               <tr key={time}>
-                <td style={{ 
-                  padding: '8px 0', textAlign: 'center', fontSize: '0.65rem', fontWeight: 'bold', color: '#64748b',
-                  background: '#f8fafc', borderRight: '2px solid #e2e8f0', borderBottom: '1px solid #e2e8f0',
-                  position: 'sticky', left: 0, zIndex: 30 
-                }}>{time}</td>
+                <td style={{ padding: '8px 0', textAlign: 'center', fontSize: '0.65rem', fontWeight: 'bold', color: '#64748b', background: '#f8fafc', borderRight: '2px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', position: 'sticky', left: 0, zIndex: 30 }}>{time}</td>
                 {weekDays.map(date => {
                   const result = checkAvailability(date, time);
-                  const dateStr = date.toISOString().split('T')[0];
+                  const dateStr = date.toLocaleDateString('sv-SE');
                   const isSelected = selectedDateTime.date === dateStr && selectedDateTime.time === time;
                   
                   return (
-                    <td 
-                      key={date.toString()} 
-                      onClick={() => result.status === 'available' && setSelectedDateTime({ date: dateStr, time: time })}
-                      style={{ 
-                        textAlign: 'center', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0',
-                        cursor: result.status === 'available' ? 'pointer' : 'default',
-                        background: isSelected ? '#2563eb' : (['none', 'closed', 'rest', 'past', 'booked'].includes(result.status) ? '#f1f5f9' : '#fff'),
-                        color: isSelected ? '#fff' : (result.status === 'available' ? '#2563eb' : '#cbd5e1'),
-                        height: '42px'
-                      }}
-                    >
-                      <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>
-                        {result.label || (result.status === 'available' ? '◎' : '')}
-                      </div>
+                    <td key={date.toString()} onClick={() => result.status === 'available' && setSelectedDateTime({ date: dateStr, time: time })} style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', cursor: result.status === 'available' ? 'pointer' : 'default', background: isSelected ? '#2563eb' : (['none', 'closed', 'rest', 'past', 'booked'].includes(result.status) ? '#f1f5f9' : '#fff'), color: isSelected ? '#fff' : (result.status === 'available' ? '#2563eb' : '#cbd5e1'), height: '42px' }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{result.label || (result.status === 'available' ? '◎' : '')}</div>
                     </td>
                   );
                 })}
@@ -232,10 +206,7 @@ function TimeSelection() {
           <div style={{ marginBottom: '10px', fontSize: '0.9rem' }}>
             選択：<b>{selectedDateTime.date.replace(/-/g, '/')} {selectedDateTime.time}</b>
           </div>
-          <button 
-            style={{ width: '100%', maxWidth: '400px', padding: '16px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}
-            onClick={() => navigate(`/shop/${shopId}/confirm`, { state: { ...location.state, ...selectedDateTime } })}
-          >
+          <button style={{ width: '100%', maxWidth: '400px', padding: '16px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }} onClick={() => navigate(`/shop/${shopId}/confirm`, { state: { ...location.state, ...selectedDateTime } })}>
             予約内容の確認へ進む
           </button>
         </div>
