@@ -7,6 +7,8 @@ import SuperAdmin from './pages/SuperAdmin';
 import TimeSelection from './pages/TimeSelection'; 
 import ConfirmReservation from './pages/ConfirmReservation';
 import AdminReservations from './pages/AdminReservations';
+import TrialRegistration from './pages/TrialRegistration';
+
 // 💡 追加：キャンセル画面を呼び出す合図
 import CancelReservation from './pages/CancelReservation';
 
@@ -17,6 +19,9 @@ function App() {
         <Routes>
           {/* 三土手さん専用の管理画面（秘密のパス） */}
           <Route path="/super-admin-snipsnap" element={<SuperAdmin />} />
+          
+          {/* トライアル申し込み画面 */}
+          <Route path="/trial-registration" element={<TrialRegistration />} />
 
           {/* ポータル（ホーム）画面 */}
           <Route path="/" element={<Home />} />
