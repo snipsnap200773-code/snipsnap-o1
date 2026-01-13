@@ -63,59 +63,37 @@ function AdminDashboard() {
   const [minLeadTimeHours, setMinLeadTimeHours] = useState(0); 
   const [autoFillLogic, setAutoFillLogic] = useState(true); 
 
-  const dayMap = {
-    mon: '月曜日', tue: '火曜日', wed: '水曜日', thu: '木曜日',
-    fri: '金曜日', sat: '土曜日', sun: '日曜日'
-  };
+  const dayMap = { mon: '月曜日', tue: '火曜日', wed: '水曜日', thu: '木曜日', fri: '金曜日', sat: '土曜日', sun: '日曜日' };
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     showMsg('コピーしました！');
   };
 
-  useEffect(() => {
-    fetchInitialShopData();
-  }, [shopId]);
+  useEffect(() => { fetchInitialShopData(); }, [shopId]);
 
   const fetchInitialShopData = async () => {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', shopId).single();
+    const { data } = await supabase.from('profiles').select('*').eq('id', shopId).single();
     if (data) {
-      setShopData(data);
-      setAllowMultiple(data.allow_multiple_services);
-      setPhone(data.phone || '');
-      setEmailContact(data.email_contact || '');
-      setAddress(data.address || '');
-      setDescription(data.description || '');
-      setNotes(data.notes || '');
-      setBusinessHours(data.business_hours || {});
-      setMaxLastSlots(data.max_last_slots || 2);
-      setSlotIntervalMin(data.slot_interval_min || 15);
-      setBufferPreparationMin(data.buffer_preparation_min || 0);
-      setMinLeadTimeHours(data.min_lead_time_hours || 0);
-      setAutoFillLogic(data.auto_fill_logic ?? true);
-      setImageUrl(data.image_url || '');
-      setOfficialUrl(data.official_url || '');
-      setLineOfficialUrl(data.line_official_url || '');
-      setNotifyLineEnabled(data.notify_line_enabled ?? true);
-      setBusinessName(data.business_name || '');
-      setBusinessNameKana(data.business_name_kana || '');
-      setOwnerName(data.owner_name || '');
-      setOwnerNameKana(data.owner_name_kana || '');
-      setBusinessType(data.business_type || '');
-      setLineToken(data.line_channel_access_token || '');
-      setLineAdminId(data.line_admin_user_id || '');
+      setShopData(data); setAllowMultiple(data.allow_multiple_services); setPhone(data.phone || '');
+      setEmailContact(data.email_contact || ''); setAddress(data.address || ''); setDescription(data.description || '');
+      setNotes(data.notes || ''); setBusinessHours(data.business_hours || {}); setMaxLastSlots(data.max_last_slots || 2);
+      setSlotIntervalMin(data.slot_interval_min || 15); setBufferPreparationMin(data.buffer_preparation_min || 0);
+      setMinLeadTimeHours(data.min_lead_time_hours || 0); setAutoFillLogic(data.auto_fill_logic ?? true);
+      setImageUrl(data.image_url || ''); setOfficialUrl(data.official_url || ''); setLineOfficialUrl(data.line_official_url || '');
+      setNotifyLineEnabled(data.notify_line_enabled ?? true); setBusinessName(data.business_name || '');
+      setBusinessNameKana(data.business_name_kana || ''); setOwnerName(data.owner_name || '');
+      setOwnerNameKana(data.owner_name_kana || ''); setBusinessType(data.business_type || '');
+      setLineToken(data.line_channel_access_token || ''); setLineAdminId(data.line_admin_user_id || '');
     }
   };
 
-  useEffect(() => {
-    if (isAuthorized) fetchMenuDetails();
-  }, [isAuthorized]);
+  useEffect(() => { if (isAuthorized) fetchMenuDetails(); }, [isAuthorized]);
 
   const fetchMenuDetails = async () => {
     const catRes = await supabase.from('service_categories').select('*').eq('shop_id', shopId).order('sort_order', { ascending: true });
     const servRes = await supabase.from('services').select('*').eq('shop_id', shopId).order('sort_order', { ascending: true });
     const optRes = await supabase.from('service_options').select('*'); 
-
     if (catRes.data) setCategories(catRes.data);
     if (servRes.data) setServices(servRes.data);
     if (optRes.data) setOptions(optRes.data);
@@ -127,15 +105,9 @@ function AdminDashboard() {
     else alert("パスワードが違います");
   };
 
-  const showMsg = (txt) => {
-    setMessage(txt);
-    setTimeout(() => setMessage(''), 3000);
-  };
+  const showMsg = (txt) => { setMessage(txt); setTimeout(() => setMessage(''), 3000); };
 
-  const changeTab = (tabName) => {
-    setActiveTab(tabName);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const changeTab = (tabName) => { setActiveTab(tabName); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   const handleFinalSave = async () => {
     const { error } = await supabase.from('profiles').update({
@@ -156,14 +128,9 @@ function AdminDashboard() {
     const idx = list.findIndex(item => item.id === id);
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= list.length) return;
-    const newList = [...list];
-    const [moved] = newList.splice(idx, 1);
-    newList.splice(targetIdx, 0, moved);
+    const newList = [...list]; const [moved] = newList.splice(idx, 1); newList.splice(targetIdx, 0, moved);
     const table = type === 'category' ? 'service_categories' : 'services';
-    const updates = newList.map((item, i) => ({
-      id: item.id, shop_id: shopId, sort_order: i, name: item.name,
-      ...(type === 'service' ? { slots: item.slots, category: item.category } : {})
-    }));
+    const updates = newList.map((item, i) => ({ id: item.id, shop_id: shopId, sort_order: i, name: item.name, ...(type === 'service' ? { slots: item.slots, category: item.category } : {}) }));
     await supabase.from(table).upsert(updates);
     fetchMenuDetails();
   };
@@ -216,7 +183,7 @@ function AdminDashboard() {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', fontFamily: 'sans-serif' }}>
         <form onSubmit={handleAuth} style={{ background: '#fff', padding: '40px', borderRadius: '20px', textAlign: 'center', width: '90%', maxWidth: '350px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', boxSizing: 'border-box' }}>
-          <h2 style={{ marginBottom: '10px' }}>管理者認証 🔒</h2>
+          <h2>管理者認証 🔒</h2>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '25px' }}>設定を変更するには合言葉を入力してください</p>
           <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} placeholder="パスワードを入力" style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', marginBottom: '20px', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.1rem' }} />
           <button type="submit" style={{ width: '100%', padding: '15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>ログイン</button>
@@ -225,9 +192,9 @@ function AdminDashboard() {
     );
   }
 
-  // 💡 スマホ専用：はみ出しと余白を完全に抑え込む共通スタイル
-  const cardStyle = { marginBottom: '20px', background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', boxSizing: 'border-box', width: '100%', overflow: 'hidden' };
-  const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box', fontSize: '1rem', background: '#fff' };
+  // 💡 スマホ最適化用スタイル定数
+  const sectionStyle = { marginBottom: '20px', background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', boxSizing: 'border-box', width: '100%' };
+  const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box', fontSize: '1rem', outline: 'none' };
 
   return (
     <div style={{ fontFamily: 'sans-serif', maxWidth: '700px', margin: '0 auto', paddingBottom: '120px', boxSizing: 'border-box', width: '100%' }}>
@@ -248,7 +215,7 @@ function AdminDashboard() {
         {/* --- 🛠️ メニュータブ --- */}
         {activeTab === 'menu' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
-            <section style={{ ...cardStyle, border: '1px solid #2563eb' }}>
+            <section style={{ ...sectionStyle, border: '1px solid #2563eb' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: '#2563eb' }}>🛡️ 予約ルール</h3>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <input type="checkbox" checked={allowMultiple} onChange={(e) => setAllowMultiple(e.target.checked)} style={{ width: '22px', height: '22px' }} />
@@ -256,7 +223,7 @@ function AdminDashboard() {
               </label>
             </section>
 
-            <section style={cardStyle}>
+            <section style={sectionStyle}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📂 カテゴリ設定</h3>
               <form onSubmit={handleCategorySubmit} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
                 <input placeholder="カテゴリ名" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} style={{ ...inputStyle, flex: 1 }} required />
@@ -286,17 +253,17 @@ function AdminDashboard() {
                     {editingDisableCatId === c.id && (
                       <div style={{ marginTop: '10px', padding: '10px', background: '#fff', borderRadius: '12px', border: '1px solid #2563eb' }}>
                         <p style={{ fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '8px', color: '#ef4444' }}>🚫 選択時に無効化するカテゴリ：</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '15px' }}>
-                          {categories.filter(target => target.id !== c.id).map(target => {
-                            const isSelected = c.disable_categories?.split(',').includes(target.name);
-                            return <button key={target.id} onClick={() => handleToggleDisableCat(c.id, target.name)} style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '15px', border: '1px solid', borderColor: isSelected ? '#ef4444' : '#ccc', background: isSelected ? '#fee2e2' : '#fff', color: isSelected ? '#ef4444' : '#666' }}>{isSelected ? '✕ ' : '+ '} {target.name}</button>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '12px' }}>
+                          {categories.filter(t => t.id !== c.id).map(t => {
+                            const isSelected = c.disable_categories?.split(',').includes(t.name);
+                            return <button key={t.id} onClick={() => handleToggleDisableCat(c.id, t.name)} style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '15px', border: '1px solid', borderColor: isSelected ? '#ef4444' : '#ccc', background: isSelected ? '#fee2e2' : '#fff', color: isSelected ? '#ef4444' : '#666' }}>{t.name}</button>
                           })}
                         </div>
                         <p style={{ fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '8px', color: '#2563eb' }}>✅ 選択時に必須となるカテゴリ：</p>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                          {categories.filter(target => target.id !== c.id).map(target => {
-                            const isSelected = c.required_categories?.split(',').includes(target.name);
-                            return <button key={target.id} onClick={() => handleToggleRequiredCat(c.id, target.name)} style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '15px', border: '1px solid', borderColor: isSelected ? '#2563eb' : '#ccc', background: isSelected ? '#dbeafe' : '#fff', color: isSelected ? '#2563eb' : '#666' }}>{isSelected ? '✕ ' : '+ '} {target.name}</button>
+                          {categories.filter(t => t.id !== c.id).map(t => {
+                            const isSelected = c.required_categories?.split(',').includes(t.name);
+                            return <button key={t.id} onClick={() => handleToggleRequiredCat(c.id, t.name)} style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: '15px', border: '1px solid', borderColor: isSelected ? '#2563eb' : '#ccc', background: isSelected ? '#dbeafe' : '#fff', color: isSelected ? '#2563eb' : '#666' }}>{t.name}</button>
                           })}
                         </div>
                       </div>
@@ -306,7 +273,7 @@ function AdminDashboard() {
               </div>
             </section>
 
-            <section style={{ ...cardStyle, background: '#f8fafc' }}>
+            <section style={{ ...sectionStyle, background: '#f8fafc' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メニュー登録・編集</h3>
               <form onSubmit={handleServiceSubmit}>
                 <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} style={{ ...inputStyle, marginBottom: '10px' }} required>
@@ -328,7 +295,7 @@ function AdminDashboard() {
               <div key={cat.id} style={{ marginBottom: '25px', width: '100%', boxSizing: 'border-box' }}>
                 <h4 style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '10px', borderLeft: '4px solid #cbd5e1', paddingLeft: '8px' }}>{cat.name}</h4>
                 {services.filter(s => s.category === cat.name).map((s, idxInCat) => (
-                  <div key={s.id} style={{ ...cardStyle, marginBottom: '10px', padding: '12px 15px' }}>
+                  <div key={s.id} style={{ ...sectionStyle, marginBottom: '10px', padding: '12px 15px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 'bold' }}>{s.name}</div>
@@ -344,18 +311,27 @@ function AdminDashboard() {
                         <button onClick={() => deleteService(s.id)}>×</button>
                       </div>
                     </div>
+                    {/* 💡 多段枝分かれ設定エリア */}
                     {activeServiceForOptions?.id === s.id && (
                       <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
-                        <p style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>🌿 枝分かれメニュー（オプション）：</p>
-                        <form onSubmit={handleOptionSubmit} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
-                          <input placeholder="枝名" value={optName} onChange={(e) => setOptName(e.target.value)} style={{ ...inputStyle, flex: 1, padding: '8px' }} />
-                          <input type="number" value={optSlots} onChange={(e) => setOptSlots(parseInt(e.target.value))} style={{ width: '50px', padding: '8px', border: '1px solid #ddd', borderRadius: '8px' }} />
-                          <button type="submit" style={{ padding: '0 10px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px' }}>＋</button>
+                        <p style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '10px' }}>🌿 枝分かれ（多段カテゴリ設定）</p>
+                        <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '15px' }}>
+                          <input placeholder="枝カテゴリ名（例：ブリーチ回数）" value={optGroupName} onChange={(e) => setOptGroupName(e.target.value)} style={inputStyle} />
+                          <div style={{ display: 'flex', gap: '5px' }}>
+                            <input placeholder="選択肢（例：1回）" value={optName} onChange={(e) => setOptName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                            <input type="number" value={optSlots} onChange={(e) => setOptSlots(parseInt(e.target.value))} style={{ width: '60px', ...inputStyle }} />
+                            <button type="submit" style={{ padding: '0 15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px' }}>＋</button>
+                          </div>
                         </form>
-                        {options.filter(o => o.service_id === s.id).map(o => (
-                          <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '5px 0', borderBottom: '1px solid #eee' }}>
-                            <span>{o.option_name} (+{o.additional_slots}コマ)</span>
-                            <button onClick={() => deleteOption(o.id)} style={{ border: 'none', color: '#ef4444' }}>×</button>
+                        {Array.from(new Set(options.filter(o => o.service_id === s.id).map(o => o.group_name))).map(group => (
+                          <div key={group} style={{ marginBottom: '10px' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '4px' }}>▼ {group || '共通枝'}</div>
+                            {options.filter(o => o.service_id === s.id && o.group_name === group).map(o => (
+                              <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '5px 8px', background: '#fff', borderRadius: '6px', border: '1px solid #eee', marginBottom: '3px' }}>
+                                <span>{o.option_name} (+{o.additional_slots}コマ)</span>
+                                <button onClick={() => deleteOption(o.id)} style={{ color: '#ef4444', border: 'none', background: 'none' }}>×</button>
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>
@@ -370,7 +346,7 @@ function AdminDashboard() {
         {/* --- ⏰ 営業時間タブ --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
-            <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
+            <section style={{ ...sectionStyle, border: '2px solid #2563eb' }}>
               <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#2563eb' }}>⚙️ 詳細予約エンジンの設定</h3>
               <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>1コマの単位</label><div style={{ display: 'flex', gap: '10px' }}>{[15, 30].map(min => (<button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? '#2563eb' : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '8px' }}>{min}分</button>))}</div></div>
               <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>準備時間（インターバル）</label><select value={bufferPreparationMin} onChange={(e) => setBufferPreparationMin(parseInt(e.target.value))} style={inputStyle}><option value={0}>なし</option><option value={15}>15分</option><option value={30}>30分</option></select></div>
@@ -378,21 +354,19 @@ function AdminDashboard() {
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><input type="checkbox" checked={autoFillLogic} onChange={(e) => setAutoFillLogic(e.target.checked)} style={{ width: '22px', height: '22px' }} /><b>自動詰め機能を有効にする</b></label>
             </section>
             
-            <section style={cardStyle}>
+            <section style={sectionStyle}>
               <h3 style={{ marginTop: 0 }}>⏰ 基本営業時間と休憩</h3>
               {Object.keys(dayMap).map(day => (
                 <div key={day} style={{ borderBottom: '1px solid #f1f5f9', padding: '15px 0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <b style={{ fontSize: '1rem' }}>{dayMap[day]}</b>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={!businessHours[day]?.is_closed} onChange={(e) => {
-                        const h = { ...businessHours }; h[day] = { ...h[day], is_closed: !e.target.checked }; setBusinessHours(h);
-                      }} style={{ width: '18px', height: '18px' }} />
+                      <input type="checkbox" checked={!businessHours[day]?.is_closed} onChange={(e) => setBusinessHours({...businessHours, [day]: {...businessHours[day], is_closed: !e.target.checked}})} style={{ width: '18px', height: '18px' }} />
                       {businessHours[day]?.is_closed ? <span style={{ color: '#ef4444', fontWeight: 'bold' }}>定休日</span> : '営業中'}
                     </label>
                   </div>
                   {!businessHours[day]?.is_closed && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 15, padding: '10px', background: '#f8fafc', borderRadius: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 15, padding: '12px', background: '#f8fafc', borderRadius: '10px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: '0.8rem', width: '35px' }}>営業</span>
                         <input type="time" value={businessHours[day]?.open || '09:00'} onChange={(e) => setBusinessHours({...businessHours, [day]: {...businessHours[day], open: e.target.value}})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
@@ -416,54 +390,35 @@ function AdminDashboard() {
         {/* --- 🏪 店舗情報タブ --- */}
         {activeTab === 'info' && (
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <section style={{ ...cardStyle, padding: '20px' }}>
+            <section style={{ ...sectionStyle, padding: '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <UrlBox label={`🔑 店舗主用設定 (PW: ${shopData?.admin_password})`} url={`${window.location.origin}/admin/${shopId}`} color="#2563eb" copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} />
-                <UrlBox label="💬 LINEリッチメニュー用URL（読込爆速）" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
+                <UrlBox label={`🔑 管理用PW: ${shopData?.admin_password}`} url={`${window.location.origin}/admin/${shopId}`} color="#2563eb" copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} />
+                <UrlBox label="💬 LINEリッチメニュー用URL" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
                 <UrlBox label="📅 お客様用予約（一般Web用）" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
               </div>
             </section>
 
-            <section style={cardStyle}>
+            <section style={sectionStyle}>
               <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィールの設定</h3>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗名</label>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={inputStyle} placeholder="店舗名" />
-                <input value={businessNameKana} onChange={(e) => setBusinessNameKana(e.target.value)} style={inputStyle} placeholder="かな" />
-              </div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>代表者名</label>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} style={inputStyle} placeholder="代表者名" />
-                <input value={ownerNameKana} onChange={(e) => setOwnerNameKana(e.target.value)} style={inputStyle} placeholder="かな" />
-              </div>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>業種</label>
-              <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}>
-                <option value="美容室・理容室">美容室・理容室</option>
-                <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
-                <option value="エステ・リラク">エステ・リラク</option>
-                <option value="整体・接骨院">整体・接骨院</option>
-                <option value="飲食店">飲食店</option>
-                <option value="その他">その他</option>
-              </select>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>画像URL</label>
-              <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="https://..." />
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>住所</label>
-              <input value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="住所" />
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>電話番号</label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>メール</label>
-              <input type="email" value={emailContact} onChange={(e) => setEmailContact(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>注意事項</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} placeholder="予約時の注意など" />
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>店舗名 / かな</label>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={inputStyle} /><input value={businessNameKana} onChange={(e) => setBusinessNameKana(e.target.value)} style={inputStyle} /></div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>代表者名 / かな</label>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} style={inputStyle} /><input value={ownerNameKana} onChange={(e) => setOwnerNameKana(e.target.value)} style={inputStyle} /></div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>業種</label>
+              <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}><option value="美容室・理容室">美容室・理容室</option><option value="その他">その他</option></select>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>メール</label><input type="email" value={emailContact} onChange={(e) => setEmailContact(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>注意事項</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} />
             </section>
 
-            <section style={{ ...cardStyle, border: '1px solid #00b900' }}>
-              <h3 style={{ marginTop: 0, color: '#00b900', display: 'flex', alignItems: 'center', gap: '8px' }}><span>💬</span> LINE公式アカウント連携ガイド</h3>
+            <section style={{ ...sectionStyle, border: '1px solid #00b900' }}>
+              <h3 style={{ marginTop: 0, color: '#00b900' }}>💬 LINE公式アカウント連携ガイド</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {guideSteps.map(s => (
-                  <div key={s.step} style={{ display: 'flex', gap: '10px', background: '#f0fdf4', padding: '12px', borderRadius: '10px', alignItems: 'center', boxSizing: 'border-box' }}>
-                    <div style={{ width: '24px', height: '24px', background: '#00b900', color: '#fff', borderRadius: '50%', textAlign: 'center', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{s.step}</div>
-                    <div style={{ fontSize: '0.75rem' }}><b>{s.title}</b><br/>{s.desc}</div>
+                {guideSteps.map(item => (
+                  <div key={item.step} style={{ display: 'flex', gap: '10px', background: '#f0fdf4', padding: '12px', borderRadius: '10px', alignItems: 'center' }}>
+                    <div style={{ width: '24px', height: '24px', background: '#00b900', color: '#fff', borderRadius: '50%', textAlign: 'center', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.step}</div>
+                    <div style={{ fontSize: '0.75rem' }}><b>{item.title}</b><br/>{item.desc}</div>
                   </div>
                 ))}
                 <div style={{ marginTop: '10px', padding: '15px', background: '#f0fdf4', borderRadius: '12px', boxSizing: 'border-box' }}>
@@ -471,10 +426,8 @@ function AdminDashboard() {
                     <input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} />
                     <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 LINE通知を有効にする</span>
                   </label>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d', display: 'block', marginBottom: '5px' }}>Access Token</label>
-                  <input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} style={inputStyle} />
-                  <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d', marginTop: '10px', display: 'block', marginBottom: '5px' }}>Admin User ID</label>
-                  <input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} style={inputStyle} placeholder="Uxxxxxxxx..." />
+                  <label style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>Access Token</label><input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} style={inputStyle} />
+                  <label style={{ fontSize: '0.7rem', fontWeight: 'bold', marginTop: '10px', display: 'block' }}>User ID</label><input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} style={inputStyle} />
                 </div>
               </div>
             </section>
@@ -482,22 +435,20 @@ function AdminDashboard() {
         )}
       </div>
 
-      {/* 💾 保存ボタン（フローティング） */}
-      <div style={{ position: 'fixed', bottom: '25px', right: '20px', zIndex: 1000 }}>
-        <button onClick={handleFinalSave} style={{ padding: '18px 35px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '40px', fontWeight: 'bold', boxShadow: '0 8px 30px rgba(37,99,235,0.4)', fontSize: '1rem', cursor: 'pointer' }}>
-          設定を保存する 💾
-        </button>
+      {/* 💾 保存ボタン */}
+      <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 1000 }}>
+        <button onClick={handleFinalSave} style={{ padding: '18px 35px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '40px', fontWeight: 'bold', boxShadow: '0 8px 20px rgba(37,99,235,0.4)', cursor: 'pointer' }}>設定を保存する 💾</button>
       </div>
     </div>
   );
 }
 
 const UrlBox = ({ label, url, color, copy }) => (
-  <div style={{ boxSizing: 'border-box', width: '100%', marginBottom: '10px' }}>
-    <label style={{ fontSize: '0.7rem', color, fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>{label}</label>
-    <div style={{ display: 'flex', gap: '5px' }}>
+  <div style={{ boxSizing: 'border-box', width: '100%' }}>
+    <label style={{ fontSize: '0.7rem', color, fontWeight: 'bold' }}>{label}</label>
+    <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
       <input readOnly value={url} style={{ flex: 1, padding: '10px', fontSize: '0.75rem', background: '#f8fafc', border: '1px solid #eee', borderRadius: '10px', boxSizing: 'border-box' }} />
-      <button onClick={copy} style={{ padding: '8px 12px', background: '#fff', border: `1px solid ${color}`, color, borderRadius: '10px', fontWeight: 'bold', fontSize: '0.75rem', cursor: 'pointer' }}>コピー</button>
+      <button onClick={copy} style={{ padding: '8px 12px', background: '#fff', border: `1px solid ${color}`, color, borderRadius: '10px', fontWeight: 'bold', fontSize: '0.75rem' }}>コピー</button>
     </div>
   </div>
 );
@@ -507,7 +458,7 @@ const guideSteps = [
   { step: '2', title: 'Messaging API有効化', desc: '管理画面の設定から有効にしてください。' },
   { step: '3', title: 'アクセストークン取得', desc: 'LINE Developersでトークンを発行。' },
   { step: '4', title: 'ユーザーIDの確認', desc: 'Messaging API設定にある「あなたのユーザーID」。' },
-  { step: '5', title: '設定画面への入力', desc: '取得した情報を下の項目に入力して保存。' },
+  { step: '5', title: '設定画面への入力', desc: '取得した情報を下に入力して保存。' },
   { step: '6', title: 'リッチメニュー設定', desc: 'URLをコピーしてLINE側に貼り付け！' }
 ];
 
