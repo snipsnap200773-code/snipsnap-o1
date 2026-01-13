@@ -41,21 +41,18 @@ function AdminDashboard() {
   const [maxLastSlots, setMaxLastSlots] = useState(2);
   const [imageUrl, setImageUrl] = useState(''); // 店舗画像URL (復活)
 
-  // 店舗名・オーナー・業種
   const [businessName, setBusinessName] = useState('');
   const [businessNameKana, setBusinessNameKana] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [ownerNameKana, setOwnerNameKana] = useState('');
   const [businessType, setBusinessType] = useState('');
 
-  // 外部URL・LINE
   const [officialUrl, setOfficialUrl] = useState('');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('');
   const [notifyLineEnabled, setNotifyLineEnabled] = useState(true);
   const [lineToken, setLineToken] = useState('');
   const [lineAdminId, setLineAdminId] = useState('');
 
-  // 詳細予約ルール
   const [slotIntervalMin, setSlotIntervalMin] = useState(15); 
   const [bufferPreparationMin, setBufferPreparationMin] = useState(0); 
   const [minLeadTimeHours, setMinLeadTimeHours] = useState(0); 
@@ -176,20 +173,6 @@ function AdminDashboard() {
   const deleteService = async (id) => { if (window.confirm('削除しますか？')) { await supabase.from('services').delete().eq('id', id); fetchMenuDetails(); } };
   const deleteOption = async (id) => { await supabase.from('service_options').delete().eq('id', id); fetchMenuDetails(); };
 
-  if (!isAuthorized) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', fontFamily: 'sans-serif' }}>
-        <form onSubmit={handleAuth} style={{ background: '#fff', padding: '40px', borderRadius: '20px', textAlign: 'center', width: '90%', maxWidth: '350px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', boxSizing: 'border-box' }}>
-          <h2>管理者認証 🔒</h2>
-          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '25px' }}>設定を変更するには合言葉を入力してください</p>
-          <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} placeholder="パスワードを入力" style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', marginBottom: '20px', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.1rem' }} />
-          <button type="submit" style={{ width: '100%', padding: '15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold' }}>ログイン</button>
-          <Link to="/" style={{ display: 'block', marginTop: '20px', fontSize: '0.8rem', color: '#666', textDecoration: 'none' }}>ポータルへ戻る</Link>
-        </form>
-      </div>
-    );
-  }
-
   // 💡 スマホ最適化スタイル：はみ出しと余白のちぐはぐを根絶
   const cardStyle = { marginBottom: '20px', background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', boxSizing: 'border-box', width: '100%', overflow: 'hidden' };
   const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', boxSizing: 'border-box', fontSize: '1rem', background: '#fff' };
@@ -240,12 +223,7 @@ function AdminDashboard() {
                       </div>
                     </div>
                     <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      <button onClick={async () => {
-                        await supabase.from('service_categories').update({ allow_multiple_in_category: !c.allow_multiple_in_category }).eq('id', c.id);
-                        fetchMenuDetails();
-                      }} style={{ fontSize: '0.7rem', padding: '4px 8px', background: c.allow_multiple_in_category ? '#2563eb' : '#fff', color: c.allow_multiple_in_category ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '15px' }}>
-                        {c.allow_multiple_in_category ? '複数選択可' : '1つのみ選択'}
-                      </button>
+                      <button onClick={async () => { await supabase.from('service_categories').update({ allow_multiple_in_category: !c.allow_multiple_in_category }).eq('id', c.id); fetchMenuDetails(); }} style={{ fontSize: '0.7rem', padding: '4px 8px', background: c.allow_multiple_in_category ? '#2563eb' : '#fff', color: c.allow_multiple_in_category ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '15px' }}>{c.allow_multiple_in_category ? '複数選択可' : '1つのみ選択'}</button>
                       <button onClick={() => setEditingDisableCatId(editingDisableCatId === c.id ? null : c.id)} style={{ fontSize: '0.7rem', padding: '4px 8px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '15px' }}>🔗 連動設定</button>
                     </div>
                     {editingDisableCatId === c.id && (
@@ -303,21 +281,22 @@ function AdminDashboard() {
                           <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} disabled={idxInCat === 0} style={{ border: 'none', background: 'none' }}>▲</button>
                           <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} disabled={idxInCat === services.filter(ser => ser.category === cat.name).length - 1} style={{ border: 'none', background: 'none' }}>▼</button>
                         </div>
-                        <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)}>枝</button>
+                        <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} style={{fontWeight:'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333'}}>枝</button>
                         <button onClick={() => {setEditingServiceId(s.id); setNewServiceName(s.name); setNewServiceSlots(s.slots); setSelectedCategory(s.category);}}>✎</button>
                         <button onClick={() => deleteService(s.id)}>×</button>
                       </div>
                     </div>
-                    {/* 💡 多段枝分かれ設定エリア (修正完了版) */}
+                    {/* 💡 枝分かれ設定エリア (修正完了：メニュー名枠とコマ数枠を2段で配置) */}
                     {activeServiceForOptions?.id === s.id && (
-                      <div style={{ marginTop: '15px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #eee' }}>
+                      <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
                         <p style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '10px' }}>🌿 枝分かれ（条件分岐）の設定</p>
-                        <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '15px' }}>
+                        <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
                           <input placeholder="枝カテゴリ名（例：ブリーチ）" value={optGroupName} onChange={(e) => setOptGroupName(e.target.value)} style={inputStyle} />
-                          <div style={{ display: 'flex', gap: '5px' }}>
-                            <input placeholder="選択メニュー名（例：1回）" value={optName} onChange={(e) => setOptName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                            <input type="number" value={optSlots} onChange={(e) => setOptSlots(parseInt(e.target.value))} style={{ width: '60px', ...inputStyle }} />
-                            <button type="submit" style={{ padding: '0 15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px' }}>＋</button>
+                          <input placeholder="枝メニュー名（例：1回、2回）" value={optName} onChange={(e) => setOptName(e.target.value)} style={inputStyle} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#666', whiteSpace: 'nowrap' }}>追加コマ:</label>
+                            <input type="number" value={optSlots} onChange={(e) => setOptSlots(parseInt(e.target.value))} style={{ width: '80px', ...inputStyle }} />
+                            <button type="submit" style={{ flex: 1, padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>＋ 枝を追加</button>
                           </div>
                         </form>
                         {Array.from(new Set(options.filter(o => o.service_id === s.id).map(o => o.group_name))).map(group => (
@@ -345,7 +324,7 @@ function AdminDashboard() {
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
               <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#2563eb' }}>⚙️ 詳細予約エンジンの設定</h3>
-              <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>1コマの単位</label><div style={{ display: 'flex', gap: '10px' }}>{[15, 30].map(min => (<button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? '#2563eb' : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc' }}>{min}分</button>))}</div></div>
+              <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>1コマの単位</label><div style={{ display: 'flex', gap: '10px' }}>{[15, 30].map(min => (<button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? '#2563eb' : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '8px' }}>{min}分</button>))}</div></div>
               <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>準備時間（インターバル）</label><select value={bufferPreparationMin} onChange={(e) => setBufferPreparationMin(parseInt(e.target.value))} style={inputStyle}><option value={0}>なし</option><option value={15}>15分</option><option value={30}>30分</option></select></div>
               <div style={{ marginBottom: '20px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '10px' }}>当日予約の制限</label><select value={minLeadTimeHours} onChange={(e) => setMinLeadTimeHours(parseInt(e.target.value))} style={inputStyle}><option value={0}>制限なし</option><option value={1}>1時間後</option><option value={3}>3時間後</option><option value={24}>前日まで</option></select></div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><input type="checkbox" checked={autoFillLogic} onChange={(e) => setAutoFillLogic(e.target.checked)} style={{ width: '22px', height: '22px' }} /><b>自動詰め機能を有効にする</b></label>
@@ -364,17 +343,17 @@ function AdminDashboard() {
                   </div>
                   {!businessHours[day]?.is_closed && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 15, padding: '10px', background: '#f8fafc', borderRadius: '10px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: '0.8rem', width: '35px' }}>営業</span>
                         <input type="time" value={businessHours[day]?.open || '09:00'} onChange={(e) => setBusinessHours({...businessHours, [day]: {...businessHours[day], open: e.target.value}})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
                         <span>〜</span>
                         <input type="time" value={businessHours[day]?.close || '18:00'} onChange={(e) => setBusinessHours({...businessHours, [day]: {...businessHours[day], close: e.target.value}})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: '0.8rem', width: '35px' }}>休憩</span>
-                        <input type="time" value={businessHours[day]?.rest_start || ''} onChange={(e) => setBusinessHours({...businessHours, [day]: {...businessHours[day], rest_start: e.target.value}})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
+                        <input type="time" value={businessHours[day]?.rest_start || ''} onChange={(e) => setBusinessHours({...businessHours, [day]: { ...businessHours[day], rest_start: e.target.value }})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
                         <span>〜</span>
-                        <input type="time" value={businessHours[day]?.rest_end || ''} onChange={(e) => setBusinessHours({...businessHours, [day]: {...businessHours[day], rest_end: e.target.value}})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
+                        <input type="time" value={businessHours[day]?.rest_end || ''} onChange={(e) => setBusinessHours({...businessHours, [day]: { ...businessHours[day], rest_end: e.target.value }})} style={{ ...inputStyle, width: 'auto', padding: '5px' }} />
                       </div>
                     </div>
                   )}
@@ -388,11 +367,9 @@ function AdminDashboard() {
         {activeTab === 'info' && (
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ ...cardStyle, padding: '20px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <UrlBox label={`🔑 店舗主用設定 (PW: ${shopData?.admin_password})`} url={`${window.location.origin}/admin/${shopId}`} color="#2563eb" copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} />
-                <UrlBox label="💬 LINEリッチメニュー用URL（読込爆速）" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
-                <UrlBox label="📅 お客様用予約（一般Web用）" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
-              </div>
+              <UrlBox label={`🔑 管理用PW: ${shopData?.admin_password}`} url={`${window.location.origin}/admin/${shopId}`} color="#2563eb" copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} />
+              <UrlBox label="💬 LINEリッチメニュー用URL（読込爆速）" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
+              <UrlBox label="📅 お客様用予約（一般Web用）" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
             </section>
 
             <section style={cardStyle}>
