@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     // 💡 受取パラメーター
     const payload = await req.json();
     const { 
-      type,               // 💡 追加： 'welcome' かどうかを判定
+      type,               // 💡 'welcome' かどうかを判定
       shopId,             // 共通
       customerEmail,      // 予約用
       customerName,       // 予約用
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     // 🚀 パターンA：店主様への歓迎メール ＆ 三土手さんへの通知送信
     // ==========================================
     if (type === 'welcome') {
-      // 1. 店主様への歓迎メール送信
+      // 1. 店主様への歓迎メール送信（LINE専用URL案内を追加）
       const welcomeRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -101,13 +101,16 @@ Deno.serve(async (req) => {
 
               <div style="background: #f0fdf4; padding: 20px; border-radius: 10px; margin: 25px 0; border: 1px solid #bbf7d0;">
                 <h2 style="font-size: 1rem; margin-top: 0; color: #166534; border-bottom: 2px solid #bbf7d0; padding-bottom: 8px;">📅 お客様用 予約URL</h2>
-                <p>このURLを公式LINEのリッチメニュー、インスタのプロフィール、HP等に貼り付けてご利用ください：<br>
+                <p style="margin-bottom: 8px;"><strong>【SNS・HP掲載用】</strong><br>
                 <a href="${reserve_url}" style="color: #15803d; font-weight: bold;">${reserve_url}</a></p>
+                
+                <p style="margin-top: 15px; margin-bottom: 8px;"><strong>【LINEリッチメニュー専用】</strong>（読込が爆速になります）<br>
+                <code style="background: #fff; padding: 3px 8px; border: 1px solid #bbf7d0; border-radius: 4px; color: #166534; display: block; word-break: break-all;">${reserve_url}?openExternalBrowser=1</code></p>
               </div>
 
               <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
               <p style="font-size: 0.85rem; color: #64748b;">
-                ※公式LINEとの通知連携方法は、設定画面の下部にある「連携ガイド」を参考に進めてください。<br>
+                ※公式LINEとの通知連携方法は、設定画面の下部にある「連携ガイド」を参考に進めてください。<br><br>
                 ご不明な点がございましたら、このメールに返信の形で運営事務局までお問い合わせください。
               </p>
             </div>
