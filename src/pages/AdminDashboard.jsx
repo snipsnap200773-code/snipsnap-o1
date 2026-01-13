@@ -41,12 +41,19 @@ function AdminDashboard() {
   const [maxLastSlots, setMaxLastSlots] = useState(2);
   const [imageUrl, setImageUrl] = useState('');
 
+  // 💡 追加：オーナー・業種情報State
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerNameKana, setOwnerNameKana] = useState('');
+  const [businessType, setBusinessType] = useState('');
+
   // 外部URL用State
   const [officialUrl, setOfficialUrl] = useState('');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('');
 
-  // LINE通知設定用State
+  // 💡 拡張：LINE通知設定・連携用State
   const [notifyLineEnabled, setNotifyLineEnabled] = useState(true);
+  const [lineToken, setLineToken] = useState('');
+  const [lineAdminId, setLineAdminId] = useState('');
 
   // 詳細予約ルールState
   const [slotIntervalMin, setSlotIntervalMin] = useState(15); 
@@ -83,6 +90,13 @@ function AdminDashboard() {
       setOfficialUrl(data.official_url || '');
       setLineOfficialUrl(data.line_official_url || '');
       setNotifyLineEnabled(data.notify_line_enabled ?? true);
+      // 💡 追加：オーナー・業種情報のセット
+      setOwnerName(data.owner_name || '');
+      setOwnerNameKana(data.owner_name_kana || '');
+      setBusinessType(data.business_type || '');
+      // 💡 追加：LINE連携情報のセット
+      setLineToken(data.line_channel_access_token || '');
+      setLineAdminId(data.line_admin_user_id || '');
     }
   };
 
@@ -125,6 +139,7 @@ function AdminDashboard() {
   };
 
   const handleFinalSave = async () => {
+    // 💡 修正：オーナー情報、LINE連携情報も含めて保存
     const { error } = await supabase
       .from('profiles')
       .update({
@@ -135,7 +150,12 @@ function AdminDashboard() {
         image_url: imageUrl,
         official_url: officialUrl, 
         line_official_url: lineOfficialUrl,
-        notify_line_enabled: notifyLineEnabled
+        notify_line_enabled: notifyLineEnabled,
+        owner_name: ownerName,
+        owner_name_kana: ownerNameKana,
+        business_type: businessType,
+        line_channel_access_token: lineToken,
+        line_admin_user_id: lineAdminId
       })
       .eq('id', shopId);
 
@@ -298,7 +318,7 @@ function AdminDashboard() {
             </section>
 
             <section style={{ marginBottom: '30px', background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メニュー登録・編集</h3>
+              <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メメニュー登録・編集</h3>
               <form onSubmit={handleServiceSubmit}>
                 <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} style={{ width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '8px', border: '1px solid #ccc' }} required>
                   <option value="">-- カテゴリ選択 --</option>
@@ -376,6 +396,26 @@ function AdminDashboard() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #ddd' }}>
               <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィールの設定</h3>
+
+              {/* 💡 オーナー・業種設定セクション */}
+              <div style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '15px', marginBottom: '15px' }}>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>代表者名</label>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                  <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="氏名" style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
+                  <input value={ownerNameKana} onChange={(e) => setOwnerNameKana(e.target.value)} placeholder="ふりがな" style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }} />
+                </div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>業種</label>
+                <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}>
+                  <option value="">-- 業種を選択 --</option>
+                  <option value="美容室・理容室">美容室・理容室</option>
+                  <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
+                  <option value="エステ・リラク">エステ・リラク</option>
+                  <option value="整体・接骨院">整体・接骨院</option>
+                  <option value="飲食店">飲食店</option>
+                  <option value="その他">その他</option>
+                </select>
+              </div>
+
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像URL</label>
               <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://.../photo.jpg" style={{ width: '100%', padding: '10px', marginBottom: 20, borderRadius: '6px', border: '1px solid #ddd' }} />
               
@@ -388,8 +428,9 @@ function AdminDashboard() {
                 <p style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '8px' }}>※URLを入力するとホーム画面にボタンが表示されます</p>
               </div>
 
+              {/* 💡 個別LINE通知設定セクション */}
               <div style={{ background: '#f0fdf4', padding: '15px', borderRadius: '10px', border: '1px solid #bbf7d0', marginBottom: '20px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', marginBottom: '15px' }}>
                   <input 
                     type="checkbox" 
                     checked={notifyLineEnabled} 
@@ -400,9 +441,25 @@ function AdminDashboard() {
                     📢 新着予約のLINE通知を受け取る
                   </span>
                 </label>
-                <p style={{ fontSize: '0.7rem', color: '#15803d', marginTop: '8px', marginLeft: '34px' }}>
-                  ※ONにすると、お客様が予約した際に公式LINEへ通知が届きます。
-                </p>
+
+                <div style={{ borderTop: '1px solid #bbf7d0', paddingTop: '10px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#15803d', display: 'block', marginBottom: '5px' }}>💬 LINE Channel Access Token</label>
+                  <input 
+                    type="password" 
+                    value={lineToken} 
+                    onChange={(e) => setLineToken(e.target.value)} 
+                    placeholder="アクセストークンを貼り付け" 
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '10px' }} 
+                  />
+                  
+                  <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#15803d', display: 'block', marginBottom: '5px' }}>🆔 通知先 LINE User ID (U...)</label>
+                  <input 
+                    value={lineAdminId} 
+                    onChange={(e) => setLineAdminId(e.target.value)} 
+                    placeholder="Uxxxxxxxx..." 
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #bbf7d0' }} 
+                  />
+                </div>
               </div>
 
               <label>店舗の説明</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ width: '100%', minHeight: 100, marginBottom: 20 }} />
@@ -412,7 +469,7 @@ function AdminDashboard() {
               <label>注意事項</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: '100%', border: '2px solid #ef4444' }} />
             </section>
 
-            {/* 💡 統合：LINE公式アカウント連携ガイド */}
+            {/* LINE公式アカウント連携ガイド */}
             <section style={{ background: '#fff', padding: '25px', borderRadius: '12px', border: '1px solid #00b900' }}>
               <h3 style={{ marginTop: 0, fontSize: '1.1rem', color: '#00b900', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span>💬</span> LINE公式アカウント連携ガイド
@@ -427,7 +484,7 @@ function AdminDashboard() {
                   { step: '2', title: 'Messaging APIの有効化', desc: '設定 ＞ Messaging API から「APIを利用する」を有効にします。' },
                   { step: '3', title: 'アクセストークンの取得', desc: 'LINE Developersにて「チャネルアクセストークン」を発行します。' },
                   { step: '4', title: 'ユーザーIDの確認', desc: 'LINE Developersの基本設定にて、店長様の「ユーザーID(U...)」を確認します。' },
-                  { step: '5', title: '運営への連絡', desc: '取得したトークンとIDをシステム運営者（三土手）へお伝えください。' },
+                  { step: '5', title: '設定画面への入力', desc: '取得したトークンとIDを上の「個別LINE通知設定」欄に入力して保存します。' },
                   { step: '6', title: 'リッチメニューの設定', desc: 'LINEのリッチメニューに、当システムの予約URLを貼り付けて完了です！' }
                 ].map((item) => (
                   <div key={item.step} style={{ display: 'flex', gap: '15px', padding: '15px', background: '#f0fdf4', borderRadius: '10px' }}>
@@ -446,7 +503,7 @@ function AdminDashboard() {
 
               <div style={{ marginTop: '20px', padding: '15px', background: '#fffbeb', borderRadius: '10px', border: '1px solid #fcd34d' }}>
                 <p style={{ margin: 0, fontSize: '0.75rem', color: '#92400e', fontWeight: 'bold' }}>
-                  ⚠️ 注意：設定が不安な場合は、ステップ2まで完了した状態で運営担当までご相談ください。代行設定も承ります。
+                  💡 連携には「チャネルアクセストークン」と「ユーザーID」が必要です。ガイドに沿って設定を進めてください。
                 </p>
               </div>
             </section>

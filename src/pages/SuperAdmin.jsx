@@ -4,7 +4,13 @@ import { supabase } from '../supabaseClient';
 function SuperAdmin() {
   const [newShopName, setNewShopName] = useState('');
   const [newShopKana, setNewShopKana] = useState('');
-  // 💡 新規作成用のLINE設定State
+  // 💡 追加項目
+  const [newOwnerName, setNewOwnerName] = useState('');
+  const [newOwnerNameKana, setNewOwnerNameKana] = useState('');
+  const [newBusinessType, setNewBusinessType] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+
   const [newLineToken, setNewLineToken] = useState('');
   const [newLineAdminId, setNewLineAdminId] = useState('');
 
@@ -16,7 +22,6 @@ function SuperAdmin() {
   const [editName, setEditName] = useState('');
   const [editKana, setEditKana] = useState('');
   const [editPassword, setEditPassword] = useState('');
-  // 💡 編集用：入力欄を空に保つことで漏洩を防ぐ
   const [editLineToken, setEditLineToken] = useState('');
   const [editLineAdminId, setEditLineAdminId] = useState('');
 
@@ -31,21 +36,26 @@ function SuperAdmin() {
     if (data) setCreatedShops(data);
   };
 
-  // パスワード自動生成関数
   const generateRandomPassword = () => {
-    return Math.random().toString(36).slice(-8); // ランダムな8文字
+    return Math.random().toString(36).slice(-8);
   };
 
   const createNewShop = async () => {
-    if (!newShopName || !newShopKana) return alert('店舗名とふりがなを入力してください');
+    // 必須チェック（店舗名とふりがな、代表者名）
+    if (!newShopName || !newShopKana || !newOwnerName) return alert('店舗名、ふりがな、代表者名を入力してください');
     
-    const newPass = generateRandomPassword(); // パスワード生成
+    const newPass = generateRandomPassword();
 
     const { error } = await supabase
       .from('profiles')
       .insert([{ 
         business_name: newShopName, 
         business_name_kana: newShopKana,
+        owner_name: newOwnerName, // 💡 追加
+        owner_name_kana: newOwnerNameKana, // 💡 追加
+        business_type: newBusinessType, // 💡 追加
+        email_contact: newEmail, // 💡 追加
+        phone: newPhone, // 💡 追加
         admin_password: newPass,
         line_channel_access_token: newLineToken,
         line_admin_user_id: newLineAdminId,
@@ -55,7 +65,10 @@ function SuperAdmin() {
     if (error) {
       alert('作成に失敗しました');
     } else {
+      // 入力クリア
       setNewShopName(''); setNewShopKana('');
+      setNewOwnerName(''); setNewOwnerNameKana('');
+      setNewBusinessType(''); setNewEmail(''); setNewPhone('');
       setNewLineToken(''); setNewLineAdminId(''); 
       fetchCreatedShops();
       alert(`「${newShopName}」を作成しました！\n初期パスワードは 【 ${newPass} 】 です。`);
@@ -65,7 +78,6 @@ function SuperAdmin() {
   const updateShopInfo = async (id) => {
     if (!editName || !editKana || !editPassword) return alert('全項目入力してください');
     
-    // 💡 既存のデータを取得（トークンの変更がない場合に備えて）
     const targetShop = createdShops.find(s => s.id === id);
 
     const { error } = await supabase
@@ -74,7 +86,6 @@ function SuperAdmin() {
         business_name: editName, 
         business_name_kana: editKana,
         admin_password: editPassword,
-        // 💡 空欄の場合は元のトークンを維持し、入力がある場合のみ上書きする
         line_channel_access_token: editLineToken || targetShop.line_channel_access_token,
         line_admin_user_id: editLineAdminId || targetShop.line_admin_user_id
       })
@@ -82,8 +93,8 @@ function SuperAdmin() {
 
     if (!error) {
       setEditingShopId(null);
-      setEditLineToken(''); // クリア
-      setEditLineAdminId(''); // クリア
+      setEditLineToken('');
+      setEditLineAdminId('');
       fetchCreatedShops();
       alert('店舗情報を更新しました');
     } else {
@@ -131,12 +142,33 @@ function SuperAdmin() {
     <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '600px', margin: '0 auto', backgroundColor: '#f4f7f9', minHeight: '100vh', paddingBottom: '100px' }}>
       <h1 style={{ fontSize: '1.5rem', borderLeft: '6px solid #2563eb', paddingLeft: '15px', marginBottom: '25px' }}>🛠 店舗統括管理</h1>
       
-      {/* 新規作成エリア */}
+      {/* 🆕 新規店舗の発行エリア */}
       <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', marginBottom: '30px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
         <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: '#1e293b', marginBottom: '15px' }}>🆕 新規店舗の発行</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <input value={newShopName} onChange={(e) => setNewShopName(e.target.value)} placeholder="店舗名" style={{ padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1' }} />
-          <input value={newShopKana} onChange={(e) => setNewShopKana(e.target.value)} placeholder="ふりがな" style={{ padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1' }} />
+          
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input value={newOwnerName} onChange={(e) => setNewOwnerName(e.target.value)} placeholder="代表者 氏名" style={{ ...smallInput, flex: 1 }} />
+            <input value={newOwnerNameKana} onChange={(e) => setNewOwnerNameKana(e.target.value)} placeholder="氏名 ふりがな" style={{ ...smallInput, flex: 1 }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input value={newShopName} onChange={(e) => setNewShopName(e.target.value)} placeholder="店舗名" style={{ ...smallInput, flex: 1 }} />
+            <input value={newShopKana} onChange={(e) => setNewShopKana(e.target.value)} placeholder="店舗 ふりがな" style={{ ...smallInput, flex: 1 }} />
+          </div>
+
+          <select value={newBusinessType} onChange={(e) => setNewBusinessType(e.target.value)} style={smallInput}>
+            <option value="">-- 業種を選択 --</option>
+            <option value="美容室・理容室">美容室・理容室</option>
+            <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
+            <option value="エステ・リラク">エステ・リラク</option>
+            <option value="整体・接骨院">整体・接骨院</option>
+            <option value="飲食店">飲食店</option>
+            <option value="その他">その他</option>
+          </select>
+
+          <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="メールアドレス" style={smallInput} />
+          <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="電話番号" style={smallInput} />
           
           <div style={{ padding: '10px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <label style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold' }}>💬 個別LINE通知設定 (任意)</label>
@@ -173,24 +205,13 @@ function SuperAdmin() {
                         <label style={{ fontSize: '0.65rem', fontWeight: 'bold', display: 'block' }}>管理画面パスワード</label>
                         <input value={editPassword || ""} onChange={(e) => setEditPassword(e.target.value)} style={{ width: '100%', padding: '5px', border: '1px solid #d97706', borderRadius: '4px', fontSize: '0.9rem' }} />
                     </div>
-                    {/* 💡 改善：編集画面での機密情報隠匿 */}
                     <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
                         <label style={{ fontSize: '0.65rem', fontWeight: 'bold', display: 'block', color: '#166534' }}>LINE通知キー設定</label>
                         <div style={{ fontSize: '0.7rem', color: '#16a34a', marginBottom: '5px' }}>
-                          {shop.line_channel_access_token ? "✅ 設定済み（変更時のみ入力）" : "⚠️ 未設定"}
+                          {shop.line_channel_access_token ? "✅ 設定済み（非表示）" : "⚠️ 未設定"}
                         </div>
-                        <input 
-                          value={editLineToken} 
-                          onChange={(e) => setEditLineToken(e.target.value)} 
-                          style={{ width: '100%', marginTop: '4px', padding: '5px', border: '1px solid #16a34a', borderRadius: '4px', fontSize: '0.75rem' }} 
-                          placeholder={shop.line_channel_access_token ? "●●●●●●●●●●" : "新規入力：Access Token"} 
-                        />
-                        <input 
-                          value={editLineAdminId} 
-                          onChange={(e) => setEditLineAdminId(e.target.value)} 
-                          style={{ width: '100%', marginTop: '4px', padding: '5px', border: '1px solid #16a34a', borderRadius: '4px', fontSize: '0.75rem' }} 
-                          placeholder={shop.line_admin_user_id ? "ユーザーIDを更新する場合は入力" : "新規入力：Admin User ID"} 
-                        />
+                        <input value={editLineToken} onChange={(e) => setEditLineToken(e.target.value)} style={{ width: '100%', marginTop: '4px', padding: '5px', border: '1px solid #16a34a', borderRadius: '4px', fontSize: '0.75rem' }} placeholder={shop.line_channel_access_token ? "●●●●●●●●●●" : "新規入力：Access Token"} />
+                        <input value={editLineAdminId} onChange={(e) => setEditLineAdminId(e.target.value)} style={{ width: '100%', marginTop: '4px', padding: '5px', border: '1px solid #16a34a', borderRadius: '4px', fontSize: '0.75rem' }} placeholder={shop.line_admin_user_id ? "ユーザーIDを変更する場合入力" : "新規入力：Admin User ID"} />
                     </div>
                     <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
                       <button onClick={() => updateShopInfo(shop.id)} style={{ padding: '6px 15px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>保存</button>
@@ -203,7 +224,7 @@ function SuperAdmin() {
                       {shop.is_suspended && <span style={{ background: '#ef4444', color: '#fff', fontSize: '0.6rem', padding: '2px 5px', borderRadius: '4px', verticalAlign: 'middle', marginRight: '6px' }}>中止中</span>}
                       {shop.business_name}
                     </h2>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{shop.business_name_kana}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{shop.business_name_kana} / {shop.owner_name || '店主名未登録'}</div>
                     <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: '0.7rem', color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
                             PW: <strong>{shop.admin_password || '未設定'}</strong>
@@ -223,7 +244,6 @@ function SuperAdmin() {
                   setEditName(shop.business_name || ""); 
                   setEditKana(shop.business_name_kana || ""); 
                   setEditPassword(shop.admin_password || ""); 
-                  // 💡 重要：編集開始時にトークンとIDは空文字にする（表示させない）
                   setEditLineToken("");
                   setEditLineAdminId("");
                 }} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', cursor: 'pointer', fontSize: '0.7rem', padding: '4px 8px', borderRadius: '6px' }}>編集</button>
@@ -240,7 +260,7 @@ function SuperAdmin() {
                   <a href={`${window.location.origin}/admin/${shop.id}`} target="_blank" rel="noreferrer" style={{ padding: '8px 10px', fontSize: '0.7rem', borderRadius: '6px', background: '#2563eb', color: '#fff', textDecoration: 'none', textAlign: 'center' }}>開く</a>
                 </div>
               </div>
-              
+              {/* LINE URL, 予約URL（省略せずにそのまま） */}
               <div>
                 <label style={{ fontSize: '0.7rem', color: '#00b900', fontWeight: 'bold' }}>💬 LINEリッチメニュー用URL</label>
                 <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
@@ -249,7 +269,6 @@ function SuperAdmin() {
                   <a href={`${window.location.origin}/shop/${shop.id}/reserve?source=line`} target="_blank" rel="noreferrer" style={{ padding: '8px 10px', fontSize: '0.7rem', borderRadius: '6px', background: '#00b900', color: '#fff', textDecoration: 'none', textAlign: 'center' }}>開く</a>
                 </div>
               </div>
-
               <div>
                 <label style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold' }}>📅 お客様用予約（一般Web用）</label>
                 <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
@@ -271,5 +290,12 @@ function SuperAdmin() {
     </div>
   );
 }
+
+const smallInput = {
+  padding: '10px',
+  borderRadius: '8px',
+  border: '1px solid #cbd5e1',
+  fontSize: '0.85rem'
+};
 
 export default SuperAdmin;

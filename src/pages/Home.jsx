@@ -84,7 +84,7 @@ function Home() {
                   </div>
                 </div>
 
-                {/* 💡 3つのボタンエリア */}
+                {/* 3つのボタンエリア */}
                 <div style={{ display: 'flex', padding: '10px', gap: '8px', background: '#fafafa' }}>
                   
                   {/* LINEで予約ボタン */}
@@ -115,6 +115,40 @@ function Home() {
             ))}
           </div>
         )}
+
+        {/* 💡 統合：無料トライアルバナー（ポータル最下部） */}
+        <div style={{ 
+          marginTop: '60px', 
+          padding: '40px 20px', 
+          background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)', 
+          borderRadius: '20px', 
+          textAlign: 'center', 
+          color: '#fff',
+          boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)'
+        }}>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: '10px', fontWeight: '900' }}>🚀 店舗オーナー様へ</h2>
+          <p style={{ fontSize: '0.85rem', opacity: 0.9, marginBottom: '25px', lineHeight: '1.6' }}>
+            SnipSnapで、あなたの店舗専用の予約システムを作りませんか？<br />
+            今なら1ヶ月間、すべての機能を無料でお試しいただけます。
+          </p>
+          <Link to="/trial-registration" style={{ 
+            display: 'inline-block',
+            background: '#fff', 
+            color: '#2563eb', 
+            padding: '14px 35px', 
+            borderRadius: '50px', 
+            textDecoration: 'none', 
+            fontWeight: 'bold',
+            fontSize: '1rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+          }}>
+            1ヶ月無料トライアルに申し込む
+          </Link>
+          <p style={{ fontSize: '0.7rem', marginTop: '15px', opacity: 0.7 }}>
+            ※トライアル期間終了後に自動的に課金されることはありません。
+          </p>
+        </div>
+
       </div>
 
       <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999', fontSize: '0.7rem' }}>
