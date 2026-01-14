@@ -25,12 +25,14 @@ function AdminReservations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMonth, setViewMonth] = useState(new Date()); 
 
-  // 🆕 顧客管理用State
+  // 🆕 顧客管理用・編集用State
   const [customers, setCustomers] = useState([]); 
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [editCustomerMemo, setEditCustomerMemo] = useState('');
   const [customerFullHistory, setCustomerFullHistory] = useState([]);
+  
+  // 編集用の一時状態
+  const [editFields, setEditFields] = useState({ name: '', phone: '', email: '', memo: '' });
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -51,55 +53,70 @@ function AdminReservations() {
     setLoading(false);
   };
 
-  // 🆕 顧客サジェストロジック
+  // 🔍 顧客サジェスト
   useEffect(() => {
     const searchCustomers = async () => {
-      if (!searchTerm || searchTerm.length < 1) { setCustomers([]); return; }
-      const { data } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('shop_id', shopId)
-        .ilike('name', `%${searchTerm}%`)
-        .limit(5);
+      if (!searchTerm) { setCustomers([]); return; }
+      const { data } = await supabase.from('customers').select('*').eq('shop_id', shopId).ilike('name', `%${searchTerm}%`).limit(5);
       setCustomers(data || []);
     };
     const timer = setTimeout(searchCustomers, 300);
     return () => clearTimeout(timer);
   }, [searchTerm, shopId]);
 
-  // 🆕 顧客詳細を開くロジック
+  // 🆕 顧客詳細を開く（検索窓から）
   const openCustomerDetail = async (customer) => {
     setSelectedCustomer(customer);
-    setEditCustomerMemo(customer.memo || '');
-    setSearchTerm(''); // 検索窓を閉じる
-    
-    // 全期間の予約履歴を取得
-    const { data } = await supabase
-      .from('reservations')
-      .select('*')
-      .eq('shop_id', shopId)
-      .eq('customer_name', customer.name) // 名前連動
-      .order('start_time', { ascending: false });
-    
+    setEditFields({ name: customer.name, phone: customer.phone || '', email: customer.email || '', memo: customer.memo || '' });
+    setSearchTerm('');
+    const { data } = await supabase.from('reservations').select('*').eq('shop_id', shopId).eq('customer_name', customer.name).order('start_time', { ascending: false });
     setCustomerFullHistory(data || []);
     setShowCustomerModal(true);
   };
 
-  // 🆕 顧客メモの保存
-  const saveCustomerMemo = async () => {
-    if (!selectedCustomer) return;
+  // 🆕 予約詳細を開く（カレンダーから）
+  const openDetail = async (res) => {
+    setSelectedRes(res);
+    // 紐づく顧客情報を取得して編集フォームにセット
+    const { data: cust } = await supabase.from('customers').select('*').eq('shop_id', shopId).eq('name', res.customer_name).maybeSingle();
+    if (cust) {
+      setEditFields({ name: cust.name, phone: cust.phone || '', email: cust.email || '', memo: cust.memo || '' });
+    } else {
+      setEditFields({ name: res.customer_name, phone: res.customer_phone || '', email: res.customer_email || '', memo: '' });
+    }
+
+    const history = reservations.filter(r => r.res_type === 'normal' && r.id !== res.id && (r.customer_name === res.customer_name) && new Date(r.start_time) < new Date(res.start_time)).sort((a, b) => new Date(b.start_time) - new Date(a.start_time)).slice(0, 5);
+    setCustomerHistory(history);
+    setShowDetailModal(true);
+  };
+
+  // 🆕 名簿情報の保存（共通ロジック）
+  const handleUpdateCustomer = async () => {
+    const targetName = selectedCustomer?.name || selectedRes?.customer_name;
+    
+    // UPSERT (あれば更新、なければ作成)
     const { error } = await supabase
       .from('customers')
-      .update({ memo: editCustomerMemo })
-      .eq('id', selectedCustomer.id);
-    
-    if (!error) {
-      alert('メモを保存しました');
+      .upsert({
+        shop_id: shopId,
+        name: editFields.name,
+        phone: editFields.phone,
+        email: editFields.email,
+        memo: editFields.memo,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'shop_id, name' }); // 名前をキーにして更新
+
+    if (error) {
+      alert('保存エラー: ' + error.message);
+    } else {
+      alert('名簿情報を更新しました');
       setShowCustomerModal(false);
+      setShowDetailModal(false);
+      fetchData();
     }
   };
 
-  // 🛡️ 死守：カレンダー表示ロジック
+  // --- 以下、カレンダー基幹ロジック（死守） ---
   const weekDays = useMemo(() => {
     const days = [];
     const base = new Date(startDate);
@@ -113,7 +130,6 @@ function AdminReservations() {
     return days;
   }, [startDate]);
 
-  // 🛡️ 死守：スロット生成ロジック
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
     let minTotalMinutes = 24 * 60;
@@ -143,7 +159,6 @@ function AdminReservations() {
 
   const getJapanDateStr = (date) => date.toLocaleDateString('sv-SE');
 
-  // 🛡️ 死守：予約重なり判定ロジック
   const getStatusAt = (dateStr, timeStr) => {
     const currentSlotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
     const matches = reservations.filter(r => {
@@ -157,21 +172,6 @@ function AdminReservations() {
     return matches.find(r => r.res_type === 'blocked') || matches[0];
   };
 
-  const openDetail = (res) => {
-    setSelectedRes(res);
-    const history = reservations
-      .filter(r => 
-        r.res_type === 'normal' && r.id !== res.id &&
-        ((r.customer_email === res.customer_email && res.customer_email !== 'admin@example.com') || 
-         (r.customer_phone === res.customer_phone && res.customer_phone !== '---')) &&
-        new Date(r.start_time) < new Date(res.start_time)
-      )
-      .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
-      .slice(0, 5);
-    setCustomerHistory(history);
-    setShowDetailModal(true);
-  };
-
   const deleteRes = async (id) => {
     if (window.confirm('このデータを消去して予約を「可能」に戻しますか？')) {
       await supabase.from('reservations').delete().eq('id', id);
@@ -183,12 +183,7 @@ function AdminReservations() {
     const startTimeStr = `${selectedDate}T${targetTime}:00`;
     const startTime = new Date(startTimeStr);
     const endTime = new Date(startTime.getTime() + (shop.slot_interval_min || 30) * 60000);
-    const insertData = { 
-      shop_id: shopId, customer_name: '管理者によるブロック', res_type: 'blocked', 
-      start_at: startTime.toISOString(), end_at: endTime.toISOString(),
-      start_time: startTime.toISOString(), end_time: endTime.toISOString(),
-      total_slots: 1, customer_email: 'admin@example.com', customer_phone: '---', options: { services: [] }
-    };
+    const insertData = { shop_id: shopId, customer_name: '管理者によるブロック', res_type: 'blocked', start_at: startTime.toISOString(), end_at: endTime.toISOString(), start_time: startTime.toISOString(), end_time: endTime.toISOString(), total_slots: 1, customer_email: 'admin@example.com', customer_phone: '---', options: { services: [] } };
     const { error } = await supabase.from('reservations').insert([insertData]);
     if (error) alert(`エラー: ${error.message}`);
     else { setShowMenuModal(false); fetchData(); }
@@ -214,7 +209,7 @@ function AdminReservations() {
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#fff', overflow: 'hidden', position: 'fixed', inset: 0 }}>
       
-      {/* 💻 PC用サイドバー（検索結果リストを削除して整理） */}
+      {/* 💻 PC用サイドバー */}
       {isPC && (
         <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #e2e8f0', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px', background: '#fff', zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -239,13 +234,12 @@ function AdminReservations() {
               })}
             </div>
           </div>
-
           <button onClick={() => navigate(`/admin/${shopId}`)} style={{ marginTop: 'auto', padding: '15px', background: '#fff', border: '1px solid #ddd', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>店舗設定へ</button>
         </div>
       )}
 
       {/* 📱💻 メイングリッドエリア */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingBottom: isPC ? 0 : '80px' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: isPC ? '15px 25px' : '15px 10px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
           {isPC ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flex: 1 }}>
@@ -254,23 +248,13 @@ function AdminReservations() {
                 <button onClick={goPrev} style={headerBtnStylePC}>前週</button>
                 <button onClick={goNext} style={headerBtnStylePC}>次週</button>
               </div>
-
-              {/* 🆕 統合されたヘッダー顧客検索窓 */}
               <div style={{ position: 'relative', marginLeft: '10px', width: '300px' }}>
-                <input 
-                  type="text" 
-                  placeholder="👤 顧客を検索..." 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                  style={{ width: '100%', padding: '12px 15px 12px 40px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '0.9rem' }} 
-                />
+                <input type="text" placeholder="👤 顧客を検索..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 15px 12px 40px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '0.9rem' }} />
                 <span style={{ position: 'absolute', left: '12px', top: '12px', opacity: 0.4 }}>🔍</span>
-                
-                {/* 🆕 サジェスト結果 */}
                 {customers.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '12px', marginTop: '5px', zIndex: 1000, border: '1px solid #eee', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '12px', marginTop: '5px', zIndex: 1000, border: '1px solid #eee' }}>
                     {customers.map(c => (
-                      <div key={c.id} onClick={() => openCustomerDetail(c)} style={{ padding: '12px 15px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', transition: '0.2s' }} onMouseEnter={(e) => e.target.style.background = '#f1f5f9'} onMouseLeave={(e) => e.target.style.background = '#fff'}>
+                      <div key={c.id} onClick={() => openCustomerDetail(c)} style={{ padding: '12px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}>
                         <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{c.name} 様</div>
                         <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{c.phone || '電話未登録'}</div>
                       </div>
@@ -287,14 +271,14 @@ function AdminReservations() {
               <button onClick={goNext} style={mobileArrowBtnStyle}>▶</button>
             </div>
           )}
-          {!isPC && <button onClick={() => navigate(`/admin/${shopId}`)} style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', fontSize: '1.4rem', cursor: 'pointer', opacity: 0.3 }}>⚙️</button>}
         </div>
 
+        {/* カレンダーテーブル */}
         <div style={{ flex: 1, overflowY: 'auto', overflowX: isPC ? 'auto' : 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: isPC ? '900px' : '100%' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff' }}>
               <tr>
-                <th style={{ width: isPC ? '80px' : '32px', borderBottom: '1px solid #ddd', fontSize: '0.6rem', color: '#999' }}></th>
+                <th style={{ width: isPC ? '80px' : '32px', borderBottom: '1px solid #ddd' }}></th>
                 {weekDays.map(date => {
                   const isToday = getJapanDateStr(new Date()) === getJapanDateStr(date);
                   return (
@@ -311,12 +295,8 @@ function AdminReservations() {
                 const [hour, min] = time.split(':');
                 return (
                   <tr key={time} style={{ height: '60px' }}>
-                    <td style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', textAlign: 'center', lineHeight: '1.1' }}>
-                      {isPC ? <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>{time}</span> : (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          {min === '00' ? <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#444' }}>{parseInt(hour)}</span> : <span style={{ fontSize: '0.65rem', color: '#999' }}>{min}</span>}
-                        </div>
-                      )}
+                    <td style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>{time}</span>
                     </td>
                     {weekDays.map(date => {
                       const dStr = getJapanDateStr(date);
@@ -325,8 +305,8 @@ function AdminReservations() {
                       return (
                         <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                           {res && (
-                            <div style={{ position: 'absolute', inset: '1px', background: res.res_type === 'blocked' ? '#fee2e2' : (isStart ? '#BAE6FD' : '#F3F4F6'), color: res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#451a03' : '#cbd5e1'), padding: isPC ? '6px 8px' : '2px 4px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#0284c7' : '#d1d5db')}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                              {res.res_type === 'blocked' ? <div style={{fontWeight:'bold',textAlign:'center'}}>✕</div> : (isStart ? <><div style={{ fontWeight: 'bold', fontSize: isPC ? '0.85rem' : '0.65rem', wordBreak: 'break-all' }}>{res.customer_name} 様</div>{isPC && <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>{res.options?.services?.map(s => s.name).join(', ')}</div>}</> : <div style={{ fontStyle: 'italic', fontSize: '0.4rem', textAlign: 'center' }}>・</div>)}
+                            <div style={{ position: 'absolute', inset: '1px', background: res.res_type === 'blocked' ? '#fee2e2' : (isStart ? '#BAE6FD' : '#F3F4F6'), color: res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#451a03' : '#cbd5e1'), padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#0284c7' : '#d1d5db')}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                              {res.res_type === 'blocked' ? '✕' : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・')}
                             </div>
                           )}
                         </td>
@@ -340,45 +320,51 @@ function AdminReservations() {
         </div>
       </div>
 
-      {/* --- モーダル（共通） --- */}
-      
-      {/* 🆕 顧客詳細モーダル（案1の核心） */}
-      {showCustomerModal && selectedCustomer && (
-        <div onClick={() => setShowCustomerModal(false)} style={overlayStyle}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...modalContentStyle, maxWidth: '600px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '1.5rem' }}>{selectedCustomer.name} 様</h2>
-                <div style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '5px' }}>
-                  📞 {selectedCustomer.phone || '電話未登録'} / ✉️ {selectedCustomer.email || 'メール未登録'}
-                </div>
-              </div>
-              <button onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+      {/* --- 🆕 モーダル群 --- */}
+
+      {/* 1. 顧客詳細/編集モーダル (検索から) */}
+      {(showCustomerModal || showDetailModal) && (
+        <div onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} style={overlayStyle}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...modalContentStyle, maxWidth: '650px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0 }}>{showCustomerModal ? '👤 顧客マスター編集' : '📅 予約詳細・名簿更新'}</h2>
+              <button onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: isPC ? '1fr 1fr' : '1fr', gap: '20px' }}>
-              {/* 左：顧客メモ */}
-              <div>
-                <h4 style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '10px' }}>📋 顧客メモ・注意事項</h4>
-                <textarea 
-                  value={editCustomerMemo} 
-                  onChange={(e) => setEditCustomerMemo(e.target.value)}
-                  style={{ width: '100%', height: '150px', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '0.9rem', marginBottom: '10px' }}
-                  placeholder="アレルギー、好み、過去の話題など..."
-                />
-                <button onClick={saveCustomerMemo} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>メモを保存</button>
+            <div style={{ display: 'grid', gridTemplateColumns: isPC ? '1fr 1fr' : '1fr', gap: '25px' }}>
+              {/* 左：編集フォーム */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <label style={labelStyle}>お客様名</label>
+                  <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={inputStyle} />
+                  
+                  <label style={labelStyle}>電話番号</label>
+                  <input type="tel" value={editFields.phone} onChange={(e) => setEditFields({...editFields, phone: e.target.value})} style={inputStyle} placeholder="未登録" />
+                  
+                  <label style={labelStyle}>メールアドレス</label>
+                  <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={inputStyle} placeholder="未登録" />
+                  
+                  <label style={labelStyle}>顧客メモ</label>
+                  <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ ...inputStyle, height: '80px' }} placeholder="好み、注意事項など" />
+                  
+                  <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
+                </div>
+                {showDetailModal && selectedRes && (
+                  <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>予約を消去</button>
+                )}
               </div>
 
-              {/* 右：全履歴 */}
+              {/* 右：履歴表示 */}
               <div>
-                <h4 style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '10px' }}>🕒 全期間の予約履歴 ({customerFullHistory.length}回)</h4>
-                <div style={{ height: '210px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
-                  {customerFullHistory.map(h => (
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#64748b' }}>🕒 来店履歴</h4>
+                <div style={{ height: '350px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
+                  {(showCustomerModal ? customerFullHistory : customerHistory).map(h => (
                     <div key={h.id} style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
                       <div style={{ fontWeight: 'bold' }}>{new Date(h.start_time).toLocaleDateString('ja-JP')}</div>
                       <div style={{ color: '#2563eb', marginTop: '2px' }}>{h.options?.services?.map(s => s.name).join(', ')}</div>
                     </div>
                   ))}
+                  {(showCustomerModal ? customerFullHistory : customerHistory).length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#cbd5e1' }}>履歴なし</div>}
                 </div>
               </div>
             </div>
@@ -386,53 +372,15 @@ function AdminReservations() {
         </div>
       )}
 
-      {/* 🛡️ 死守：予約詳細ポップアップ */}
-      {showDetailModal && selectedRes && (
-        <div onClick={() => setShowDetailModal(false)} style={overlayStyle}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...modalContentStyle, maxWidth: '450px' }}>
-            <h3 style={{ marginTop: 0 }}>{selectedRes.res_type === 'blocked' ? '予約不可の解除' : `${selectedRes.customer_name} 様`}</h3>
-            <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '16px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
-              {selectedRes.res_type === 'blocked' ? <p style={{ fontWeight: 'bold', color: '#ef4444', margin: 0 }}>🚫 この枠を予約可能に戻しますか？</p> : (
-                <>
-                  <div style={{ color: '#0369a1', fontWeight: '900', fontSize: '1.1rem', marginBottom: '10px' }}>✂️ {selectedRes.options?.services?.map(s => s.name).join(' / ')}</div>
-                  <div style={{ fontSize: '0.9rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <span>📅 <b>日時:</b> {new Date(selectedRes.start_time).toLocaleString('ja-JP', {month:'long', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
-                    <span>📞 <b>電話:</b> {selectedRes.customer_phone === '---' ? '未登録' : selectedRes.customer_phone}</span>
-                    <span>✉️ <b>メール:</b> {selectedRes.customer_email === 'admin@example.com' ? '未登録' : selectedRes.customer_email}</span>
-                  </div>
-                </>
-              )}
-            </div>
-            {selectedRes.res_type === 'normal' && (
-              <div style={{ marginBottom: '25px' }}>
-                <p style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#94a3b8', marginBottom: '10px' }}>🕒 最近の履歴</p>
-                <div style={{ maxHeight: '120px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
-                  {customerHistory.length > 0 ? customerHistory.map(h => (
-                    <div key={h.id} style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
-                      <div style={{ fontWeight: 'bold', color: '#475569' }}>{new Date(h.start_time).toLocaleDateString('ja-JP')}</div>
-                      <div style={{ color: '#64748b', marginTop: '4px' }}>{h.options?.services?.map(s => s.name).join(', ')}</div>
-                    </div>
-                  )) : <div style={{ padding: '20px', textAlign: 'center', color: '#cbd5e1' }}>履歴はありません</div>}
-                </div>
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => deleteRes(selectedRes.id)} style={{ flex: 1, padding: '15px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>消去</button>
-              <button onClick={() => setShowDetailModal(false)} style={{ flex: 1, padding: '15px', background: '#f1f5f9', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>閉じる</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 🛡️ 死守：ねじ込み予約モーダル */}
+      {/* ⚡ ねじ込みメニューモーダル (死守) */}
       {showMenuModal && (
         <div onClick={() => setShowMenuModal(false)} style={overlayStyle}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '35px', borderRadius: '30px', width: '90%', maxWidth: '340px', textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ margin: '0 0 10px 0', color: '#64748b' }}>{selectedDate.replace(/-/g, '/')}</h3>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '35px', borderRadius: '30px', width: '90%', maxWidth: '340px', textAlign: 'center' }}>
+            <h3 style={{ margin: '0 0 10px 0', color: '#64748b' }}>{selectedDate}</h3>
             <p style={{ fontWeight: '900', color: '#2563eb', fontSize: '2.2rem', margin: '0 0 30px 0' }}>{targetTime}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button onClick={() => navigate(`/shop/${shopId}/reserve`, { state: { adminDate: selectedDate, adminTime: targetTime } })} style={{ padding: '22px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: '900', fontSize: '1.2rem' }}>📝 予約を入れる</button>
-              <button onClick={handleBlockTime} style={{ padding: '20px', background: '#fff', color: '#ef4444', border: '2px solid #ef4444', borderRadius: '20px', fontWeight: 'bold', fontSize: '1.1rem' }}>✕ 予約不可にする</button>
+              <button onClick={handleBlockTime} style={{ padding: '20px', background: '#fff', color: '#ef4444', border: '2px solid #ef4444', borderRadius: '20px', fontWeight: 'bold' }}>✕ 予約不可にする</button>
               <button onClick={() => setShowMenuModal(false)} style={{ padding: '15px', border: 'none', background: 'none', color: '#94a3b8' }}>キャンセル</button>
             </div>
           </div>
@@ -442,11 +390,12 @@ function AdminReservations() {
   );
 }
 
+const labelStyle = { fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' };
+const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box' };
 const headerBtnStylePC = { padding: '10px 20px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' };
-const mobileArrowBtnStyle = { background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1rem', color: '#1e293b', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const floatingBtnStyle = { background: 'none', border: 'none', fontSize: '1.4rem', fontWeight: 'bold', color: '#475569', cursor: 'pointer', padding: '10px' };
-const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', fontSize: '1rem', color: '#2563eb', padding: '0 5px' };
-const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px', backdropFilter: 'blur(8px)' };
-const modalContentStyle = { background: '#fff', width: '100%', maxWidth: '400px', borderRadius: '25px', padding: '30px' };
+const mobileArrowBtnStyle = { background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1rem' };
+const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', color: '#2563eb' };
+const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' };
+const modalContentStyle = { background: '#fff', width: '95%', borderRadius: '25px', padding: '30px', maxHeight: '90vh', overflowY: 'auto' };
 
 export default AdminReservations;
