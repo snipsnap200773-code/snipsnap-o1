@@ -73,19 +73,20 @@ function ConfirmReservation() {
     // --- 💡 4. 予約データをテーブルに保存 ---
     const { data: resData, error: dbError } = await supabase.from('reservations').insert([
       {
-        shop_id: shopId,
-        customer_name: isAdminEntry ? `${customerName} (店舗受付)` : customerName,
-        customer_phone: customerPhone || '---',
-        customer_email: customerEmail || 'admin@example.com',
-        start_at: startDateTime.toISOString(),
-        end_at: endDateTime.toISOString(),
-        start_time: startDateTime.toISOString(),
-        end_time: endDateTime.toISOString(), 
-        total_slots: totalSlotsNeeded,
-        res_type: 'normal',
-        line_user_id: lineUser?.userId || null,
-        cancel_token: cancelToken,
-        options: {
+        shop_id: shopId, //
+        // 修正箇所：(店舗受付) を付けずに入力された名前をそのまま保存する
+        customer_name: customerName, 
+        customer_phone: customerPhone || '---', //
+        customer_email: customerEmail || 'admin@example.com', //
+        start_at: startDateTime.toISOString(), //
+        end_at: endDateTime.toISOString(), //
+        start_time: startDateTime.toISOString(), //
+        end_time: endDateTime.toISOString(),  //
+        total_slots: totalSlotsNeeded, //
+        res_type: 'normal', //
+        line_user_id: lineUser?.userId || null, //
+        cancel_token: cancelToken, //
+        options: { //
           services: selectedServices,
           options: selectedOptions
         }
@@ -107,7 +108,7 @@ function ConfirmReservation() {
         // 🚀 shopId を含めてエッジ関数を呼び出し
         await supabase.functions.invoke('send-reservation-email', {
           body: {
-            shopId: shopId, // 💡 ここを追加：店舗別の設定を読み込むために必須
+            shopId: shopId, 
             customerEmail: customerEmail,
             customerName: customerName,
             shopName: shop.business_name,
