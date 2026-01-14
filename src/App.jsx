@@ -14,7 +14,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* 🚀 【PCフル画面・管理エリア】 ※mobile-containerの外 */}
+        {/* 🚀 【PCフル画面・管理エリア】 mobile-container の外側へ独立 */}
         <Route path="/super-admin-snipsnap" element={<SuperAdmin />} />
         <Route path="/admin/:shopId" element={<AdminDashboard />} />
         <Route path="/admin/:shopId/dashboard" element={<AdminDashboard />} />
@@ -22,7 +22,7 @@ function App() {
 
         {/* 📱 【スマホ480px制限・ユーザーエリア】 */}
         <Route path="*" element={
-          <div className="mobile-container" style={{ margin: '0 auto' }}>
+          <div className="mobile-container" style={{ margin: '0 auto', maxWidth: '480px' }}>
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/trial-registration" element={<TrialRegistration />} />
