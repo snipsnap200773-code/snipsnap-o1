@@ -50,7 +50,18 @@ function SuperAdmin() {
   const updateShopInfo = async (id) => {
     if (!editName || !editKana || !editPassword) return alert('全項目入力してください');
     const targetShop = createdShops.find(s => s.id === id);
-    const { error } = await supabase.from('profiles').update({ business_name: editName, business_name_kana: editKana, owner_name: editOwnerName, owner_name_kana: editOwnerNameKana, business_type: editBusinessType, email_contact: editEmail, phone: editPhone, admin_password: editPassword, line_channel_access_token: editLineToken || targetShop.line_channel_access_token, line_admin_user_id: editLineAdminId || targetShop.line_admin_user_id }).eq('id', id);
+    const { error } = await supabase.from('profiles').update({ 
+      business_name: editName, 
+      business_name_kana: editKana, 
+      owner_name: editOwnerName, 
+      owner_name_kana: editOwnerNameKana, 
+      business_type: editBusinessType, 
+      email_contact: editEmail, 
+      phone: editPhone, 
+      admin_password: editPassword, 
+      line_channel_access_token: editLineToken || targetShop.line_channel_access_token, 
+      line_admin_user_id: editLineAdminId || targetShop.line_admin_user_id 
+    }).eq('id', id);
     if (!error) { setEditingShopId(null); setEditLineToken(''); setEditLineAdminId(''); fetchCreatedShops(); alert('店舗情報を更新しました'); } else { alert('更新に失敗しました'); }
   };
 
@@ -124,28 +135,45 @@ function SuperAdmin() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '0.65rem', color: '#2563eb', fontWeight: 'bold' }}>No.{shop.displayNumber}</div>
                   
-                  {/* 🆕 修正：編集モードの表示切り替えロジックを再統合 */}
+                  {/* 🆕 2枚目画像 の全編集項目を完全再現 */}
                   {editingShopId === shop.id ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                       <div style={{ display: 'flex', gap: '5px' }}>
-                        <input value={editName} onChange={(e) => setEditName(e.target.value)} style={smallInput} placeholder="店舗名" />
-                        <input value={editPassword} onChange={(e) => setEditPassword(e.target.value)} style={smallInput} placeholder="PW" />
+                        <input value={editOwnerName} onChange={(e) => setEditOwnerName(e.target.value)} style={smallInput} placeholder="代表者名" />
+                        <input value={editOwnerNameKana} onChange={(e) => setEditOwnerNameKana(e.target.value)} style={smallInput} placeholder="氏名かな" />
                       </div>
                       <div style={{ display: 'flex', gap: '5px' }}>
-                        <button onClick={() => updateShopInfo(shop.id)} style={{ flex: 1, padding: '8px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>保存</button>
-                        <button onClick={() => setEditingShopId(null)} style={{ flex: 1, padding: '8px', background: '#94a3b8', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>取消</button>
+                        <input value={editName} onChange={(e) => setEditName(e.target.value)} style={smallInput} placeholder="店舗名" />
+                        <input value={editKana} onChange={(e) => setEditKana(e.target.value)} style={smallInput} placeholder="店舗かな" />
+                      </div>
+                      <select value={editBusinessType} onChange={(e) => setEditBusinessType(e.target.value)} style={smallInput}>
+                        <option value="">-- 業種を選択 --</option>
+                        <option value="美容室・理容室">美容室・理容室</option>
+                        <option value="整体・接骨院">整体・接骨院</option>
+                        <option value="飲食店">飲食店</option>
+                        <option value="その他">その他</option>
+                      </select>
+                      <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} style={smallInput} placeholder="メールアドレス" />
+                      <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} style={smallInput} placeholder="電話番号" />
+                      <div style={{ background: '#fef3c7', padding: '8px', borderRadius: '6px' }}>
+                        <label style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 'bold' }}>PW設定</label>
+                        <input value={editPassword} onChange={(e) => setEditPassword(e.target.value)} style={{ ...smallInput, border: '1px solid #fcd34d' }} />
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
+                        <button onClick={() => updateShopInfo(shop.id)} style={{ flex: 1, padding: '12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>保存</button>
+                        <button onClick={() => setEditingShopId(null)} style={{ flex: 1, padding: '12px', background: '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>取消</button>
                       </div>
                     </div>
                   ) : (
                     <>
                       <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b' }}>{shop.business_name}</h2>
-                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>PW: <strong>{shop.admin_password}</strong></div>
+                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{shop.owner_name} / PW: <strong>{shop.admin_password}</strong></div>
                     </>
                   )}
                 </div>
                 
                 <div style={{ display: 'flex', gap: '5px' }}>
-                  {/* 🆕 修正：編集ボタンクリック時に値をセットするように修正 */}
                   <button onClick={() => {
                     setEditingShopId(shop.id);
                     setEditName(shop.business_name || "");
