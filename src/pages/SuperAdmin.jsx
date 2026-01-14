@@ -115,36 +115,57 @@ function SuperAdmin() {
           </div>
         </div>
 
-        {/* 並べ替え */}
-        <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', whiteSpace: 'nowrap', paddingBottom: '5px' }}>
-          {['number_desc', 'number_asc', 'kana'].map((type) => (
-            <button key={type} onClick={() => setSortType(type)} style={{ padding: '6px 12px', fontSize: '0.7rem', borderRadius: '20px', border: '1px solid #2563eb', background: sortType === type ? '#2563eb' : '#fff', color: sortType === type ? '#fff' : '#2563eb' }}>
-              {type === 'number_desc' ? '新しい順' : type === 'number_asc' ? '古い順' : 'あいうえお'}
-            </button>
-          ))}
-        </div>
-
         {/* 店舗リスト */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {getSortedShops().map(shop => (
             <div key={shop.id} style={{ background: '#fff', padding: '15px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+              
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '0.65rem', color: '#2563eb', fontWeight: 'bold' }}>No.{shop.displayNumber}</div>
-                  <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b' }}>{shop.business_name}</h2>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>PW: <strong>{shop.admin_password}</strong></div>
+                  
+                  {/* 🆕 修正：編集モードの表示切り替えロジックを再統合 */}
+                  {editingShopId === shop.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <input value={editName} onChange={(e) => setEditName(e.target.value)} style={smallInput} placeholder="店舗名" />
+                        <input value={editPassword} onChange={(e) => setEditPassword(e.target.value)} style={smallInput} placeholder="PW" />
+                      </div>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <button onClick={() => updateShopInfo(shop.id)} style={{ flex: 1, padding: '8px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>保存</button>
+                        <button onClick={() => setEditingShopId(null)} style={{ flex: 1, padding: '8px', background: '#94a3b8', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold' }}>取消</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b' }}>{shop.business_name}</h2>
+                      <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>PW: <strong>{shop.admin_password}</strong></div>
+                    </>
+                  )}
                 </div>
+                
                 <div style={{ display: 'flex', gap: '5px' }}>
-                  <button onClick={() => setEditingShopId(shop.id)} style={actionBtnStyle}>編集</button>
+                  {/* 🆕 修正：編集ボタンクリック時に値をセットするように修正 */}
+                  <button onClick={() => {
+                    setEditingShopId(shop.id);
+                    setEditName(shop.business_name || "");
+                    setEditKana(shop.business_name_kana || "");
+                    setEditOwnerName(shop.owner_name || "");
+                    setEditOwnerNameKana(shop.owner_name_kana || "");
+                    setEditBusinessType(shop.business_type || "");
+                    setEditEmail(shop.email_contact || "");
+                    setEditPhone(shop.phone || "");
+                    setEditPassword(shop.admin_password || "");
+                  }} style={actionBtnStyle}>編集</button>
                   <button onClick={() => deleteShop(shop)} style={{ ...actionBtnStyle, color: '#ef4444' }}>消去</button>
                 </div>
               </div>
 
-              {/* URLセクション：はみ出し防止の縦並びレイアウト */}
+              {/* URLセクション */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 {[
                   { label: '🔑 店舗主用設定', url: `${window.location.origin}/admin/${shop.id}`, color: '#2563eb' },
-                  { label: '💬 LINEメニュー用', url: `${window.location.origin}/shop/${shop.id}/reserve?source=line`, color: '#00b900' },
+                  { label: '💬 LINEメニュー用', url: `${window.location.origin}/shop/${shop.id}/reserve?openExternalBrowser=1`, color: '#00b900' },
                   { label: '📅 一般予約用', url: `${window.location.origin}/shop/${shop.id}/reserve`, color: '#059669' }
                 ].map((item, idx) => (
                   <div key={idx} style={{ background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
