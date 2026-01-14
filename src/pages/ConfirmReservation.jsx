@@ -162,8 +162,14 @@ function ConfirmReservation() {
         });
       }
 
-      alert(isAdminEntry ? '爆速ねじ込み完了！名簿も更新しました。' : '予約が完了しました！');
-      navigate(isAdminEntry ? `/admin/${shopId}/reservations` : '/');
+      alert(isAdminEntry ? '爆速ねじ込み完了！' : '予約が完了しました！');
+
+if (isAdminEntry) {
+  // 🆕 管理者ねじ込み時は、予約した日付（targetDate）をパラメータに付けて戻る
+  navigate(`/admin/${shopId}/reservations?date=${targetDate}`);
+} else {
+  navigate('/');
+}
 
     } catch (err) {
       console.error(err);
