@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 function TrialRegistration() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 🆕 ページ表示時に最上部へスクロールさせる処理を追加
+  useEffect(() => {
+    const scrollTimer = setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, 100);
+    return () => clearTimeout(scrollTimer);
+  }, []);
 
   const [formData, setFormData] = useState({
     ownerName: '',
@@ -51,14 +59,13 @@ function TrialRegistration() {
 
       if (error) throw error;
 
-      // 🚀 💡 2. 司令塔（index.ts）を呼び出して歓迎メールを送信
+      // 💡 2. 司令塔（index.ts）を呼び出して歓迎メールを送信
       const baseUrl = window.location.origin;
       await supabase.functions.invoke('send-reservation-email', {
         body: {
           type: 'welcome',
-          shopName: formData.shopName, // index.ts側の変数名と一致させる
+          shopName: formData.shopName,
           owner_email: formData.email,
-          // 💡 修正：メール内のURLからも /dashboard を削除
           dashboard_url: `${baseUrl}/admin/${data.id}`,
           reservations_url: `${baseUrl}/admin/${data.id}/reservations`,
           reserve_url: `${baseUrl}/shop/${data.id}/reserve`,
@@ -68,7 +75,7 @@ function TrialRegistration() {
 
       alert(`おめでとうございます！「${formData.shopName}」の登録が完了し、メールを送信しました。`);
 
-      // 💡 修正 3. 管理画面へ直接案内（/dashboardを削除して本来のパスへ）
+      // 管理画面へ直接案内
       navigate(`/admin/${data.id}`);
 
     } catch (err) {
