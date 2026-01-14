@@ -14,8 +14,10 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* 🚀 【PCフル画面・管理エリア】 mobile-container の外側へ独立 */}
-        <Route path="/super-admin-snipsnap" element={<SuperAdmin />} />
+        {/* 🚀 【PCフル画面・管理エリア】案B：URLを推測困難なものに変更 */}
+        {/* 三土手さん、このパス（/super-admin-...）をブラウザのお気に入りに保存してください */}
+        <Route path="/super-admin-216-midote-snipsnap-dmaaaahkmm" element={<SuperAdmin />} />
+        
         <Route path="/admin/:shopId" element={<AdminDashboard />} />
         <Route path="/admin/:shopId/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/:shopId/reservations" element={<AdminReservations />} />

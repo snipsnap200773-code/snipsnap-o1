@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
 function SuperAdmin() {
+  // 🆕 管理者ログイン用の追加State
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [inputPass, setInputPass] = useState('');
+  // 💡 三土手さん、ここを好きなパスワードに変えてください！
+  const MASTER_PASSWORD = "1212"; 
+
+  // --- 既存のState群 ---
   const [newShopName, setNewShopName] = useState('');
   const [newShopKana, setNewShopKana] = useState('');
   const [newOwnerName, setNewOwnerName] = useState('');
@@ -27,7 +34,22 @@ function SuperAdmin() {
 
   const DELETE_PASSWORD = "1212";
 
-  useEffect(() => { fetchCreatedShops(); }, []);
+  // ログイン済みの場合のみデータを取得するよう修正
+  useEffect(() => { 
+    if (isAuthorized) {
+      fetchCreatedShops(); 
+    }
+  }, [isAuthorized]);
+
+  // 🆕 パスワードチェック関数
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (inputPass === MASTER_PASSWORD) {
+      setIsAuthorized(true);
+    } else {
+      alert('パスワードが違います');
+    }
+  };
 
   const fetchCreatedShops = async () => {
     const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: true });
@@ -96,6 +118,30 @@ function SuperAdmin() {
     alert('コピーしました！');
   };
 
+  // 🆕 ログインしていない場合の表示
+  if (!isAuthorized) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f4f7f9' }}>
+        <form onSubmit={handleLogin} style={{ background: '#fff', padding: '40px', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', textAlign: 'center', width: '320px' }}>
+          <h2 style={{ color: '#2563eb', marginBottom: '20px', fontSize: '1.4rem', fontWeight: '900' }}>SnipSnap Admin</h2>
+          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '20px' }}>統括管理パスワードを入力してください</p>
+          <input 
+            type="password" 
+            value={inputPass} 
+            onChange={(e) => setInputPass(e.target.value)} 
+            placeholder="パスワード" 
+            style={{ ...smallInput, textAlign: 'center', marginBottom: '20px' }}
+            autoFocus
+          />
+          <button type="submit" style={{ width: '100%', padding: '14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
+            ログイン
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  // ログイン後のメインUI
   return (
     <div style={{ padding: '15px', fontFamily: 'sans-serif', backgroundColor: '#f4f7f9', minHeight: '100vh', paddingBottom: '100px' }}>
       <div style={{ maxWidth: '650px', margin: '0 auto' }}>
@@ -116,11 +162,11 @@ function SuperAdmin() {
             <select value={newBusinessType} onChange={(e) => setNewBusinessType(e.target.value)} style={smallInput}>
               <option value="">-- 業種を選択 --</option>
               <option value="美容室・理容室">美容室・理容室</option>
-                        <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
-                        <option value="エステ・リラク">エステ・リラク</option>
-                        <option value="整体・接骨院">整体・接骨院</option>
-                        <option value="飲食店">飲食店</option>
-                        <option value="その他">その他</option>
+              <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
+              <option value="エステ・リラク">エステ・リラク</option>
+              <option value="整体・接骨院">整体・接骨院</option>
+              <option value="飲食店">飲食店</option>
+              <option value="その他">その他</option>
             </select>
             <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="メールアドレス" style={smallInput} />
             <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="電話番号" style={smallInput} />
@@ -137,7 +183,6 @@ function SuperAdmin() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '0.65rem', color: '#2563eb', fontWeight: 'bold' }}>No.{shop.displayNumber}</div>
                   
-                  {/* 🆕 2枚目画像 の全編集項目を完全再現 */}
                   {editingShopId === shop.id ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                       <div style={{ display: 'flex', gap: '5px' }}>
