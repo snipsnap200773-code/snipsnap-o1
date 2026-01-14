@@ -179,17 +179,61 @@ function AdminReservations() {
   };
 
   const deleteRes = async (id) => {
-    if (window.confirm('このデータを消去して予約を「可能」に戻しますか？')) {
+    const isBlock = selectedRes?.res_type === 'blocked';
+    const msg = isBlock ? 'このブロックを解除して予約を「可能」に戻しますか？' : 'この予約データを消去して予約を「可能」に戻しますか？';
+    
+    if (window.confirm(msg)) {
       await supabase.from('reservations').delete().eq('id', id);
       setShowDetailModal(false); fetchData();
     }
   };
 
+  // スロット単体のブロック
   const handleBlockTime = async () => {
     const startTimeStr = `${selectedDate}T${targetTime}:00`;
     const startTime = new Date(startTimeStr);
     const endTime = new Date(startTime.getTime() + (shop.slot_interval_min || 30) * 60000);
     const insertData = { shop_id: shopId, customer_name: '管理者によるブロック', res_type: 'blocked', start_at: startTime.toISOString(), end_at: endTime.toISOString(), start_time: startTime.toISOString(), end_time: endTime.toISOString(), total_slots: 1, customer_email: 'admin@example.com', customer_phone: '---', options: { services: [] } };
+    const { error } = await supabase.from('reservations').insert([insertData]);
+    if (error) alert(`エラー: ${error.message}`);
+    else { setShowMenuModal(false); fetchData(); }
+  };
+
+  // 🆕 終日ブロック（臨時休業）の設定ロジック
+  const handleBlockFullDay = async () => {
+    if (!window.confirm(`${selectedDate.replace(/-/g, '/')} を終日「予約不可」にしますか？`)) return;
+
+    const interval = shop.slot_interval_min || 30;
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[new Date(selectedDate).getDay()];
+    const hours = shop.business_hours?.[dayName];
+
+    // 営業時間が設定されていない、または定休日の場合のフォールバック
+    const openStr = (hours && !hours.is_closed && hours.open) ? hours.open : "09:00";
+    const closeStr = (hours && !hours.is_closed && hours.close) ? hours.close : "18:00";
+
+    const [openH, openM] = openStr.split(':').map(Number);
+    const [closeH, closeM] = closeStr.split(':').map(Number);
+    const startTime = new Date(`${selectedDate}T${openStr}:00`);
+    const endTime = new Date(`${selectedDate}T${closeStr}:00`);
+    
+    const totalMinutes = (closeH * 60 + closeM) - (openH * 60 + openM);
+    const totalSlotsNeeded = Math.ceil(totalMinutes / interval);
+
+    const insertData = {
+      shop_id: shopId,
+      customer_name: '臨時休業',
+      res_type: 'blocked',
+      start_at: startTime.toISOString(),
+      end_at: endTime.toISOString(),
+      start_time: startTime.toISOString(),
+      end_time: endTime.toISOString(),
+      total_slots: totalSlotsNeeded,
+      customer_email: 'admin@example.com',
+      customer_phone: '---',
+      options: { services: [], isFullDay: true }
+    };
+
     const { error } = await supabase.from('reservations').insert([insertData]);
     if (error) alert(`エラー: ${error.message}`);
     else { setShowMenuModal(false); fetchData(); }
@@ -315,7 +359,7 @@ function AdminReservations() {
                       <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                         {res && (
                           <div style={{ position: 'absolute', inset: '1px', background: res.res_type === 'blocked' ? '#fee2e2' : (isStart ? '#BAE6FD' : '#F3F4F6'), color: res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#451a03' : '#cbd5e1'), padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#0284c7' : '#d1d5db')}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            {res.res_type === 'blocked' ? '✕' : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・')}
+                            {res.res_type === 'blocked' ? (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕') : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・')}
                           </div>
                         )}
                       </td>
@@ -333,7 +377,7 @@ function AdminReservations() {
         <div onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalContentStyle, maxWidth: '650px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0 }}>{showCustomerModal ? '👤 顧客マスター編集' : '📅 予約詳細・名簿更新'}</h2>
+              <h2 style={{ margin: 0 }}>{showCustomerModal ? '👤 顧客マスター編集' : (selectedRes?.res_type === 'blocked' ? '🚫 ブロック設定' : '📅 予約詳細・名簿更新')}</h2>
               <button onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: isPC ? '1fr 1fr' : '1fr', gap: '25px' }}>
@@ -350,7 +394,9 @@ function AdminReservations() {
                   <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
                 </div>
                 {showDetailModal && selectedRes && (
-                  <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>予約を消去</button>
+                  <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? '#2563eb' : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    {selectedRes.res_type === 'blocked' ? (selectedRes.customer_name === '臨時休業' ? '🔓 休みを解除して営業する' : '🔓 この枠のブロックを解除') : '予約を消去'}
+                  </button>
                 )}
               </div>
               <div>
@@ -373,11 +419,17 @@ function AdminReservations() {
       {showMenuModal && (
         <div onClick={() => setShowMenuModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '35px', borderRadius: '30px', width: '90%', maxWidth: '340px', textAlign: 'center' }}>
-            <h3 style={{ margin: '0 0 10px 0', color: '#64748b' }}>{selectedDate}</h3>
+            <h3 style={{ margin: '0 0 10px 0', color: '#64748b' }}>{selectedDate.replace(/-/g, '/')}</h3>
             <p style={{ fontWeight: '900', color: '#2563eb', fontSize: '2.2rem', margin: '0 0 30px 0' }}>{targetTime}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button onClick={() => navigate(`/shop/${shopId}/reserve`, { state: { adminDate: selectedDate, adminTime: targetTime } })} style={{ padding: '22px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: '900', fontSize: '1.2rem' }}>📝 予約を入れる</button>
-              <button onClick={handleBlockTime} style={{ padding: '20px', background: '#fff', color: '#ef4444', border: '2px solid #ef4444', borderRadius: '20px', fontWeight: 'bold' }}>✕ 予約不可にする</button>
+              
+              {/* ブロックオプション */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <button onClick={handleBlockTime} style={{ padding: '15px', background: '#fff', color: '#ef4444', border: '2px solid #fee2e2', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.85rem' }}>✕ この枠のみ</button>
+                <button onClick={handleBlockFullDay} style={{ padding: '15px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.85rem' }}>🚀 今日を休みに</button>
+              </div>
+
               <button onClick={() => setShowMenuModal(false)} style={{ padding: '15px', border: 'none', background: 'none', color: '#94a3b8' }}>キャンセル</button>
             </div>
           </div>
