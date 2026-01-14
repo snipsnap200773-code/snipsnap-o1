@@ -6,8 +6,11 @@ function Home() {
   const [shops, setShops] = useState([]);
 
   useEffect(() => {
-    // 🆕 ページが表示されたら必ず一番上にスクロール
-    window.scrollTo(0, 0);
+    // 🆕 1. 最強のスクロールリセット
+    // ブラウザの「スクロール位置復元」よりも後に実行されるよう、わずかな遅延（100ms）を設けて強制実行します
+    const scrollTimer = setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, 100);
 
     const fetchShops = async () => {
       const { data } = await supabase
@@ -18,7 +21,7 @@ function Home() {
         .order('business_name_kana', { ascending: true });
       
       if (data) {
-        // 🆕 「美容室SnipSnap」をトップに、それ以外をあいうえお順にする並び替え
+        // 🆕 2. 「美容室SnipSnap」をトップに、それ以外をあいうえお順にする並び替え
         const sortedShops = [...data].sort((a, b) => {
           if (a.business_name === '美容室SnipSnap') return -1;
           if (b.business_name === '美容室SnipSnap') return 1;
@@ -27,7 +30,11 @@ function Home() {
         setShops(sortedShops);
       }
     };
+
     fetchShops();
+
+    // クリーンアップ
+    return () => clearTimeout(scrollTimer);
   }, []);
 
   return (
@@ -127,7 +134,7 @@ function Home() {
           </div>
         )}
 
-        {/* 💡 統合：無料トライアルバナー（ポータル最下部） */}
+        {/* 💡 3. トライアルバナー（文言をベータ版に更新） */}
         <div style={{ 
           marginTop: '60px', 
           padding: '40px 20px', 
