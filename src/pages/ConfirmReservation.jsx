@@ -74,7 +74,7 @@ function ConfirmReservation() {
     const { data: resData, error: dbError } = await supabase.from('reservations').insert([
       {
         shop_id: shopId,
-        customer_name: isAdminEntry ? `${customerName} ` : customerName,
+        customer_name: isAdminEntry ? `${customerName} (店舗受付)` : customerName,
         customer_phone: customerPhone || '---',
         customer_email: customerEmail || 'admin@example.com',
         start_at: startDateTime.toISOString(),
