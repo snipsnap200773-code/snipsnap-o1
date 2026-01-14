@@ -116,9 +116,11 @@ function SuperAdmin() {
             <select value={newBusinessType} onChange={(e) => setNewBusinessType(e.target.value)} style={smallInput}>
               <option value="">-- 業種を選択 --</option>
               <option value="美容室・理容室">美容室・理容室</option>
-              <option value="整体・接骨院">整体・接骨院</option>
-              <option value="飲食店">飲食店</option>
-              <option value="その他">その他</option>
+                        <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
+                        <option value="エステ・リラク">エステ・リラク</option>
+                        <option value="整体・接骨院">整体・接骨院</option>
+                        <option value="飲食店">飲食店</option>
+                        <option value="その他">その他</option>
             </select>
             <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="メールアドレス" style={smallInput} />
             <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="電話番号" style={smallInput} />
@@ -149,11 +151,11 @@ function SuperAdmin() {
                       <select value={editBusinessType} onChange={(e) => setEditBusinessType(e.target.value)} style={smallInput}>
                         <option value="">-- 業種を選択 --</option>
                         <option value="美容室・理容室">美容室・理容室</option>
-              <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
-              <option value="エステ・リラク">エステ・リラク</option>
-              <option value="整体・接骨院">整体・接骨院</option>
-              <option value="飲食店">飲食店</option>
-              <option value="その他">その他</option>
+                        <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
+                        <option value="エステ・リラク">エステ・リラク</option>
+                        <option value="整体・接骨院">整体・接骨院</option>
+                        <option value="飲食店">飲食店</option>
+                        <option value="その他">その他</option>
                       </select>
                       <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} style={smallInput} placeholder="メールアドレス" />
                       <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} style={smallInput} placeholder="電話番号" />
