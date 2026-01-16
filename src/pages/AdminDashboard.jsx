@@ -320,9 +320,18 @@ function AdminDashboard() {
                         <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} style={{fontWeight:'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333'}}>枝</button>
                         
                         {/* 🆕 並び替えボタンの復活（上下配置） */}
-                          <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} style={{ border: 'none', background: 'none', fontSize: '0.8rem', cursor: 'pointer' }}>▲</button>
-                          <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ border: 'none', background: 'none', fontSize: '0.8rem', cursor: 'pointer' }}>▼</button>
-
+<button 
+  onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} 
+  style={{ border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.8rem', cursor: 'pointer', padding: '5px 8px', borderRadius: '6px', lineHeight: '1' }}
+>
+  ▲
+</button>
+<button 
+  onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} 
+  style={{ border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.8rem', cursor: 'pointer', padding: '5px 8px', borderRadius: '6px', lineHeight: '1' }}
+>
+  ▼
+</button>
                         {/* 🆕 ✎ボタン: クリック時にスクロール実行を追加 */}
                         <button onClick={() => {
                           setEditingServiceId(s.id); 
