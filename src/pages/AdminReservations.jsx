@@ -181,15 +181,11 @@ function AdminReservations() {
 
   const getStatusAt = (dateStr, timeStr) => {
     const dateObj = new Date(dateStr);
-    
-    // 1. 定休日チェック
     if (checkIsRegularHoliday(dateObj)) {
       return { res_type: 'blocked', customer_name: '定休日', start_time: `${dateStr}T${timeStr}:00`, isRegularHoliday: true };
     }
 
     const currentSlotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
-    
-    // 2. 実予約チェック
     const matches = reservations.filter(r => {
       const start = new Date(r.start_time).getTime();
       const end = new Date(r.end_time).getTime();
@@ -201,9 +197,10 @@ function AdminReservations() {
       return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
     }
 
-    // 🆕 3. 準備時間（インターバル）の可視化ロジック
+    // 🆕 柔軟な自動詰め込みロジック
     const buffer = shop?.buffer_preparation_min || 0;
     const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal');
+
     const isInBuffer = dayRes.some(r => {
       const resEnd = new Date(r.end_time).getTime();
       return currentSlotStart >= resEnd && currentSlotStart < (resEnd + buffer * 60 * 1000);
@@ -213,22 +210,17 @@ function AdminReservations() {
       return { res_type: 'system_blocked', customer_name: 'ｲﾝﾀｰﾊﾞﾙ', isBuffer: true };
     }
 
-    // 🆕 4. 自動詰め込みロジックの可視化ロジック
-    if (shop?.auto_fill_logic) {
+    if (shop?.auto_fill_logic && dayRes.length > 0) {
       const dayOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dateObj.getDay()];
       const hours = shop.business_hours[dayOfWeek];
-      
       if (hours && !hours.is_closed) {
-        // 開店直後、または「予約終了＋インターバル」の直後の枠か判定
         const isAdjacent = dayRes.some(r => {
           const rEndWithBuffer = new Date(new Date(r.end_time).getTime() + buffer * 60 * 1000);
           const rEndStr = rEndWithBuffer.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
           return rEndStr === timeStr;
         }) || timeStr === hours.open;
 
-        if (!isAdjacent) {
-          return { res_type: 'system_blocked', customer_name: '－', isGap: true };
-        }
+        if (!isAdjacent) return { res_type: 'system_blocked', customer_name: '－', isGap: true };
       }
     }
 
@@ -301,7 +293,6 @@ function AdminReservations() {
 
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#fff', overflow: 'hidden', position: 'fixed', inset: 0 }}>
-      
       {isPC && (
         <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #e2e8f0', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px', background: '#fff', zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -390,15 +381,13 @@ function AdminReservations() {
                     const res = getStatusAt(dStr, time);
                     const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === time;
                     
-                    // 背景色の決定ロジック
                     let bgColor = '#fff';
                     let borderColor = '#f1f5f9';
                     let textColor = '#cbd5e1';
-                    
                     if (res) {
                       if (res.isRegularHoliday) { bgColor = '#f3f4f6'; textColor = '#94a3b8'; }
                       else if (res.res_type === 'blocked') { bgColor = '#fee2e2'; textColor = '#ef4444'; borderColor = '#ef4444'; }
-                      else if (res.res_type === 'system_blocked') { bgColor = '#f8fafc'; textColor = '#cbd5e1'; } // ｲﾝﾀｰﾊﾞﾙ・自動詰め
+                      else if (res.res_type === 'system_blocked') { bgColor = '#f8fafc'; textColor = '#cbd5e1'; }
                       else if (isStart) { bgColor = '#BAE6FD'; textColor = '#451a03'; borderColor = '#0284c7'; }
                       else { bgColor = '#F3F4F6'; textColor = '#cbd5e1'; }
                     }
@@ -458,7 +447,6 @@ function AdminReservations() {
                         </div>
                       </div>
                     )}
-
                     <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                       <label style={labelStyle}>お客様名</label>
                       <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={inputStyle} />
@@ -490,7 +478,6 @@ function AdminReservations() {
                 </div>
               </div>
             </div>
-
             {!isPC && (
               <button 
                 onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} 
@@ -516,7 +503,6 @@ function AdminReservations() {
               </div>
               <button onClick={() => setShowMenuModal(false)} style={{ padding: '15px', border: 'none', background: 'none', color: '#94a3b8' }}>キャンセル</button>
             </div>
-
             {!isPC && (
               <button 
                 onClick={() => setShowMenuModal(false)} 

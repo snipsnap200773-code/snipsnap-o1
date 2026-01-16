@@ -41,7 +41,6 @@ function TimeSelection() {
     const checkSecondLast = new Date(date);
     checkSecondLast.setDate(dom + 14);
     const isSecondToLastWeek = (checkSecondLast.getMonth() !== currentMonth) && !isLastWeek;
-
     if (holidays[`${nthWeek}-${dayName}`]) return true;
     if (isLastWeek && holidays[`L1-${dayName}`]) return true;
     if (isSecondToLastWeek && holidays[`L2-${dayName}`]) return true;
@@ -96,8 +95,6 @@ function TimeSelection() {
     if (hours.rest_start && hours.rest_end && timeStr >= hours.rest_start && timeStr < hours.rest_end) return { status: 'rest', label: '休' };
 
     const targetDateTime = new Date(`${dateStr}T${timeStr}:00`);
-
-    // 🆕 ロジック：準備時間（インターバル）の適用
     const buffer = shop.buffer_preparation_min || 0;
 
     const limitDays = Math.floor((shop.min_lead_time_hours || 0) / 24);
@@ -116,32 +113,31 @@ function TimeSelection() {
     const closeDateTime = new Date(`${dateStr}T${String(closeH).padStart(2,'0')}:${String(closeM).padStart(2,'0')}:00`);
     if (potentialEndTime > closeDateTime) return { status: 'short', label: '△' };
 
-    // 🆕 ロジック：予約の重なり判定（インターバル込み）
     const isBooked = existingReservations.some(res => {
       const resStart = new Date(res.start_time).getTime();
       const resEnd = new Date(res.end_time).getTime();
-      // 設定されたインターバルを終了時刻に足して判定
       const bufferEnd = resEnd + (buffer * 60 * 1000);
       return (targetDateTime.getTime() < bufferEnd && potentialEndTime.getTime() > resStart);
     });
 
     if (isBooked) return { status: 'booked', label: '×' };
 
-    // 🆕 ロジック：自動詰め機能（空き時間ガード）
+    // 🆕 改良版：自動詰め機能（予約がある日だけ発動）
     if (shop.auto_fill_logic) {
       const dayRes = existingReservations.filter(r => r.start_time.startsWith(dateStr));
+      
+      // その日に1件でも予約がある場合のみ、詰め込みルールを適用
       if (dayRes.length > 0) {
-        // 「開店直後」または「既存予約の直後」か判定
         const isAdjacent = dayRes.some(r => {
-          const rEndStr = new Date(r.end_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+          // 既存予約の「終了＋インターバル」が、今回の「開始」と一致するか
+          const rEndWithBuffer = new Date(new Date(r.end_time).getTime() + buffer * 60 * 1000);
+          const rEndStr = rEndWithBuffer.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
           return rEndStr === timeStr;
-        }) || timeStr === hours.open;
+        }) || timeStr === hours.open; // または開店時間ピッタリ
 
         if (!isAdjacent) return { status: 'gap', label: '－' };
-      } else {
-        // 予約がゼロの日は、開店時間のみ許可
-        if (timeStr !== hours.open) return { status: 'gap', label: '－' };
       }
+      // 予約がゼロの日は何もしない（どこでも予約可能）
     }
 
     return { status: 'available', label: '◎' };
