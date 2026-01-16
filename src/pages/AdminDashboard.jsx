@@ -320,10 +320,8 @@ function AdminDashboard() {
                         <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} style={{fontWeight:'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333'}}>枝</button>
                         
                         {/* 🆕 並び替えボタンの復活（上下配置） */}
-                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                           <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} style={{ border: 'none', background: 'none', fontSize: '0.8rem', cursor: 'pointer' }}>▲</button>
                           <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ border: 'none', background: 'none', fontSize: '0.8rem', cursor: 'pointer' }}>▼</button>
-                        </div>
 
                         {/* 🆕 ✎ボタン: クリック時にスクロール実行を追加 */}
                         <button onClick={() => {
