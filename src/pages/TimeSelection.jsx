@@ -122,13 +122,15 @@ function TimeSelection() {
 
     if (isBooked) return { status: 'booked', label: '×' };
 
-    // 🆕 修正版：究極のピンポイント隙間ブロック
+    // 🆕 修正版：優先順位付き・前後ピンポイント隙間ブロック
     if (shop.auto_fill_logic) {
       const dayRes = existingReservations.filter(r => r.start_time.startsWith(dateStr));
       if (dayRes.length > 0) {
-        const gapSlots = [];
+        const specialSlots = [];
+        const gapBlockCandidates = [];
+
         dayRes.forEach(r => {
-          // 後ろ側：特等席の１つ後ろ（２マス目）をブロック
+          // 【特等席】予約直後の枠（後ろ1マス目）を特定
           const resEnd = new Date(r.end_time).getTime();
           const earliestPossible = resEnd + (buffer * 60 * 1000);
           const perfectPostSlot = timeSlots.find(s => {
@@ -136,20 +138,22 @@ function TimeSelection() {
             const slotDate = new Date(dateStr); slotDate.setHours(sh, sm, 0, 0);
             return slotDate.getTime() >= earliestPossible;
           });
+          
           if (perfectPostSlot) {
+            specialSlots.push(perfectPostSlot); // 優先的に空ける枠
+            // 【後ろ側ブロック】特等席のさらに１つ後ろ（２マス目）を候補に
             const idx = timeSlots.indexOf(perfectPostSlot);
-            if (idx + 1 < timeSlots.length) gapSlots.push(timeSlots[idx + 1]);
+            if (idx + 1 < timeSlots.length) gapBlockCandidates.push(timeSlots[idx + 1]);
           }
-
-          // 前側：開始時間の３マス前をブロック
+          
+          // 【前側ブロック】開始時間の３マス前を候補に
           const resStartStr = new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
           const startIdx = timeSlots.indexOf(resStartStr);
-          if (startIdx >= 3) {
-            gapSlots.push(timeSlots[startIdx - 3]);
-          }
+          if (startIdx >= 3) gapBlockCandidates.push(timeSlots[startIdx - 3]);
         });
 
-        if (gapSlots.includes(timeStr)) {
+        // 判定：候補の中でも、他の予約の「特等席」になっている枠はブロックしない
+        if (gapBlockCandidates.includes(timeStr) && !specialSlots.includes(timeStr)) {
           return { status: 'gap', label: '✕' }; 
         }
       }
@@ -182,12 +186,16 @@ function TimeSelection() {
           <thead>
             <tr>
               <th style={{ width: '14%', background: '#f8fafc', borderRight: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, left: 0, zIndex: 50 }}></th>
-              {weekDays.map(date => (
-                <th key={date.toString()} style={{ width: '12.28%', padding: '8px 0', background: date.getDay() === 0 ? '#fff1f2' : date.getDay() === 6 ? '#eff6ff' : '#f8fafc', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 40 }}>
-                  <div style={{ fontSize: '0.55rem', color: date.getDay() === 0 ? '#ef4444' : date.getDay() === 6 ? '#2563eb' : '#64748b' }}>{['日', '月', '火', '水', '木', '金', '土'][date.getDay()]}</div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{date.getDate()}</div>
-                </th>
-              ))}
+              {weekDays.map(date => {
+                const isSun = date.getDay() === 0;
+                const isSat = date.getDay() === 6;
+                return (
+                  <th key={date.toString()} style={{ width: '12.28%', padding: '8px 0', background: isSun ? '#fff1f2' : isSat ? '#eff6ff' : '#f8fafc', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 40 }}>
+                    <div style={{ fontSize: '0.55rem', color: isSun ? '#ef4444' : isSat ? '#2563eb' : '#64748b' }}>{['日', '月', '火', '水', '木', '金', '土'][date.getDay()]}</div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{date.getDate()}</div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>

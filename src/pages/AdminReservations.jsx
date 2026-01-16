@@ -185,11 +185,11 @@ function AdminReservations() {
       return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
     }
 
-    // 🆕 修正版：前後ピンポイント隙間ブロック可視化
+    // 🆕 究極のパズルロジックの実装
     const buffer = shop?.buffer_preparation_min || 0;
     const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal');
 
-    // ｲﾝﾀｰﾊﾞﾙの判定（実予約の直後）
+    // 1. ｲﾝﾀｰﾊﾞﾙ（実予約の直後）判定
     const isInBuffer = dayRes.some(r => {
       const resEnd = new Date(r.end_time).getTime();
       return currentSlotStart >= resEnd && currentSlotStart < (resEnd + buffer * 60 * 1000);
@@ -197,9 +197,11 @@ function AdminReservations() {
     if (isInBuffer) return { res_type: 'system_blocked', customer_name: 'ｲﾝﾀｰﾊﾞﾙ', isBuffer: true };
 
     if (shop?.auto_fill_logic && dayRes.length > 0) {
-      const gapSlots = [];
+      const primeSeats = []; // 死守すべき特等席リスト
+      const gapBlockCandidates = []; // ✕にする候補リスト
+
       dayRes.forEach(r => {
-        // 後ろ側：特等席の１つ後ろ（２マス目）をブロック
+        // --- 後ろ側の計算 ---
         const resEnd = new Date(r.end_time).getTime();
         const earliestPossible = resEnd + (buffer * 60 * 1000);
         const perfectPostSlot = timeSlots.find(s => {
@@ -207,20 +209,23 @@ function AdminReservations() {
           const slotDate = new Date(dateStr); slotDate.setHours(sh, sm, 0, 0);
           return slotDate.getTime() >= earliestPossible;
         });
+        
         if (perfectPostSlot) {
+          primeSeats.push(perfectPostSlot); // 予約直後の1マス目は特等席
           const idx = timeSlots.indexOf(perfectPostSlot);
-          if (idx + 1 < timeSlots.length) gapSlots.push(timeSlots[idx + 1]);
+          if (idx + 1 < timeSlots.length) gapBlockCandidates.push(timeSlots[idx + 1]); // その次（2マス目）をブロック候補
         }
         
-        // 前側：開始時間の３マス前をピンポイントでブロック
+        // --- 前側の計算 ---
         const resStartStr = new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
         const startIdx = timeSlots.indexOf(resStartStr);
         if (startIdx >= 3) {
-          gapSlots.push(timeSlots[startIdx - 3]);
+          gapBlockCandidates.push(timeSlots[startIdx - 3]); // 開始の3マス前をブロック候補
         }
       });
 
-      if (gapSlots.includes(timeStr)) {
+      // 判定：ブロック候補だが、他の予約の「特等席」ではない場合のみ ✕ にする
+      if (gapBlockCandidates.includes(timeStr) && !primeSeats.includes(timeStr)) {
         return { res_type: 'system_blocked', customer_name: '－', isGap: true };
       }
     }
@@ -234,11 +239,9 @@ function AdminReservations() {
   };
 
   const handleBlockTime = async () => {
-    const startTimeStr = `${selectedDate}T${targetTime}:00`;
-    const startTime = new Date(startTimeStr);
+    const startTime = new Date(`${selectedDate}T${targetTime}:00`);
     const endTime = new Date(startTime.getTime() + (shop.slot_interval_min || 30) * 60000);
-    const insertData = { shop_id: shopId, customer_name: '管理者によるブロック', res_type: 'blocked', start_at: startTime.toISOString(), end_at: endTime.toISOString(), start_time: startTime.toISOString(), end_time: endTime.toISOString(), total_slots: 1, customer_email: 'admin@example.com', customer_phone: '---', options: { services: [] } };
-    const { error } = await supabase.from('reservations').insert([insertData]);
+    const { error } = await supabase.from('reservations').insert([{ shop_id: shopId, customer_name: '管理者によるブロック', res_type: 'blocked', start_time: startTime.toISOString(), end_time: endTime.toISOString(), customer_email: 'admin@example.com', customer_phone: '---' }]);
     if (error) alert(`エラー: ${error.message}`); else { setShowMenuModal(false); fetchData(); }
   };
 
@@ -247,15 +250,10 @@ function AdminReservations() {
     const interval = shop.slot_interval_min || 30;
     const dayName = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date(selectedDate).getDay()];
     const hours = shop.business_hours?.[dayName];
-    const openStr = (hours && !hours.is_closed && hours.open) ? hours.open : "09:00";
-    const closeStr = (hours && !hours.is_closed && hours.close) ? hours.close : "18:00";
+    const openStr = hours?.open || "09:00"; const closeStr = hours?.close || "18:00";
     const startTime = new Date(`${selectedDate}T${openStr}:00`);
     const endTime = new Date(`${selectedDate}T${closeStr}:00`);
-    const [openH, openM] = openStr.split(':').map(Number);
-    const [closeH, closeM] = closeStr.split(':').map(Number);
-    const totalMinutes = (closeH * 60 + closeM) - (openH * 60 + openM);
-    const insertData = { shop_id: shopId, customer_name: '臨時休業', res_type: 'blocked', start_at: startTime.toISOString(), end_at: endTime.toISOString(), start_time: startTime.toISOString(), end_time: endTime.toISOString(), total_slots: Math.ceil(totalMinutes / interval), customer_email: 'admin@example.com', customer_phone: '---', options: { services: [], isFullDay: true } };
-    const { error } = await supabase.from('reservations').insert([insertData]);
+    const { error } = await supabase.from('reservations').insert([{ shop_id: shopId, customer_name: '臨時休業', res_type: 'blocked', start_time: startTime.toISOString(), end_time: endTime.toISOString(), options: { isFullDay: true } }]);
     if (error) alert(`エラー: ${error.message}`); else { setShowMenuModal(false); fetchData(); }
   };
 
@@ -273,13 +271,7 @@ function AdminReservations() {
   const goNext = () => setStartDate(new Date(new Date(startDate).setDate(new Date(startDate).getDate() + 7)));
   const goPrevMonth = () => setStartDate(new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() - 1)));
   const goNextMonth = () => setStartDate(new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() + 1)));
-  
-  const goToday = () => {
-    const today = new Date();
-    setStartDate(today);
-    setSelectedDate(today.toLocaleDateString('sv-SE'));
-    navigate(`/admin/${shopId}/reservations`, { replace: true });
-  };
+  const goToday = () => { const today = new Date(); setStartDate(today); setSelectedDate(today.toLocaleDateString('sv-SE')); navigate(`/admin/${shopId}/reservations`, { replace: true }); };
 
   if (loading) return <div style={{textAlign:'center', padding:'50px'}}>読み込み中...</div>;
 
@@ -427,38 +419,22 @@ function AdminReservations() {
                     <p style={{ fontWeight: 'bold', color: '#64748b' }}>この日は設定画面で「定休日」として設定されています。</p>
                   </div>
                 ) : (
-                  <>
-                    {showDetailModal && selectedRes && selectedRes.res_type === 'normal' && (
-                      <div style={{ background: '#f0f9ff', padding: '15px', borderRadius: '12px', border: '1px solid #bae6fd' }}>
-                        <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' }}>📋 今回の予約メニュー</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
-                          {selectedRes.options?.services?.length > 0 ? (
-                            selectedRes.options.services.map((s, idx) => (
-                              <span key={idx} style={{ background: '#2563eb', color: '#fff', padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>{s.name}</span>
-                            ))
-                          ) : (
-                            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>メニュー情報なし</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                      <label style={labelStyle}>お客様名</label>
-                      <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={inputStyle} />
-                      <label style={labelStyle}>電話番号</label>
-                      <input type="tel" value={editFields.phone} onChange={(e) => setEditFields({...editFields, phone: e.target.value})} style={inputStyle} placeholder="未登録" />
-                      <label style={labelStyle}>メールアドレス</label>
-                      <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={inputStyle} placeholder="未登録" />
-                      <label style={labelStyle}>顧客メモ</label>
-                      <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ ...inputStyle, height: '80px' }} placeholder="好み、注意事項など" />
-                      <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
-                    </div>
+                  <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <label style={labelStyle}>お客様名</label>
+                    <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+                    <label style={labelStyle}>電話番号</label>
+                    <input type="tel" value={editFields.phone} onChange={(e) => setEditFields({...editFields, phone: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box' }} placeholder="未登録" />
+                    <label style={labelStyle}>メールアドレス</label>
+                    <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box' }} placeholder="未登録" />
+                    <label style={labelStyle}>顧客メモ</label>
+                    <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box', height: '80px' }} placeholder="好み、注意事項など" />
+                    <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
                     {showDetailModal && selectedRes && (
-                      <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? '#2563eb' : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
-                        {selectedRes.res_type === 'blocked' ? (selectedRes.customer_name === '臨時休業' ? '🔓 休みを解除して営業する' : '🔓 この枠のブロックを解除') : '予約を消去'}
+                      <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? '#2563eb' : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
+                        {selectedRes.res_type === 'blocked' ? '🔓 枠のブロックを解除' : '予約を消去'}
                       </button>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
               <div>
@@ -473,14 +449,6 @@ function AdminReservations() {
                 </div>
               </div>
             </div>
-            {!isPC && (
-              <button 
-                onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} 
-                style={{ position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', border: 'none', padding: '12px 40px', borderRadius: '50px', fontWeight: 'bold', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 4000 }}
-              >
-                閉じる ✕
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -498,14 +466,6 @@ function AdminReservations() {
               </div>
               <button onClick={() => setShowMenuModal(false)} style={{ padding: '15px', border: 'none', background: 'none', color: '#94a3b8' }}>キャンセル</button>
             </div>
-            {!isPC && (
-              <button 
-                onClick={() => setShowMenuModal(false)} 
-                style={{ position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', border: 'none', padding: '12px 40px', borderRadius: '50px', fontWeight: 'bold', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 4000 }}
-              >
-                閉じる ✕
-              </button>
-            )}
           </div>
         </div>
       )}
