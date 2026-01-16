@@ -319,7 +319,7 @@ function AdminDashboard() {
 <div style={{ display: 'flex', gap: '8px' }}>
   <button 
     onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} 
-    style={{ padding: '4px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333' }}
+    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333' }}
   >
     枝
   </button>
@@ -327,13 +327,13 @@ function AdminDashboard() {
   {/* 🆕 並び替えボタン（他のボタンとデザインを統一） */}
   <button 
     onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} 
-    style={{ padding: '4px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
   >
     ▲
   </button>
   <button 
     onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} 
-    style={{ padding: '4px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
   >
     ▼
   </button>
@@ -346,13 +346,13 @@ function AdminDashboard() {
       setSelectedCategory(s.category);
       menuFormRef.current?.scrollIntoView({ behavior: 'smooth' });
     }} 
-    style={{ padding: '4px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
   >
     ✎
   </button>
   <button 
     onClick={() => deleteService(s.id)} 
-    style={{ padding: '4px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
   >
     ×
   </button>
