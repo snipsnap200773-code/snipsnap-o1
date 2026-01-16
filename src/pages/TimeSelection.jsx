@@ -122,33 +122,37 @@ function TimeSelection() {
 
     if (isBooked) return { status: 'booked', label: '×' };
 
-    // 🆕 修正版：ピンポイント隙間ブロック（自動詰め機能）
+    // 🆕 修正版：前後ピンポイント隙間ブロック
     if (shop.auto_fill_logic) {
       const dayRes = existingReservations.filter(r => r.start_time.startsWith(dateStr));
       if (dayRes.length > 0) {
-        // その日の各予約に対して、直後の「特等席」を特定し、その「１つ後ろ」だけをNGにする
-        const gapSlots = dayRes.map(r => {
+        const gapSlots = [];
+
+        dayRes.forEach(r => {
+          // 1. 【後ろ側】の隙間ブロック
           const resEnd = new Date(r.end_time).getTime();
           const earliestPossible = resEnd + (buffer * 60 * 1000);
-          
-          // 特等席（次に予約を入れるべき一番詰まった枠）を特定
-          const perfectSlotTime = timeSlots.find(s => {
+          const perfectPostSlot = timeSlots.find(s => {
             const [sh, sm] = s.split(':').map(Number);
-            const slotDate = new Date(dateStr);
-            slotDate.setHours(sh, sm, 0, 0);
+            const slotDate = new Date(dateStr); slotDate.setHours(sh, sm, 0, 0);
             return slotDate.getTime() >= earliestPossible;
           });
+          if (perfectPostSlot) {
+            const idx = timeSlots.indexOf(perfectPostSlot);
+            if (idx + 1 < timeSlots.length) gapSlots.push(timeSlots[idx + 1]);
+          }
 
-          if (!perfectSlotTime) return null;
-
-          // 「特等席」のインデックスを取得
-          const perfectIdx = timeSlots.indexOf(perfectSlotTime);
-          // 特等席の１つ後ろの枠だけをブロック対象として返す
-          return timeSlots[perfectIdx + 1];
-        }).filter(Boolean);
+          // 2. 【前側】の隙間ブロック
+          const resStartStr = new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+          const currentIdx = timeSlots.indexOf(resStartStr);
+          if (currentIdx > 1) {
+            // 直前の「特等席」のさらに１つ前をブロック
+            gapSlots.push(timeSlots[currentIdx - 2]);
+          }
+        });
 
         if (gapSlots.includes(timeStr)) {
-          return { status: 'gap', label: '✕' }; // 中途半端な隙間をピンポイントでNG
+          return { status: 'gap', label: '✕' }; 
         }
       }
     }
@@ -180,16 +184,12 @@ function TimeSelection() {
           <thead>
             <tr>
               <th style={{ width: '14%', background: '#f8fafc', borderRight: '2px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, left: 0, zIndex: 50 }}></th>
-              {weekDays.map(date => {
-                const isSun = date.getDay() === 0;
-                const isSat = date.getDay() === 6;
-                return (
-                  <th key={date.toString()} style={{ width: '12.28%', padding: '8px 0', background: isSun ? '#fff1f2' : isSat ? '#eff6ff' : '#f8fafc', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 40 }}>
-                    <div style={{ fontSize: '0.55rem', color: isSun ? '#ef4444' : isSat ? '#2563eb' : '#64748b' }}>{['日', '月', '火', '水', '木', '金', '土'][date.getDay()]}</div>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{date.getDate()}</div>
-                  </th>
-                );
-              })}
+              {weekDays.map(date => (
+                <th key={date.toString()} style={{ width: '12.28%', padding: '8px 0', background: date.getDay() === 0 ? '#fff1f2' : date.getDay() === 6 ? '#eff6ff' : '#f8fafc', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 40 }}>
+                  <div style={{ fontSize: '0.55rem', color: date.getDay() === 0 ? '#ef4444' : date.getDay() === 6 ? '#2563eb' : '#64748b' }}>{['日', '月', '火', '水', '木', '金', '土'][date.getDay()]}</div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{date.getDate()}</div>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>

@@ -106,14 +106,8 @@ function AdminReservations() {
         updated_at: new Date().toISOString()
       }, { onConflict: 'shop_id, name' });
 
-    if (error) {
-      alert('保存エラー: ' + error.message);
-    } else {
-      alert('名簿情報を更新しました');
-      setShowCustomerModal(false);
-      setShowDetailModal(false);
-      fetchData();
-    }
+    if (error) { alert('保存エラー: ' + error.message); } 
+    else { alert('名簿情報を更新しました'); setShowCustomerModal(false); setShowDetailModal(false); fetchData(); }
   };
 
   const checkIsRegularHoliday = (date) => {
@@ -197,7 +191,7 @@ function AdminReservations() {
       return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
     }
 
-    // 🆕 修正版：ピンポイント隙間ブロック可視化
+    // 🆕 修正版：前後ピンポイント隙間ブロック可視化
     const buffer = shop?.buffer_preparation_min || 0;
     const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal');
 
@@ -205,25 +199,28 @@ function AdminReservations() {
       const resEnd = new Date(r.end_time).getTime();
       return currentSlotStart >= resEnd && currentSlotStart < (resEnd + buffer * 60 * 1000);
     });
-
-    if (isInBuffer) {
-      return { res_type: 'system_blocked', customer_name: 'ｲﾝﾀｰﾊﾞﾙ', isBuffer: true };
-    }
+    if (isInBuffer) return { res_type: 'system_blocked', customer_name: 'ｲﾝﾀｰﾊﾞﾙ', isBuffer: true };
 
     if (shop?.auto_fill_logic && dayRes.length > 0) {
-      const gapSlots = dayRes.map(r => {
+      const gapSlots = [];
+      dayRes.forEach(r => {
+        // 後ろ
         const resEnd = new Date(r.end_time).getTime();
         const earliestPossible = resEnd + (buffer * 60 * 1000);
-        const perfectSlotTime = timeSlots.find(s => {
+        const perfectPostSlot = timeSlots.find(s => {
           const [sh, sm] = s.split(':').map(Number);
-          const slotDate = new Date(dateStr);
-          slotDate.setHours(sh, sm, 0, 0);
+          const slotDate = new Date(dateStr); slotDate.setHours(sh, sm, 0, 0);
           return slotDate.getTime() >= earliestPossible;
         });
-        if (!perfectSlotTime) return null;
-        const perfectIdx = timeSlots.indexOf(perfectSlotTime);
-        return timeSlots[perfectIdx + 1]; // １つ後ろの枠
-      }).filter(Boolean);
+        if (perfectPostSlot) {
+          const idx = timeSlots.indexOf(perfectPostSlot);
+          if (idx + 1 < timeSlots.length) gapSlots.push(timeSlots[idx + 1]);
+        }
+        // 前
+        const resStartStr = new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+        const currentIdx = timeSlots.indexOf(resStartStr);
+        if (currentIdx > 1) gapSlots.push(timeSlots[currentIdx - 2]);
+      });
 
       if (gapSlots.includes(timeStr)) {
         return { res_type: 'system_blocked', customer_name: '－', isGap: true };
@@ -296,6 +293,13 @@ function AdminReservations() {
   };
 
   if (loading) return <div style={{textAlign:'center', padding:'50px'}}>読み込み中...</div>;
+
+  const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', color: '#2563eb' };
+  const floatNavBtnStyle = { border: 'none', background: 'none', width: '60px', height: '50px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+  const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' };
+  const modalContentStyle = { background: '#fff', width: '95%', borderRadius: '25px', padding: '30px', maxHeight: '85vh', overflowY: 'auto' };
+  const headerBtnStylePC = { padding: '10px 20px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' };
+  const mobileArrowBtnStyle = { background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1rem', cursor: 'pointer' };
 
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#fff', overflow: 'hidden', position: 'fixed', inset: 0 }}>
@@ -441,7 +445,7 @@ function AdminReservations() {
                   <>
                     {showDetailModal && selectedRes && selectedRes.res_type === 'normal' && (
                       <div style={{ background: '#f0f9ff', padding: '15px', borderRadius: '12px', border: '1px solid #bae6fd' }}>
-                        <label style={labelStyle}>📋 今回の予約メニュー</label>
+                        <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' }}>📋 今回の予約メニュー</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
                           {selectedRes.options?.services?.length > 0 ? (
                             selectedRes.options.services.map((s, idx) => (
@@ -454,14 +458,14 @@ function AdminReservations() {
                       </div>
                     )}
                     <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                      <label style={labelStyle}>お客様名</label>
-                      <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={inputStyle} />
-                      <label style={labelStyle}>電話番号</label>
-                      <input type="tel" value={editFields.phone} onChange={(e) => setEditFields({...editFields, phone: e.target.value})} style={inputStyle} placeholder="未登録" />
-                      <label style={labelStyle}>メールアドレス</label>
-                      <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={inputStyle} placeholder="未登録" />
-                      <label style={labelStyle}>顧客メモ</label>
-                      <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ ...inputStyle, height: '80px' }} placeholder="好み、注意事項など" />
+                      <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' }}>お客様名</label>
+                      <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+                      <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' }}>電話番号</label>
+                      <input type="tel" value={editFields.phone} onChange={(e) => setEditFields({...editFields, phone: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box' }} placeholder="未登録" />
+                      <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' }}>メールアドレス</label>
+                      <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box' }} placeholder="未登録" />
+                      <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' }}>顧客メモ</label>
+                      <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box', height: '80px' }} placeholder="好み、注意事項など" />
                       <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
                     </div>
                     {showDetailModal && selectedRes && (
@@ -523,14 +527,5 @@ function AdminReservations() {
     </div>
   );
 }
-
-const labelStyle = { fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' };
-const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box' };
-const headerBtnStylePC = { padding: '10px 20px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' };
-const mobileArrowBtnStyle = { background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1rem', cursor: 'pointer' };
-const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', color: '#2563eb' };
-const floatNavBtnStyle = { border: 'none', background: 'none', width: '60px', height: '50px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' };
-const modalContentStyle = { background: '#fff', width: '95%', borderRadius: '25px', padding: '30px', maxHeight: '85vh', overflowY: 'auto' };
 
 export default AdminReservations;
