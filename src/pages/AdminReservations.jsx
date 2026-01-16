@@ -116,33 +116,24 @@ function AdminReservations() {
     }
   };
 
-  // 🆕 統合：定休日判定ロジック（第何週・何曜日を計算）
   const checkIsRegularHoliday = (date) => {
     if (!shop?.business_hours?.regular_holidays) return false;
     const holidays = shop.business_hours.regular_holidays;
-
     const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const dayName = dayNames[date.getDay()];
-
     const dom = date.getDate();
-    const nthWeek = Math.ceil(dom / 7); // 第1〜第5
-
+    const nthWeek = Math.ceil(dom / 7);
     const tempDate = new Date(date);
     const currentMonth = tempDate.getMonth();
-
-    // 最後判定
-    tempDate.setDate(dom + 7);
-    const isLastWeek = tempDate.getMonth() !== currentMonth;
-
-    // 最後から2番目判定
-    tempDate.setDate(dom + 14);
-    const isSecondToLastWeek = tempDate.getMonth() !== currentMonth && !isLastWeek;
-
-    // 設定と照らし合わせ
+    const checkLast = new Date(date);
+    checkLast.setDate(dom + 7);
+    const isLastWeek = checkLast.getMonth() !== currentMonth;
+    const checkSecondLast = new Date(date);
+    checkSecondLast.setDate(dom + 14);
+    const isSecondToLastWeek = (checkSecondLast.getMonth() !== currentMonth) && !isLastWeek;
     if (holidays[`${nthWeek}-${dayName}`]) return true;
     if (isLastWeek && holidays[`L1-${dayName}`]) return true;
     if (isSecondToLastWeek && holidays[`L2-${dayName}`]) return true;
-
     return false;
   };
 
@@ -189,27 +180,59 @@ function AdminReservations() {
   const getJapanDateStr = (date) => date.toLocaleDateString('sv-SE');
 
   const getStatusAt = (dateStr, timeStr) => {
-    // 🆕 定休日チェックを最優先で実行
     const dateObj = new Date(dateStr);
+    
+    // 1. 定休日チェック
     if (checkIsRegularHoliday(dateObj)) {
-      return { 
-        res_type: 'blocked', 
-        customer_name: '定休日', 
-        start_time: `${dateStr}T${timeStr}:00`,
-        isRegularHoliday: true 
-      };
+      return { res_type: 'blocked', customer_name: '定休日', start_time: `${dateStr}T${timeStr}:00`, isRegularHoliday: true };
     }
 
     const currentSlotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
+    
+    // 2. 実予約チェック
     const matches = reservations.filter(r => {
       const start = new Date(r.start_time).getTime();
       const end = new Date(r.end_time).getTime();
       return currentSlotStart >= start && currentSlotStart < end;
     });
-    if (matches.length === 0) return null;
-    const exact = matches.find(r => new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) === timeStr);
-    if (exact) return exact;
-    return matches.find(r => r.res_type === 'blocked') || matches[0];
+
+    if (matches.length > 0) {
+      const exact = matches.find(r => new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === timeStr);
+      return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
+    }
+
+    // 🆕 3. 準備時間（インターバル）の可視化ロジック
+    const buffer = shop?.buffer_preparation_min || 0;
+    const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal');
+    const isInBuffer = dayRes.some(r => {
+      const resEnd = new Date(r.end_time).getTime();
+      return currentSlotStart >= resEnd && currentSlotStart < (resEnd + buffer * 60 * 1000);
+    });
+
+    if (isInBuffer) {
+      return { res_type: 'system_blocked', customer_name: 'ｲﾝﾀｰﾊﾞﾙ', isBuffer: true };
+    }
+
+    // 🆕 4. 自動詰め込みロジックの可視化ロジック
+    if (shop?.auto_fill_logic) {
+      const dayOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dateObj.getDay()];
+      const hours = shop.business_hours[dayOfWeek];
+      
+      if (hours && !hours.is_closed) {
+        // 開店直後、または「予約終了＋インターバル」の直後の枠か判定
+        const isAdjacent = dayRes.some(r => {
+          const rEndWithBuffer = new Date(new Date(r.end_time).getTime() + buffer * 60 * 1000);
+          const rEndStr = rEndWithBuffer.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+          return rEndStr === timeStr;
+        }) || timeStr === hours.open;
+
+        if (!isAdjacent) {
+          return { res_type: 'system_blocked', customer_name: '－', isGap: true };
+        }
+      }
+    }
+
+    return null;
   };
 
   const deleteRes = async (id) => {
@@ -279,7 +302,6 @@ function AdminReservations() {
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#fff', overflow: 'hidden', position: 'fixed', inset: 0 }}>
       
-      {/* 💻 PCサイドバー */}
       {isPC && (
         <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #e2e8f0', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px', background: '#fff', zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -366,12 +388,26 @@ function AdminReservations() {
                   {weekDays.map(date => {
                     const dStr = getJapanDateStr(date);
                     const res = getStatusAt(dStr, time);
-                    const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) === time;
+                    const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === time;
+                    
+                    // 背景色の決定ロジック
+                    let bgColor = '#fff';
+                    let borderColor = '#f1f5f9';
+                    let textColor = '#cbd5e1';
+                    
+                    if (res) {
+                      if (res.isRegularHoliday) { bgColor = '#f3f4f6'; textColor = '#94a3b8'; }
+                      else if (res.res_type === 'blocked') { bgColor = '#fee2e2'; textColor = '#ef4444'; borderColor = '#ef4444'; }
+                      else if (res.res_type === 'system_blocked') { bgColor = '#f8fafc'; textColor = '#cbd5e1'; } // ｲﾝﾀｰﾊﾞﾙ・自動詰め
+                      else if (isStart) { bgColor = '#BAE6FD'; textColor = '#451a03'; borderColor = '#0284c7'; }
+                      else { bgColor = '#F3F4F6'; textColor = '#cbd5e1'; }
+                    }
+
                     return (
                       <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                         {res && (
-                          <div style={{ position: 'absolute', inset: '1px', background: res.res_type === 'blocked' ? (res.isRegularHoliday ? '#f3f4f6' : '#fee2e2') : (isStart ? '#BAE6FD' : '#F3F4F6'), color: res.res_type === 'blocked' ? (res.isRegularHoliday ? '#94a3b8' : '#ef4444') : (isStart ? '#451a03' : '#cbd5e1'), padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${res.res_type === 'blocked' ? (res.isRegularHoliday ? '#94a3b8' : '#ef4444') : (isStart ? '#0284c7' : '#d1d5db')}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            {res.res_type === 'blocked' ? (res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')) : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・')}
+                          <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            {res.res_type === 'blocked' ? (res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')) : (res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・'))}
                           </div>
                         )}
                       </td>
@@ -402,7 +438,6 @@ function AdminReservations() {
 
             <div style={{ display: 'grid', gridTemplateColumns: isPC ? '1fr 1fr' : '1fr', gap: '25px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {/* 定休日の場合は情報を表示しない */}
                 {selectedRes?.isRegularHoliday ? (
                   <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px' }}>
                     <p style={{ fontWeight: 'bold', color: '#64748b' }}>この日は設定画面で「定休日」として設定されています。</p>

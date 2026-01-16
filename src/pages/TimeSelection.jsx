@@ -26,35 +26,25 @@ function TimeSelection() {
     setLoading(false);
   };
 
-  // 🆕 統合：定休日判定ロジック（AdminReservationsと同じ高度な計算）
   const checkIsRegularHoliday = (date) => {
     if (!shop?.business_hours?.regular_holidays) return false;
     const holidays = shop.business_hours.regular_holidays;
-
     const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const dayName = dayNames[date.getDay()];
-
     const dom = date.getDate();
-    const nthWeek = Math.ceil(dom / 7); // 第1〜第5週
-
+    const nthWeek = Math.ceil(dom / 7);
     const tempDate = new Date(date);
     const currentMonth = tempDate.getMonth();
-
-    // 最後判定 (L1)
     const checkLast = new Date(date);
     checkLast.setDate(dom + 7);
     const isLastWeek = checkLast.getMonth() !== currentMonth;
-
-    // 最後から2番目判定 (L2)
     const checkSecondLast = new Date(date);
     checkSecondLast.setDate(dom + 14);
     const isSecondToLastWeek = (checkSecondLast.getMonth() !== currentMonth) && !isLastWeek;
 
-    // データベースの設定（1-mon, L1-sun 等）と照合
     if (holidays[`${nthWeek}-${dayName}`]) return true;
     if (isLastWeek && holidays[`L1-${dayName}`]) return true;
     if (isSecondToLastWeek && holidays[`L2-${dayName}`]) return true;
-
     return false;
   };
 
@@ -93,15 +83,10 @@ function TimeSelection() {
 
   const checkAvailability = (date, timeStr) => {
     if (!shop?.business_hours) return { status: 'none' };
-    
-    // 🆕 定休日判定を最優先で実行
-    if (checkIsRegularHoliday(date)) {
-      return { status: 'closed', label: '休' };
-    }
+    if (checkIsRegularHoliday(date)) return { status: 'closed', label: '休' };
 
     const dayOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()];
     const hours = shop.business_hours[dayOfWeek];
-
     const dateStr = date.toLocaleDateString('sv-SE'); 
     const now = new Date();
     const todayStr = now.toLocaleDateString('sv-SE');
@@ -111,6 +96,9 @@ function TimeSelection() {
     if (hours.rest_start && hours.rest_end && timeStr >= hours.rest_start && timeStr < hours.rest_end) return { status: 'rest', label: '休' };
 
     const targetDateTime = new Date(`${dateStr}T${timeStr}:00`);
+
+    // 🆕 ロジック：準備時間（インターバル）の適用
+    const buffer = shop.buffer_preparation_min || 0;
 
     const limitDays = Math.floor((shop.min_lead_time_hours || 0) / 24);
     const limitDate = new Date(now);
@@ -128,13 +116,34 @@ function TimeSelection() {
     const closeDateTime = new Date(`${dateStr}T${String(closeH).padStart(2,'0')}:${String(closeM).padStart(2,'0')}:00`);
     if (potentialEndTime > closeDateTime) return { status: 'short', label: '△' };
 
+    // 🆕 ロジック：予約の重なり判定（インターバル込み）
     const isBooked = existingReservations.some(res => {
-      const resStart = new Date(res.start_time);
-      const resEnd = new Date(res.end_time);
-      return (targetDateTime < resEnd && potentialEndTime > resStart);
+      const resStart = new Date(res.start_time).getTime();
+      const resEnd = new Date(res.end_time).getTime();
+      // 設定されたインターバルを終了時刻に足して判定
+      const bufferEnd = resEnd + (buffer * 60 * 1000);
+      return (targetDateTime.getTime() < bufferEnd && potentialEndTime.getTime() > resStart);
     });
 
     if (isBooked) return { status: 'booked', label: '×' };
+
+    // 🆕 ロジック：自動詰め機能（空き時間ガード）
+    if (shop.auto_fill_logic) {
+      const dayRes = existingReservations.filter(r => r.start_time.startsWith(dateStr));
+      if (dayRes.length > 0) {
+        // 「開店直後」または「既存予約の直後」か判定
+        const isAdjacent = dayRes.some(r => {
+          const rEndStr = new Date(r.end_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+          return rEndStr === timeStr;
+        }) || timeStr === hours.open;
+
+        if (!isAdjacent) return { status: 'gap', label: '－' };
+      } else {
+        // 予約がゼロの日は、開店時間のみ許可
+        if (timeStr !== hours.open) return { status: 'gap', label: '－' };
+      }
+    }
+
     return { status: 'available', label: '◎' };
   };
 
@@ -179,7 +188,7 @@ function TimeSelection() {
                   const dateStr = date.toLocaleDateString('sv-SE');
                   const isSelected = selectedDateTime.date === dateStr && selectedDateTime.time === time;
                   return (
-                    <td key={date.toString()} onClick={() => res.status === 'available' && setSelectedDateTime({ date: dateStr, time })} style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', cursor: res.status === 'available' ? 'pointer' : 'default', background: isSelected ? '#2563eb' : (['none', 'closed', 'rest', 'past', 'booked'].includes(res.status) ? '#f1f5f9' : '#fff'), color: isSelected ? '#fff' : (res.status === 'available' ? '#2563eb' : '#cbd5e1'), height: '42px' }}>
+                    <td key={date.toString()} onClick={() => res.status === 'available' && setSelectedDateTime({ date: dateStr, time })} style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', cursor: res.status === 'available' ? 'pointer' : 'default', background: isSelected ? '#2563eb' : (['none', 'closed', 'rest', 'past', 'booked', 'gap'].includes(res.status) ? '#f1f5f9' : '#fff'), color: isSelected ? '#fff' : (res.status === 'available' ? '#2563eb' : '#cbd5e1'), height: '42px' }}>
                       <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{res.label || (res.status === 'available' ? '◎' : '')}</div>
                     </td>
                   );
