@@ -321,19 +321,13 @@ function AdminDashboard() {
                         <div style={{ fontWeight: 'bold' }}>{s.name}</div>
                         <div style={{ fontSize: '0.8rem', color: '#2563eb' }}>{s.slots * slotIntervalMin}分 ({s.slots}コマ)</div>
                       </div>
-<div style={{ display: 'flex', gap: '8px' }}>
-  <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} style={{fontWeight:'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333'}}>枝</button>
-  
-  {/* ここから：矢印を上下にまとめる */}
-  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-    <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} style={{ border: 'none', background: 'none', fontSize: '0.8rem', padding: '0 2px', cursor: 'pointer' }}>▲</button>
-    <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ border: 'none', background: 'none', fontSize: '0.8rem', padding: '0 2px', cursor: 'pointer' }}>▼</button>
-  </div>
-  {/* ここまで */}
-
-  <button onClick={() => {setEditingServiceId(s.id); setNewServiceName(s.name); setNewServiceSlots(s.slots); setSelectedCategory(s.category);}}>✎</button>
-  <button onClick={() => deleteService(s.id)}>×</button>
-</div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} style={{fontWeight:'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333'}}>枝</button>
+                        <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} style={{ border: 'none', background: 'none' }}>▲</button>
+                        <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ border: 'none', background: 'none' }}>▼</button>
+                        <button onClick={() => {setEditingServiceId(s.id); setNewServiceName(s.name); setNewServiceSlots(s.slots); setSelectedCategory(s.category);}}>✎</button>
+                        <button onClick={() => deleteService(s.id)}>×</button>
+                      </div>
                     </div>
                     {activeServiceForOptions?.id === s.id && (
                       <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
