@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 function AdminDashboard() {
   const { shopId } = useParams();
   
+  // 🆕 スクロール用の目印（Ref）を作成
+  const menuFormRef = useRef(null);
+
   // --- 1. セキュリティ用State ---
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -58,8 +61,6 @@ function AdminDashboard() {
   const [minLeadTimeHours, setMinLeadTimeHours] = useState(0); 
   const [autoFillLogic, setAutoFillLogic] = useState(true); 
 
-  // 🆕 定休日設定用（business_hours.regular_holidays に格納）
-  // 構造: { "1-mon": true, "last-sun": true, "open_on_holiday": false }
   const [regularHolidays, setRegularHolidays] = useState({});
 
   const dayMap = { mon: '月曜日', tue: '火曜日', wed: '水曜日', thu: '木曜日', fri: '金曜日', sat: '土曜日', sun: '日曜日' };
@@ -81,9 +82,7 @@ function AdminDashboard() {
       setEmailContact(data.email_contact || ''); setAddress(data.address || ''); setDescription(data.description || '');
       setNotes(data.notes || ''); 
       setBusinessHours(data.business_hours || {}); 
-      // 🆕 定休日データの復元
       setRegularHolidays(data.business_hours?.regular_holidays || {});
-      
       setMaxLastSlots(data.max_last_slots || 2);
       setSlotIntervalMin(data.slot_interval_min || 15); setBufferPreparationMin(data.buffer_preparation_min || 0);
       setMinLeadTimeHours(data.min_lead_time_hours || 0); setAutoFillLogic(data.auto_fill_logic ?? true);
@@ -117,12 +116,10 @@ function AdminDashboard() {
   const changeTab = (tabName) => { setActiveTab(tabName); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   const handleFinalSave = async () => {
-    // 🆕 保存時に定休日データをbusiness_hoursにマージ
     const updatedBusinessHours = {
       ...businessHours,
       regular_holidays: regularHolidays
     };
-
     const { error } = await supabase.from('profiles').update({
         business_name: businessName, business_name_kana: businessNameKana,
         phone, email_contact: emailContact, address, description, notes, 
@@ -138,13 +135,9 @@ function AdminDashboard() {
     else alert('保存に失敗しました。');
   };
 
-  // 🆕 定休日の切り替えロジック
   const toggleHoliday = (weekKey, dayKey) => {
     const key = `${weekKey}-${dayKey}`;
-    setRegularHolidays(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
+    setRegularHolidays(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const moveItem = async (type, list, id, direction) => {
@@ -238,7 +231,7 @@ function AdminDashboard() {
       <div style={{ padding: '15px', boxSizing: 'border-box', width: '100%' }}>
         {message && <div style={{ position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)', width: '90%', padding: '15px', background: '#dcfce7', color: '#166534', borderRadius: '8px', zIndex: 1001, textAlign: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>{message}</div>}
 
-        {/* --- 🛠️ メニュータブ (完全維持) --- */}
+        {/* --- 🛠️ メニュータブ --- */}
         {activeTab === 'menu' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '1px solid #2563eb' }}>
@@ -294,7 +287,9 @@ function AdminDashboard() {
               </div>
             </section>
 
-            <section style={{ ...cardStyle, background: '#f8fafc' }}><h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メニュー登録・編集</h3>
+            {/* 🆕 スクロールターゲット: menuFormRef を追加 */}
+            <section ref={menuFormRef} style={{ ...cardStyle, background: '#f8fafc' }}>
+              <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メニュー登録・編集</h3>
               <form onSubmit={handleServiceSubmit}>
                 <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} style={{ ...inputStyle, marginBottom: '10px' }} required>
                   <option value="">-- カテゴリ選択 --</option>
@@ -323,9 +318,21 @@ function AdminDashboard() {
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} style={{fontWeight:'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333'}}>枝</button>
-                        <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} style={{ border: 'none', background: 'none' }}>▲</button>
-                        <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ border: 'none', background: 'none' }}>▼</button>
-                        <button onClick={() => {setEditingServiceId(s.id); setNewServiceName(s.name); setNewServiceSlots(s.slots); setSelectedCategory(s.category);}}>✎</button>
+                        
+                        {/* 🆕 並び替えボタンの復活（上下配置） */}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} style={{ border: 'none', background: 'none', fontSize: '0.8rem', cursor: 'pointer' }}>▲</button>
+                          <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ border: 'none', background: 'none', fontSize: '0.8rem', cursor: 'pointer' }}>▼</button>
+                        </div>
+
+                        {/* 🆕 ✎ボタン: クリック時にスクロール実行を追加 */}
+                        <button onClick={() => {
+                          setEditingServiceId(s.id); 
+                          setNewServiceName(s.name); 
+                          setNewServiceSlots(s.slots); 
+                          setSelectedCategory(s.category);
+                          menuFormRef.current?.scrollIntoView({ behavior: 'smooth' });
+                        }}>✎</button>
                         <button onClick={() => deleteService(s.id)}>×</button>
                       </div>
                     </div>
@@ -360,7 +367,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- ⏰ 営業時間・定休日タブ (大幅刷新) --- */}
+        {/* --- ⏰ 営業時間・定休日タブ --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
@@ -380,7 +387,6 @@ function AdminDashboard() {
             
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>⏰ 曜日別営業時間・休憩</h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '15px' }}>※ここでの設定は標準的な時間です。定休日は下の枠で設定します。</p>
               {Object.keys(dayMap).map(day => (
                 <div key={day} style={{ borderBottom: '1px solid #f1f5f9', padding: '12px 0' }}>
                   <b style={{ fontSize: '0.9rem', color: '#1e293b' }}>{dayMap[day]}</b>
@@ -402,33 +408,25 @@ function AdminDashboard() {
               ))}
             </section>
 
-            {/* 🆕 統合：詳細定休日設定セクション */}
             <section style={{ ...cardStyle, border: '2px solid #ef4444' }}>
               <h3 style={{ marginTop: 0, color: '#ef4444' }}>📅 定休日の設定</h3>
-              <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '15px' }}>定休日にしたい箇所をタップしてください。</p>
-              
-              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '450px' }}>
                   <thead>
                     <tr>
                       <th style={{ padding: '8px', fontSize: '0.7rem', color: '#94a3b8' }}>週 \ 曜日</th>
-                      {Object.keys(dayMap).map(d => <th key={d} style={{ padding: '8px', fontSize: '0.8rem', color: d === 'sun' ? '#ef4444' : d === 'sat' ? '#2563eb' : '#333' }}>{dayMap[d].charAt(0)}</th>)}
+                      {Object.keys(dayMap).map(d => <th key={d} style={{ padding: '8px', fontSize: '0.8rem' }}>{dayMap[d].charAt(0)}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {weekLabels.map(week => (
                       <tr key={week.key} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px 5px', fontSize: '0.7rem', fontWeight: 'bold', color: '#64748b', width: '80px' }}>{week.label}</td>
+                        <td style={{ padding: '10px 5px', fontSize: '0.7rem', fontWeight: 'bold', color: '#64748b' }}>{week.label}</td>
                         {Object.keys(dayMap).map(day => {
                           const isActive = regularHolidays[`${week.key}-${day}`];
                           return (
                             <td key={day} style={{ padding: '4px', textAlign: 'center' }}>
-                              <button 
-                                onClick={() => toggleHoliday(week.key, day)}
-                                style={{ width: '35px', height: '35px', borderRadius: '8px', border: '1px solid #eee', background: isActive ? '#ef4444' : '#fff', color: isActive ? '#fff' : '#cbd5e1', fontWeight: 'bold', fontSize: '0.7rem', cursor: 'pointer' }}
-                              >
-                                {isActive ? '休' : '◯'}
-                              </button>
+                              <button onClick={() => toggleHoliday(week.key, day)} style={{ width: '35px', height: '35px', borderRadius: '8px', border: '1px solid #eee', background: isActive ? '#ef4444' : '#fff', color: isActive ? '#fff' : '#cbd5e1', fontWeight: 'bold', fontSize: '0.7rem', cursor: 'pointer' }}>{isActive ? '休' : '◯'}</button>
                             </td>
                           );
                         })}
@@ -437,19 +435,13 @@ function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-
-              {/* 🆕 祝日のON/OFFスイッチ */}
               <div style={{ marginTop: '25px', padding: '15px', background: '#fef2f2', borderRadius: '12px', border: '1px dashed #ef4444' }}>
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
                   <div style={{ flex: 1 }}>
                     <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#991b1b' }}>定休日が祝日の場合は営業する</span>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.7rem', color: '#b91c1c' }}>※ONにすると、定休日設定より祝日営業が優先されます</p>
                   </div>
-                  <div 
-                    onClick={() => setRegularHolidays(prev => ({...prev, open_on_holiday: !prev.open_on_holiday}))}
-                    style={{ width: '60px', height: '32px', background: regularHolidays.open_on_holiday ? '#10b981' : '#cbd5e1', borderRadius: '20px', position: 'relative', transition: '0.3s' }}
-                  >
-                    <div style={{ position: 'absolute', top: '3px', left: regularHolidays.open_on_holiday ? '31px' : '3px', width: '26px', height: '26px', background: '#fff', borderRadius: '50%', transition: '0.3s', boxShadow: '0 2px 5px rgba(0,0,0,0.2)' }} />
+                  <div onClick={() => setRegularHolidays(prev => ({...prev, open_on_holiday: !prev.open_on_holiday}))} style={{ width: '60px', height: '32px', background: regularHolidays.open_on_holiday ? '#10b981' : '#cbd5e1', borderRadius: '20px', position: 'relative', transition: '0.3s' }}>
+                    <div style={{ position: 'absolute', top: '3px', left: regularHolidays.open_on_holiday ? '31px' : '3px', width: '26px', height: '26px', background: '#fff', borderRadius: '50%', transition: '0.3s' }} />
                   </div>
                 </label>
               </div>
@@ -457,19 +449,19 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- 🏪 店舗情報タブ (完全維持) --- */}
+        {/* --- 🏪 店舗情報タブ --- */}
         {activeTab === 'info' && (
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ ...cardStyle, padding: '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 <UrlBox label={`🔑 店舗主用設定 (PW: ${shopData?.admin_password})`} url={`${window.location.origin}/admin/${shopId}`} color="#2563eb" copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} />
-                <UrlBox label="💬 LINEリッチメニュー用URL（読込爆速）" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
-                <UrlBox label="📅 お客様用予約（一般Web用）" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
+                <UrlBox label="💬 LINEリッチメニュー用URL" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
+                <UrlBox label="📅 お客様用予約" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
               </div>
             </section>
 
             <section style={cardStyle}>
-              <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィールの設定</h3>
+              <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィール</h3>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗名 / かな</label>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={inputStyle} /><input value={businessNameKana} onChange={(e) => setBusinessNameKana(e.target.value)} style={inputStyle} /></div>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>代表者名 / かな</label>
@@ -485,29 +477,14 @@ function AdminDashboard() {
             </section>
 
             <section style={{ ...cardStyle, border: '1px solid #00b900' }}>
-              <h3 style={{ marginTop: 0, color: '#00b900' }}>💬 LINE公式アカウント連携ガイド</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {[
-                  { step: '1', title: '公式アカウントの作成', desc: 'LINE Official Account Managerから開設。' },
-                  { step: '2', title: 'Messaging API有効化', desc: '管理画面の設定から有効にしてください。' },
-                  { step: '3', title: 'アクセストークン取得', desc: 'LINE Developersでトークンを発行。' },
-                  { step: '4', title: 'ユーザーIDの確認', desc: 'Messaging API設定にある「あなたのユーザーID」。' },
-                  { step: '5', title: '設定画面への入力', desc: '情報を下に入力して保存。' },
-                  { step: '6', title: 'リッチメニュー設定', desc: 'URLをコピーしてLINE側に貼り付け！' }
-                ].map(item => (
-                  <div key={item.step} style={{ display: 'flex', gap: '10px', background: '#f0fdf4', padding: '12px', borderRadius: '10px', alignItems: 'center', boxSizing: 'border-box' }}>
-                    <div style={{ width: '24px', height: '24px', background: '#00b900', color: '#fff', borderRadius: '50%', textAlign: 'center', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{item.step}</div>
-                    <div style={{ fontSize: '0.75rem' }}><b>{item.title}</b><br/>{item.desc}</div>
-                  </div>
-                ))}
-                <div style={{ marginTop: '10px', padding: '15px', background: '#f0fdf4', borderRadius: '12px', boxSizing: 'border-box' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} />
-                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 LINE通知を有効にする</span>
-                  </label>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d', display: 'block', marginBottom: '5px' }}>Access Token</label><input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} style={inputStyle} />
-                  <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d', marginTop: '10px', display: 'block', marginBottom: '5px' }}>Admin User ID</label><input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} style={inputStyle} />
-                </div>
+              <h3 style={{ marginTop: 0, color: '#00b900' }}>💬 LINE公式アカウント連携</h3>
+              <div style={{ marginTop: '10px', padding: '15px', background: '#f0fdf4', borderRadius: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                  <input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} />
+                  <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 LINE通知を有効にする</span>
+                </label>
+                <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d' }}>Access Token</label><input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} style={inputStyle} />
+                <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d', marginTop: '10px', display: 'block' }}>Admin User ID</label><input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} style={inputStyle} />
               </div>
             </section>
           </div>
