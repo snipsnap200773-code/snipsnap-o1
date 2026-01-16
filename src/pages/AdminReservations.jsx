@@ -118,11 +118,9 @@ function AdminReservations() {
     const nthWeek = Math.ceil(dom / 7);
     const tempDate = new Date(date);
     const currentMonth = tempDate.getMonth();
-    const checkLast = new Date(date);
-    checkLast.setDate(dom + 7);
+    const checkLast = new Date(date); checkLast.setDate(dom + 7);
     const isLastWeek = checkLast.getMonth() !== currentMonth;
-    const checkSecondLast = new Date(date);
-    checkSecondLast.setDate(dom + 14);
+    const checkSecondLast = new Date(date); checkSecondLast.setDate(dom + 14);
     const isSecondToLastWeek = (checkSecondLast.getMonth() !== currentMonth) && !isLastWeek;
     if (holidays[`${nthWeek}-${dayName}`]) return true;
     if (isLastWeek && holidays[`L1-${dayName}`]) return true;
@@ -236,7 +234,6 @@ function AdminReservations() {
     if (window.confirm(msg)) { await supabase.from('reservations').delete().eq('id', id); setShowDetailModal(false); fetchData(); }
   };
 
-  // 🆕 修正：個別ブロック（total_slots: 1 を追加してエラーを解消）
   const handleBlockTime = async () => {
     const start = new Date(`${selectedDate}T${targetTime}:00`);
     const end = new Date(start.getTime() + (shop.slot_interval_min || 30) * 60000);
@@ -248,7 +245,7 @@ function AdminReservations() {
       end_at: end.toISOString(),     // 必須
       start_time: start.toISOString(),
       end_time: end.toISOString(),
-      total_slots: 1,               // 🆕 個別ブロックなので「1」を必須指定
+      total_slots: 1,               // 個別ブロック
       customer_email: 'admin@example.com',
       customer_phone: '---',
       options: { services: [] }
@@ -257,33 +254,25 @@ function AdminReservations() {
     if (error) alert(`エラー: ${error.message}`); else { setShowMenuModal(false); fetchData(); }
   };
 
-  // 🆕 修正：臨時休業（曜日の短い名前に対応し、閉店時間まで確実にブロック）
   const handleBlockFullDay = async () => {
     if (!window.confirm(`${selectedDate.replace(/-/g, '/')} を終日「予約不可」にしますか？`)) return;
     const interval = shop.slot_interval_min || 30;
-    // 🆕 曜日の短い名前に修正
-    const dayNamesShort = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    const dayName = dayNamesShort[new Date(selectedDate).getDay()];
+    const dayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(selectedDate).getDay()];
     const hours = shop.business_hours?.[dayName];
-    
     const openStr = (hours && !hours.is_closed && hours.open) ? hours.open : "09:00";
     const closeStr = (hours && !hours.is_closed && hours.close) ? hours.close : "18:00";
-    
     const start = new Date(`${selectedDate}T${openStr}:00`);
     const end = new Date(`${selectedDate}T${closeStr}:00`);
-    
-    // total_slotsの計算
-    const [openH, openM] = openStr.split(':').map(Number);
-    const [closeH, closeM] = closeStr.split(':').map(Number);
-    const totalMinutes = (closeH * 60 + closeM) - (openH * 60 + openM);
+    const [oh, om] = openStr.split(':').map(Number);
+    const [ch, cm] = closeStr.split(':').map(Number);
+    const totalMinutes = (ch * 60 + cm) - (oh * 60 + om);
     const slotsCount = Math.ceil(totalMinutes / interval);
-
     const insertData = {
       shop_id: shopId,
       customer_name: '臨時休業',
       res_type: 'blocked',
-      start_at: start.toISOString(),
-      end_at: end.toISOString(),
+      start_at: start.toISOString(), // 必須
+      end_at: end.toISOString(),     // 必須
       start_time: start.toISOString(),
       end_time: end.toISOString(),
       total_slots: slotsCount,
@@ -307,10 +296,13 @@ function AdminReservations() {
 
   const goPrev = () => setStartDate(new Date(new Date(startDate).setDate(new Date(startDate).getDate() - 7)));
   const goNext = () => setStartDate(new Date(new Date(startDate).setDate(new Date(startDate).getDate() + 7)));
+  const goPrevMonth = () => setStartDate(new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() - 1)));
+  const goNextMonth = () => setStartDate(new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() + 1)));
   const goToday = () => { const today = new Date(); setStartDate(today); setSelectedDate(today.toLocaleDateString('sv-SE')); navigate(`/admin/${shopId}/reservations`, { replace: true }); };
 
   if (loading) return <div style={{textAlign:'center', padding:'50px'}}>読み込み中...</div>;
 
+  // --- PC サイドバー用スタイル ---
   const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', color: '#2563eb' };
   const floatNavBtnStyle = { border: 'none', background: 'none', width: '60px', height: '50px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
   const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' };
@@ -325,10 +317,7 @@ function AdminReservations() {
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#fff', overflow: 'hidden', position: 'fixed', inset: 0 }}>
       {isPC && (
         <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #e2e8f0', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px', background: '#fff', zIndex: 100 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '35px', height: '35px', background: '#2563eb', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>S</div>
-            <h1 style={{ fontSize: '1.2rem', fontWeight: '900', margin: 0, color: '#1e293b' }}>SnipSnap Admin</h1>
-          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><div style={{ width: '35px', height: '35px', background: '#2563eb', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>S</div><h1 style={{ fontSize: '1.2rem', fontWeight: '900', margin: 0 }}>SnipSnap Admin</h1></div>
           <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '15px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' }}>
               {viewMonth.getFullYear()}年 {viewMonth.getMonth() + 1}月
@@ -339,11 +328,7 @@ function AdminReservations() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', fontSize: '0.8rem' }}>
               {['月','火','水','木','金','土','日'].map(d => <div key={d} style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 'bold' }}>{d}</div>)}
-              {miniCalendarDays.map((date, i) => {
-                if (!date) return <div key={i} />;
-                const dStr = getJapanDateStr(date);
-                return <div key={i} onClick={() => { setStartDate(date); setSelectedDate(dStr); }} style={{ padding: '8px 0', cursor: 'pointer', borderRadius: '50%', background: dStr === selectedDate ? '#2563eb' : 'none', color: dStr === selectedDate ? '#fff' : '#475569' }}>{date.getDate()}</div>;
-              })}
+              {miniCalendarDays.map((date, i) => date ? <div key={i} onClick={() => { setStartDate(date); setSelectedDate(getJapanDateStr(date)); }} style={{ padding: '8px 0', cursor: 'pointer', borderRadius: '50%', background: getJapanDateStr(date) === selectedDate ? '#2563eb' : 'none', color: getJapanDateStr(date) === selectedDate ? '#fff' : '#475569' }}>{date.getDate()}</div> : <div key={i} />)}
             </div>
           </div>
           <button onClick={() => navigate(`/admin/${shopId}`)} style={{ marginTop: 'auto', padding: '15px', background: '#fff', border: '1px solid #ddd', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>店舗設定へ</button>
@@ -377,9 +362,9 @@ function AdminReservations() {
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', gap: '15px' }}>
-              <button onClick={() => setStartDate(new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() - 1)))} style={mobileArrowBtnStyle}>◀</button>
+              <button onClick={goPrevMonth} style={mobileArrowBtnStyle}>◀</button>
               <h2 style={{ fontSize: '1.3rem', margin: 0, fontWeight: '900', color: '#1e293b' }}>{startDate.getFullYear()}年 {startDate.getMonth() + 1}月</h2>
-              <button onClick={() => setStartDate(new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() + 1)))} style={mobileArrowBtnStyle}>▶</button>
+              <button onClick={goNextMonth} style={mobileArrowBtnStyle}>▶</button>
             </div>
           )}
         </div>
@@ -407,10 +392,12 @@ function AdminReservations() {
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>{time}</span>
                   </td>
                   {weekDays.map(date => {
-                    const dStr = getJapanDateStr(date);
-                    const res = getStatusAt(dStr, time);
+                    const dStr = getJapanDateStr(date); const res = getStatusAt(dStr, time);
                     const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === time;
                     let bgColor = '#fff'; let borderColor = '#f1f5f9'; let textColor = '#cbd5e1';
+                    
+                    const isNormalRes = res && res.res_type === 'normal';
+
                     if (res) {
                       if (res.isRegularHoliday) { bgColor = '#f3f4f6'; textColor = '#94a3b8'; }
                       else if (res.res_type === 'blocked') { bgColor = '#fee2e2'; textColor = '#ef4444'; borderColor = '#ef4444'; }
@@ -421,7 +408,12 @@ function AdminReservations() {
                     return (
                       <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                         {res && (
-                          <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                          <div style={{ 
+                            position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                            // 🆕 名前のみ左寄せ、記号等は中央寄せ
+                            alignItems: isNormalRes ? 'flex-start' : 'center',
+                            textAlign: isNormalRes ? 'left' : 'center'
+                          }}>
                             {res.res_type === 'blocked' ? (res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')) : (res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・'))}
                           </div>
                         )}
