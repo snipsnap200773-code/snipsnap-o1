@@ -197,7 +197,7 @@ function AdminReservations() {
       return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
     }
 
-    // 🆕 柔軟な自動詰め込みロジック
+    // 🆕 修正版：ピンポイント隙間ブロック可視化
     const buffer = shop?.buffer_preparation_min || 0;
     const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal');
 
@@ -211,16 +211,22 @@ function AdminReservations() {
     }
 
     if (shop?.auto_fill_logic && dayRes.length > 0) {
-      const dayOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dateObj.getDay()];
-      const hours = shop.business_hours[dayOfWeek];
-      if (hours && !hours.is_closed) {
-        const isAdjacent = dayRes.some(r => {
-          const rEndWithBuffer = new Date(new Date(r.end_time).getTime() + buffer * 60 * 1000);
-          const rEndStr = rEndWithBuffer.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
-          return rEndStr === timeStr;
-        }) || timeStr === hours.open;
+      const gapSlots = dayRes.map(r => {
+        const resEnd = new Date(r.end_time).getTime();
+        const earliestPossible = resEnd + (buffer * 60 * 1000);
+        const perfectSlotTime = timeSlots.find(s => {
+          const [sh, sm] = s.split(':').map(Number);
+          const slotDate = new Date(dateStr);
+          slotDate.setHours(sh, sm, 0, 0);
+          return slotDate.getTime() >= earliestPossible;
+        });
+        if (!perfectSlotTime) return null;
+        const perfectIdx = timeSlots.indexOf(perfectSlotTime);
+        return timeSlots[perfectIdx + 1]; // １つ後ろの枠
+      }).filter(Boolean);
 
-        if (!isAdjacent) return { res_type: 'system_blocked', customer_name: '－', isGap: true };
+      if (gapSlots.includes(timeStr)) {
+        return { res_type: 'system_blocked', customer_name: '－', isGap: true };
       }
     }
 
