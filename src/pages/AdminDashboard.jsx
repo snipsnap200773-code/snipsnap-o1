@@ -316,33 +316,48 @@ function AdminDashboard() {
                         <div style={{ fontWeight: 'bold' }}>{s.name}</div>
                         <div style={{ fontSize: '0.8rem', color: '#2563eb' }}>{s.slots * slotIntervalMin}分 ({s.slots}コマ)</div>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} style={{fontWeight:'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333'}}>枝</button>
-                        
-                        {/* 🆕 並び替えボタンの復活（上下配置） */}
-<button 
-  onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} 
-  style={{ border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.8rem', cursor: 'pointer', padding: '5px 8px', borderRadius: '6px', lineHeight: '1' }}
->
-  ▲
-</button>
-<button 
-  onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} 
-  style={{ border: '1px solid #cbd5e1', background: '#fff', fontSize: '0.8rem', cursor: 'pointer', padding: '5px 8px', borderRadius: '6px', lineHeight: '1' }}
->
-  ▼
-</button>
-                        {/* 🆕 ✎ボタン: クリック時にスクロール実行を追加 */}
-                        <button onClick={() => {
-                          setEditingServiceId(s.id); 
-                          setNewServiceName(s.name); 
-                          setNewServiceSlots(s.slots); 
-                          setSelectedCategory(s.category);
-                          menuFormRef.current?.scrollIntoView({ behavior: 'smooth' });
-                        }}>✎</button>
-                        <button onClick={() => deleteService(s.id)}>×</button>
-                      </div>
-                    </div>
+<div style={{ display: 'flex', gap: '8px' }}>
+  <button 
+    onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} 
+    style={{ padding: '6px 10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333' }}
+  >
+    枝
+  </button>
+
+  {/* 🆕 並び替えボタン（他のボタンとデザインを統一） */}
+  <button 
+    onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} 
+    style={{ padding: '6px 10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+  >
+    ▲
+  </button>
+  <button 
+    onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} 
+    style={{ padding: '6px 10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+  >
+    ▼
+  </button>
+
+  <button 
+    onClick={() => {
+      setEditingServiceId(s.id); 
+      setNewServiceName(s.name); 
+      setNewServiceSlots(s.slots); 
+      setSelectedCategory(s.category);
+      menuFormRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }} 
+    style={{ padding: '6px 10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+  >
+    ✎
+  </button>
+  <button 
+    onClick={() => deleteService(s.id)} 
+    style={{ padding: '6px 10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+  >
+    ×
+  </button>
+</div>                    
+</div>
                     {activeServiceForOptions?.id === s.id && (
                       <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
                         <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
