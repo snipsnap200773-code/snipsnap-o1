@@ -122,14 +122,13 @@ function TimeSelection() {
 
     if (isBooked) return { status: 'booked', label: '×' };
 
-    // 🆕 修正版：前後ピンポイント隙間ブロック
+    // 🆕 修正版：究極のピンポイント隙間ブロック
     if (shop.auto_fill_logic) {
       const dayRes = existingReservations.filter(r => r.start_time.startsWith(dateStr));
       if (dayRes.length > 0) {
         const gapSlots = [];
-
         dayRes.forEach(r => {
-          // 1. 【後ろ側】の隙間ブロック
+          // 後ろ側：特等席の１つ後ろ（２マス目）をブロック
           const resEnd = new Date(r.end_time).getTime();
           const earliestPossible = resEnd + (buffer * 60 * 1000);
           const perfectPostSlot = timeSlots.find(s => {
@@ -142,12 +141,11 @@ function TimeSelection() {
             if (idx + 1 < timeSlots.length) gapSlots.push(timeSlots[idx + 1]);
           }
 
-          // 2. 【前側】の隙間ブロック
+          // 前側：開始時間の３マス前をブロック
           const resStartStr = new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
-          const currentIdx = timeSlots.indexOf(resStartStr);
-          if (currentIdx > 1) {
-            // 直前の「特等席」のさらに１つ前をブロック
-            gapSlots.push(timeSlots[currentIdx - 2]);
+          const startIdx = timeSlots.indexOf(resStartStr);
+          if (startIdx >= 3) {
+            gapSlots.push(timeSlots[startIdx - 3]);
           }
         });
 
