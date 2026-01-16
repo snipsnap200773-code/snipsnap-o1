@@ -116,6 +116,36 @@ function AdminReservations() {
     }
   };
 
+  // 🆕 統合：定休日判定ロジック（第何週・何曜日を計算）
+  const checkIsRegularHoliday = (date) => {
+    if (!shop?.business_hours?.regular_holidays) return false;
+    const holidays = shop.business_hours.regular_holidays;
+
+    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayName = dayNames[date.getDay()];
+
+    const dom = date.getDate();
+    const nthWeek = Math.ceil(dom / 7); // 第1〜第5
+
+    const tempDate = new Date(date);
+    const currentMonth = tempDate.getMonth();
+
+    // 最後判定
+    tempDate.setDate(dom + 7);
+    const isLastWeek = tempDate.getMonth() !== currentMonth;
+
+    // 最後から2番目判定
+    tempDate.setDate(dom + 14);
+    const isSecondToLastWeek = tempDate.getMonth() !== currentMonth && !isLastWeek;
+
+    // 設定と照らし合わせ
+    if (holidays[`${nthWeek}-${dayName}`]) return true;
+    if (isLastWeek && holidays[`L1-${dayName}`]) return true;
+    if (isSecondToLastWeek && holidays[`L2-${dayName}`]) return true;
+
+    return false;
+  };
+
   const weekDays = useMemo(() => {
     const days = [];
     const base = new Date(startDate);
@@ -135,7 +165,7 @@ function AdminReservations() {
     let maxTotalMinutes = 0;
     let hasOpenDay = false;
     Object.values(shop.business_hours).forEach(h => {
-      if (!h.is_closed && h.open && h.close) {
+      if (typeof h === 'object' && !h.is_closed && h.open && h.close) {
         hasOpenDay = true;
         const [openH, openM] = h.open.split(':').map(Number);
         const [closeH, closeM] = h.close.split(':').map(Number);
@@ -159,6 +189,17 @@ function AdminReservations() {
   const getJapanDateStr = (date) => date.toLocaleDateString('sv-SE');
 
   const getStatusAt = (dateStr, timeStr) => {
+    // 🆕 定休日チェックを最優先で実行
+    const dateObj = new Date(dateStr);
+    if (checkIsRegularHoliday(dateObj)) {
+      return { 
+        res_type: 'blocked', 
+        customer_name: '定休日', 
+        start_time: `${dateStr}T${timeStr}:00`,
+        isRegularHoliday: true 
+      };
+    }
+
     const currentSlotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
     const matches = reservations.filter(r => {
       const start = new Date(r.start_time).getTime();
@@ -221,7 +262,6 @@ function AdminReservations() {
     return days;
   }, [viewMonth]);
 
-  // ナビゲーション操作
   const goPrev = () => setStartDate(new Date(new Date(startDate).setDate(new Date(startDate).getDate() - 7)));
   const goNext = () => setStartDate(new Date(new Date(startDate).setDate(new Date(startDate).getDate() + 7)));
   const goPrevMonth = () => setStartDate(new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() - 1)));
@@ -267,7 +307,6 @@ function AdminReservations() {
         </div>
       )}
 
-      {/* メインカレンダーエリア */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
         <div style={{ padding: isPC ? '15px 25px' : '15px 10px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}>
           {isPC ? (
@@ -331,8 +370,8 @@ function AdminReservations() {
                     return (
                       <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                         {res && (
-                          <div style={{ position: 'absolute', inset: '1px', background: res.res_type === 'blocked' ? '#fee2e2' : (isStart ? '#BAE6FD' : '#F3F4F6'), color: res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#451a03' : '#cbd5e1'), padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${res.res_type === 'blocked' ? '#ef4444' : (isStart ? '#0284c7' : '#d1d5db')}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            {res.res_type === 'blocked' ? (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕') : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・')}
+                          <div style={{ position: 'absolute', inset: '1px', background: res.res_type === 'blocked' ? (res.isRegularHoliday ? '#f3f4f6' : '#fee2e2') : (isStart ? '#BAE6FD' : '#F3F4F6'), color: res.res_type === 'blocked' ? (res.isRegularHoliday ? '#94a3b8' : '#ef4444') : (isStart ? '#451a03' : '#cbd5e1'), padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${res.res_type === 'blocked' ? (res.isRegularHoliday ? '#94a3b8' : '#ef4444') : (isStart ? '#0284c7' : '#d1d5db')}`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            {res.res_type === 'blocked' ? (res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')) : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・')}
                           </div>
                         )}
                       </td>
@@ -344,7 +383,6 @@ function AdminReservations() {
           </table>
         </div>
 
-        {/* 📱 スマホ用フローティング週コントローラー */}
         {!isPC && (
           <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', background: '#fff', borderRadius: '50px', boxShadow: '0 8px 30px rgba(0,0,0,0.15)', padding: '5px', zIndex: 100, border: '1px solid #eee' }}>
             <button onClick={goPrev} style={floatNavBtnStyle}>◀</button>
@@ -354,54 +392,61 @@ function AdminReservations() {
         )}
       </div>
 
-      {/* 📅 顧客/予約詳細モーダル */}
       {(showCustomerModal || showDetailModal) && (
-        <div onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} style={overlayStyle}>
+        <div onClick={() => { if(selectedRes?.isRegularHoliday) return; setShowCustomerModal(false); setShowDetailModal(false); }} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...modalContentStyle, maxWidth: '650px', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, fontSize: '1.2rem' }}>{showCustomerModal ? '👤 顧客マスター編集' : (selectedRes?.res_type === 'blocked' ? '🚫 ブロック設定' : '📅 予約詳細・名簿更新')}</h2>
+              <h2 style={{ margin: 0, fontSize: '1.2rem' }}>{showCustomerModal ? '👤 顧客マスター編集' : (selectedRes?.res_type === 'blocked' ? (selectedRes.isRegularHoliday ? '📅 定休日' : '🚫 ブロック設定') : '📅 予約詳細・名簿更新')}</h2>
               {isPC && <button onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: isPC ? '1fr 1fr' : '1fr', gap: '25px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {/* 🆕 予約メニュー表示セクション */}
-                {showDetailModal && selectedRes && selectedRes.res_type === 'normal' && (
-                  <div style={{ background: '#f0f9ff', padding: '15px', borderRadius: '12px', border: '1px solid #bae6fd' }}>
-                    <label style={labelStyle}>📋 今回の予約メニュー</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
-                      {selectedRes.options?.services?.length > 0 ? (
-                        selectedRes.options.services.map((s, idx) => (
-                          <span key={idx} style={{ background: '#2563eb', color: '#fff', padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>{s.name}</span>
-                        ))
-                      ) : (
-                        <span style={{ color: '#64748b', fontSize: '0.8rem' }}>メニュー情報なし</span>
-                      )}
-                    </div>
+                {/* 定休日の場合は情報を表示しない */}
+                {selectedRes?.isRegularHoliday ? (
+                  <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px' }}>
+                    <p style={{ fontWeight: 'bold', color: '#64748b' }}>この日は設定画面で「定休日」として設定されています。</p>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {showDetailModal && selectedRes && selectedRes.res_type === 'normal' && (
+                      <div style={{ background: '#f0f9ff', padding: '15px', borderRadius: '12px', border: '1px solid #bae6fd' }}>
+                        <label style={labelStyle}>📋 今回の予約メニュー</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
+                          {selectedRes.options?.services?.length > 0 ? (
+                            selectedRes.options.services.map((s, idx) => (
+                              <span key={idx} style={{ background: '#2563eb', color: '#fff', padding: '4px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>{s.name}</span>
+                            ))
+                          ) : (
+                            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>メニュー情報なし</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
-                <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                  <label style={labelStyle}>お客様名</label>
-                  <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={inputStyle} />
-                  <label style={labelStyle}>電話番号</label>
-                  <input type="tel" value={editFields.phone} onChange={(e) => setEditFields({...editFields, phone: e.target.value})} style={inputStyle} placeholder="未登録" />
-                  <label style={labelStyle}>メールアドレス</label>
-                  <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={inputStyle} placeholder="未登録" />
-                  <label style={labelStyle}>顧客メモ</label>
-                  <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ ...inputStyle, height: '80px' }} placeholder="好み、注意事項など" />
-                  <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
-                </div>
-                {showDetailModal && selectedRes && (
-                  <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? '#2563eb' : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
-                    {selectedRes.res_type === 'blocked' ? (selectedRes.customer_name === '臨時休業' ? '🔓 休みを解除して営業する' : '🔓 この枠のブロックを解除') : '予約を消去'}
-                  </button>
+                    <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <label style={labelStyle}>お客様名</label>
+                      <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={inputStyle} />
+                      <label style={labelStyle}>電話番号</label>
+                      <input type="tel" value={editFields.phone} onChange={(e) => setEditFields({...editFields, phone: e.target.value})} style={inputStyle} placeholder="未登録" />
+                      <label style={labelStyle}>メールアドレス</label>
+                      <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={inputStyle} placeholder="未登録" />
+                      <label style={labelStyle}>顧客メモ</label>
+                      <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ ...inputStyle, height: '80px' }} placeholder="好み、注意事項など" />
+                      <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
+                    </div>
+                    {showDetailModal && selectedRes && (
+                      <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? '#2563eb' : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        {selectedRes.res_type === 'blocked' ? (selectedRes.customer_name === '臨時休業' ? '🔓 休みを解除して営業する' : '🔓 この枠のブロックを解除') : '予約を消去'}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
               <div>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#64748b' }}>🕒 来店履歴</h4>
                 <div style={{ height: isPC ? '350px' : '200px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
-                  {(showCustomerModal ? customerFullHistory : customerHistory).map(h => (
+                  {!selectedRes?.isRegularHoliday && (showCustomerModal ? customerFullHistory : customerHistory).map(h => (
                     <div key={h.id} style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
                       <div style={{ fontWeight: 'bold' }}>{new Date(h.start_time).toLocaleDateString('ja-JP')}</div>
                       <div style={{ color: '#2563eb', marginTop: '2px' }}>{h.options?.services?.map(s => s.name).join(', ')}</div>
@@ -411,7 +456,6 @@ function AdminReservations() {
               </div>
             </div>
 
-            {/* 📱 スマホ用フローティング閉じるボタン */}
             {!isPC && (
               <button 
                 onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} 
@@ -424,7 +468,6 @@ function AdminReservations() {
         </div>
       )}
 
-      {/* ねじ込みメニューモーダル */}
       {showMenuModal && (
         <div onClick={() => setShowMenuModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '35px', borderRadius: '30px', width: '90%', maxWidth: '340px', textAlign: 'center', position: 'relative' }}>
@@ -439,7 +482,6 @@ function AdminReservations() {
               <button onClick={() => setShowMenuModal(false)} style={{ padding: '15px', border: 'none', background: 'none', color: '#94a3b8' }}>キャンセル</button>
             </div>
 
-            {/* 📱 スマホ用フローティング閉じるボタン */}
             {!isPC && (
               <button 
                 onClick={() => setShowMenuModal(false)} 

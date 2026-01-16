@@ -26,6 +26,38 @@ function TimeSelection() {
     setLoading(false);
   };
 
+  // 🆕 統合：定休日判定ロジック（AdminReservationsと同じ高度な計算）
+  const checkIsRegularHoliday = (date) => {
+    if (!shop?.business_hours?.regular_holidays) return false;
+    const holidays = shop.business_hours.regular_holidays;
+
+    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayName = dayNames[date.getDay()];
+
+    const dom = date.getDate();
+    const nthWeek = Math.ceil(dom / 7); // 第1〜第5週
+
+    const tempDate = new Date(date);
+    const currentMonth = tempDate.getMonth();
+
+    // 最後判定 (L1)
+    const checkLast = new Date(date);
+    checkLast.setDate(dom + 7);
+    const isLastWeek = checkLast.getMonth() !== currentMonth;
+
+    // 最後から2番目判定 (L2)
+    const checkSecondLast = new Date(date);
+    checkSecondLast.setDate(dom + 14);
+    const isSecondToLastWeek = (checkSecondLast.getMonth() !== currentMonth) && !isLastWeek;
+
+    // データベースの設定（1-mon, L1-sun 等）と照合
+    if (holidays[`${nthWeek}-${dayName}`]) return true;
+    if (isLastWeek && holidays[`L1-${dayName}`]) return true;
+    if (isSecondToLastWeek && holidays[`L2-${dayName}`]) return true;
+
+    return false;
+  };
+
   const weekDays = useMemo(() => {
     const days = [];
     for (let i = 0; i < 7; i++) {
@@ -40,9 +72,9 @@ function TimeSelection() {
     if (!shop?.business_hours) return [];
     let minOpen = "23:59", maxClose = "00:00";
     Object.values(shop.business_hours).forEach(h => {
-      if (h.is_closed) return;
-      if (h.open < minOpen) minOpen = h.open;
-      if (h.close > maxClose) maxClose = h.close;
+      if (typeof h === 'object' && h.is_closed) return;
+      if (typeof h === 'object' && h.open < minOpen) minOpen = h.open;
+      if (typeof h === 'object' && h.close > maxClose) maxClose = h.close;
     });
     const slots = [];
     const interval = shop.slot_interval_min || 15;
@@ -61,10 +93,15 @@ function TimeSelection() {
 
   const checkAvailability = (date, timeStr) => {
     if (!shop?.business_hours) return { status: 'none' };
+    
+    // 🆕 定休日判定を最優先で実行
+    if (checkIsRegularHoliday(date)) {
+      return { status: 'closed', label: '休' };
+    }
+
     const dayOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()];
     const hours = shop.business_hours[dayOfWeek];
 
-    // 💡 ズレ解消の重要ポイント：toISOString()ではなくtoLocaleDateStringを使う
     const dateStr = date.toLocaleDateString('sv-SE'); 
     const now = new Date();
     const todayStr = now.toLocaleDateString('sv-SE');
@@ -75,7 +112,6 @@ function TimeSelection() {
 
     const targetDateTime = new Date(`${dateStr}T${timeStr}:00`);
 
-    // 💡 予約制限（当日〜3日後）の適用
     const limitDays = Math.floor((shop.min_lead_time_hours || 0) / 24);
     const limitDate = new Date(now);
     limitDate.setHours(0,0,0,0);
