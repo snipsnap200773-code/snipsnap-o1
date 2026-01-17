@@ -107,6 +107,37 @@ function AdminDashboard() {
     if (optRes.data) setOptions(optRes.data);
   };
 
+  // 🆕 【追加ロジック】スマホ撮影・画像自動アップロード関数
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // ファイル名をユニークにする（店舗IDと時刻）
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${shopId}-${Date.now()}.${fileExt}`;
+
+    showMsg('画像を送信中...');
+
+    // Supabase Storageの shop-images バケットへアップロード
+    const { error: uploadError } = await supabase.storage
+      .from('shop-images')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      alert('アップロード失敗: ' + uploadError.message);
+      return;
+    }
+
+    // 公開URLを取得
+    const { data: { publicUrl } } = supabase.storage
+      .from('shop-images')
+      .getPublicUrl(fileName);
+
+    // Stateを更新（これでプレビューが表示され、保存時にDBへ送られます）
+    setImageUrl(publicUrl);
+    showMsg('画像を読み込みました。下の「保存」ボタンで確定してください。');
+  };
+
   // 🆕 パスワードハッシュ化に対応した【修正版】認証ロジック
   const handleAuth = (e) => {
     e.preventDefault();
@@ -550,13 +581,38 @@ function AdminDashboard() {
 
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィール</h3>
+
+              {/* 🆕 スマホ撮影・画像アップロードセクション */}
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像（スマホで撮影・変更）</label>
+              <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
+                {imageUrl ? (
+                  <img src={imageUrl} alt="preview" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }} />
+                ) : (
+                  <div style={{ width: '100%', height: '120px', background: '#e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.8rem', marginBottom: '12px' }}>画像未設定</div>
+                )}
+                
+                <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment" // スマホで「カメラ」を優先起動させる魔法の属性
+                    onChange={handleFileUpload} 
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }}
+                  />
+                  <button type="button" style={{ width: '100%', padding: '12px', background: '#fff', border: '1px solid #2563eb', color: '#2563eb', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                    📸 写真を撮る / 変更する
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '10px' }}>※撮影後、下の「保存」ボタンを必ず押してください</p>
+              </div>
+
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗名 / かな</label>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input value={businessName} onChange={(e) => setBusinessName(e.target.value)} style={inputStyle} /><input value={businessNameKana} onChange={(e) => setBusinessNameKana(e.target.value)} style={inputStyle} /></div>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>代表者名 / かな</label>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} style={inputStyle} /><input value={ownerNameKana} onChange={(e) => setOwnerNameKana(e.target.value)} style={inputStyle} /></div>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>業種</label>
               <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}><option value="美容室・理容室">美容室・理容室</option><option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option><option value="エステ・リラク">エステ・リラク</option><option value="整体・接骨院">整体・接骨院</option><option value="飲食店">飲食店</option><option value="その他">その他</option></select>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗画像URL</label>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗画像URL (手入力も可)</label>
               <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="https://..." />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
