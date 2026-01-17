@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import bcrypt from 'bcryptjs'; // 🆕 セキュリティ強化のためのインポート
 
 function AdminDashboard() {
   const { shopId } = useParams();
@@ -11,6 +12,9 @@ function AdminDashboard() {
   // --- 1. セキュリティ用State ---
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
+  // 🆕 パスワード変更用のStateを追加（既存ロジックは一切変えません）
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // --- 2. 共通State ---
   const [activeTab, setActiveTab] = useState('menu'); 
@@ -103,12 +107,52 @@ function AdminDashboard() {
     if (optRes.data) setOptions(optRes.data);
   };
 
+  // 🆕 パスワードハッシュ化に対応した認証ロジック
   const handleAuth = (e) => {
     e.preventDefault();
-    if (passwordInput === shopData?.admin_password) {
+    
+    let isMatch = false;
+    // ハッシュ化されたパスワード（hashed_password）がある場合はそれと比較、なければ旧来の生パスワードと比較
+    if (shopData?.hashed_password) {
+      isMatch = bcrypt.compareSync(passwordInput, shopData.hashed_password);
+    } else {
+      isMatch = passwordInput === shopData?.admin_password;
+    }
+
+    if (isMatch) {
       setIsAuthorized(true);
       fetchMenuDetails(); 
     } else { alert("パスワードが違います"); }
+  };
+
+  // 🆕 運営者からも見えなくなるパスワード更新関数（ハッシュ化）
+  const handleUpdatePassword = async () => {
+    if (newPassword.length < 8) {
+      alert("セキュリティのため、パスワードは8文字以上に設定してください。");
+      return;
+    }
+
+    if (window.confirm("パスワードを更新します。一度更新されると運営者（三土手）もあなたのパスワードを知ることはできなくなります。よろしいですか？")) {
+      const salt = bcrypt.genSaltSync(10);
+      const hashedPassword = bcrypt.hashSync(newPassword, salt);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          hashed_password: hashedPassword,
+          admin_password: '********' // 生パスワードを伏せ字にして上書き
+        })
+        .eq('id', shopId);
+
+      if (!error) {
+        showMsg('パスワードを安全に更新しました！');
+        setNewPassword('');
+        setIsChangingPassword(false);
+        fetchInitialShopData(); // 最新状態に更新
+      } else {
+        alert('パスワードの更新に失敗しました。');
+      }
+    }
   };
 
   const showMsg = (txt) => { setMessage(txt); setTimeout(() => setMessage(''), 3000); };
@@ -220,9 +264,9 @@ function AdminDashboard() {
     <div style={{ fontFamily: 'sans-serif', maxWidth: '700px', margin: '0 auto', paddingBottom: '120px', boxSizing: 'border-box', width: '100%' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', borderBottom: '1px solid #eee', padding: '10px' }}>
         <div style={{ display: 'flex', gap: '5px' }}>
-          {['menu', 'hours', 'info'].map(tab => (
+          {['menu', 'hours', 'info', 'security'].map(tab => ( // 🆕 'security'タブを追加
             <button key={tab} onClick={() => changeTab(tab)} style={{ flex: 1, padding: '12px 5px', border: 'none', borderRadius: '8px', background: activeTab === tab ? '#2563eb' : '#f1f5f9', color: activeTab === tab ? '#fff' : '#475569', fontWeight: 'bold', fontSize: '0.85rem' }}>
-              {tab === 'menu' ? 'メニュー' : tab === 'hours' ? '営業時間' : '店舗情報'}
+              {tab === 'menu' ? 'メニュー' : tab === 'hours' ? '営業時間' : tab === 'info' ? '店舗情報' : '🔒 安全'}
             </button>
           ))}
         </div>
@@ -287,7 +331,6 @@ function AdminDashboard() {
               </div>
             </section>
 
-            {/* 🆕 スクロールターゲット: menuFormRef を追加 */}
             <section ref={menuFormRef} style={{ ...cardStyle, background: '#f8fafc' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メニュー登録・編集</h3>
               <form onSubmit={handleServiceSubmit}>
@@ -316,48 +359,45 @@ function AdminDashboard() {
                         <div style={{ fontWeight: 'bold' }}>{s.name}</div>
                         <div style={{ fontSize: '0.8rem', color: '#2563eb' }}>{s.slots * slotIntervalMin}分 ({s.slots}コマ)</div>
                       </div>
-<div style={{ display: 'flex', gap: '8px' }}>
-  <button 
-    onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} 
-    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333' }}
-  >
-    枝
-  </button>
-
-  {/* 🆕 並び替えボタン（他のボタンとデザインを統一） */}
-  <button 
-    onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} 
-    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-  >
-    ▲
-  </button>
-  <button 
-    onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} 
-    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-  >
-    ▼
-  </button>
-
-  <button 
-    onClick={() => {
-      setEditingServiceId(s.id); 
-      setNewServiceName(s.name); 
-      setNewServiceSlots(s.slots); 
-      setSelectedCategory(s.category);
-      menuFormRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }} 
-    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-  >
-    ✎
-  </button>
-  <button 
-    onClick={() => deleteService(s.id)} 
-    style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-  >
-    ×
-  </button>
-</div>                    
-</div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button 
+                          onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} 
+                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333' }}
+                        >
+                          枝
+                        </button>
+                        <button 
+                          onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} 
+                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          ▲
+                        </button>
+                        <button 
+                          onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} 
+                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          ▼
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setEditingServiceId(s.id); 
+                            setNewServiceName(s.name); 
+                            setNewServiceSlots(s.slots); 
+                            setSelectedCategory(s.category);
+                            menuFormRef.current?.scrollIntoView({ behavior: 'smooth' });
+                          }} 
+                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          ✎
+                        </button>
+                        <button 
+                          onClick={() => deleteService(s.id)} 
+                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                        >
+                          ×
+                        </button>
+                      </div>                    
+                    </div>
                     {activeServiceForOptions?.id === s.id && (
                       <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
                         <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -508,6 +548,52 @@ function AdminDashboard() {
                 <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d' }}>Access Token</label><input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} style={inputStyle} />
                 <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d', marginTop: '10px', display: 'block' }}>Admin User ID</label><input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} style={inputStyle} />
               </div>
+            </section>
+          </div>
+        )}
+
+        {/* 🆕 --- 🔒 安全設定タブ (追加セクション) --- */}
+        {activeTab === 'security' && (
+          <div style={{ width: '100%', boxSizing: 'border-box' }}>
+            <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
+              <h3 style={{ marginTop: 0, color: '#2563eb' }}>🔐 セキュリティ設定</h3>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '20px' }}>
+                パスワードを変更すると、開発者（三土手）であっても、データベースからあなたのパスワードを読み取ることが物理的に不可能になります。
+              </p>
+              
+              {!isChangingPassword ? (
+                <button 
+                  onClick={() => setIsChangingPassword(true)}
+                  style={{ width: '100%', padding: '15px', background: '#fff', border: '1px solid #2563eb', color: '#2563eb', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  パスワードを変更する
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>新しいパスワード (8文字以上)</label>
+                  <input 
+                    type="password" 
+                    value={newPassword} 
+                    onChange={(e) => setNewPassword(e.target.value)} 
+                    style={inputStyle} 
+                    placeholder="新しいパスワードを入力"
+                  />
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                      onClick={handleUpdatePassword} 
+                      style={{ flex: 1, padding: '15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}
+                    >
+                      安全に保存
+                    </button>
+                    <button 
+                      onClick={() => setIsChangingPassword(false)} 
+                      style={{ flex: 1, padding: '15px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           </div>
         )}
