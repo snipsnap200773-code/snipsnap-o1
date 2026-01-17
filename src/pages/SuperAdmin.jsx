@@ -6,7 +6,7 @@ function SuperAdmin() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [inputPass, setInputPass] = useState('');
   // 💡 三土手さん、ここを好きなパスワードに変えてください！
-  const MASTER_PASSWORD = "1212"; 
+  const MASTER_PASSWORD = "infec4994"; 
 
   // --- 既存のState群 ---
   const [newShopName, setNewShopName] = useState('');
@@ -32,7 +32,7 @@ function SuperAdmin() {
   const [editLineToken, setEditLineToken] = useState('');
   const [editLineAdminId, setEditLineAdminId] = useState('');
 
-  const DELETE_PASSWORD = "1212";
+  const DELETE_PASSWORD = "Dmhkaaaamm0216";
 
   // ログイン済みの場合のみデータを取得するよう修正
   useEffect(() => { 
@@ -103,23 +103,13 @@ function SuperAdmin() {
     }
   };
 
-  // 🆕 削除機能：エラーの詳細を表示するように微調整
   const deleteShop = async (shop) => {
     if (window.confirm(`【警告】「${shop.business_name}」を完全に削除します。`)) {
       const inputPass = window.prompt("削除用パスワードを入力してください：");
       if (inputPass === DELETE_PASSWORD) {
         const { error } = await supabase.from('profiles').delete().eq('id', shop.id);
-        if (!error) { 
-          fetchCreatedShops(); 
-          alert('店舗を削除しました。'); 
-        } else {
-          // 🆕 削除に失敗した場合、理由（制約違反など）を表示
-          console.error('削除エラー:', error);
-          alert(`削除に失敗しました。\n理由: ${error.message}`); 
-        }
-      } else if (inputPass !== null) { 
-        alert('パスワードが違います。'); 
-      }
+        if (!error) { fetchCreatedShops(); alert('店舗を削除しました。'); }
+      } else if (inputPass !== null) { alert('パスワードが違います。'); }
     }
   };
 
