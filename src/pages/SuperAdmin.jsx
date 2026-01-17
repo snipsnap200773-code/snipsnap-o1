@@ -5,8 +5,10 @@ function SuperAdmin() {
   // 🆕 管理者ログイン用の追加State
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [inputPass, setInputPass] = useState('');
-  // 💡 三土手さん、ここを好きなパスワードに変えてください！
-  const MASTER_PASSWORD = import.meta.env.VITE_SUPER_ADMIN_PASSWORD; 
+
+  // 💡 修正箇所：Vercelの設定名（MASTER / DELETE）に合わせました
+  const MASTER_PASSWORD = import.meta.env.VITE_SUPER_MASTER_PASSWORD; 
+  const DELETE_PASSWORD = import.meta.env.VITE_SUPER_DELETE_PASSWORD;
 
   // --- 既存のState群 ---
   const [newShopName, setNewShopName] = useState('');
@@ -32,8 +34,6 @@ function SuperAdmin() {
   const [editLineToken, setEditLineToken] = useState('');
   const [editLineAdminId, setEditLineAdminId] = useState('');
 
-  const DELETE_PASSWORD = import.meta.env.VITE_SUPER_ADMIN_PASSWORD;
-
   // ログイン済みの場合のみデータを取得するよう修正
   useEffect(() => { 
     if (isAuthorized) {
@@ -44,6 +44,9 @@ function SuperAdmin() {
   // 🆕 パスワードチェック関数
   const handleLogin = (e) => {
     e.preventDefault();
+    // デバッグ用：もしログインできない場合は F12 キーのコンソールで「正解」が読み込めているか確認できます
+    console.log("MASTER_PASSWORD_STATUS:", MASTER_PASSWORD ? "Loaded" : "Not Found");
+    
     if (inputPass === MASTER_PASSWORD) {
       setIsAuthorized(true);
     } else {
@@ -105,11 +108,18 @@ function SuperAdmin() {
 
   const deleteShop = async (shop) => {
     if (window.confirm(`【警告】「${shop.business_name}」を完全に削除します。`)) {
-      const inputPass = window.prompt("削除用パスワードを入力してください：");
-      if (inputPass === DELETE_PASSWORD) {
+      const inputPassForDelete = window.prompt("削除用パスワードを入力してください：");
+      if (inputPassForDelete === DELETE_PASSWORD) {
         const { error } = await supabase.from('profiles').delete().eq('id', shop.id);
-        if (!error) { fetchCreatedShops(); alert('店舗を削除しました。'); }
-      } else if (inputPass !== null) { alert('パスワードが違います。'); }
+        if (!error) { 
+          fetchCreatedShops(); 
+          alert('店舗を削除しました。'); 
+        } else {
+          alert(`削除に失敗しました。\n理由: ${error.message}`);
+        }
+      } else if (inputPassForDelete !== null) { 
+        alert('パスワードが違います。'); 
+      }
     }
   };
 
@@ -118,7 +128,6 @@ function SuperAdmin() {
     alert('コピーしました！');
   };
 
-  // 🆕 ログインしていない場合の表示
   if (!isAuthorized) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f4f7f9' }}>
@@ -141,13 +150,10 @@ function SuperAdmin() {
     );
   }
 
-  // ログイン後のメインUI
   return (
     <div style={{ padding: '15px', fontFamily: 'sans-serif', backgroundColor: '#f4f7f9', minHeight: '100vh', paddingBottom: '100px' }}>
       <div style={{ maxWidth: '650px', margin: '0 auto' }}>
         <h1 style={{ fontSize: '1.4rem', borderLeft: '6px solid #2563eb', paddingLeft: '15px', marginBottom: '25px', color: '#1e293b' }}>🛠 店舗統括管理</h1>
-        
-        {/* 新規発行エリア */}
         <div style={{ background: '#fff', padding: '15px', borderRadius: '16px', marginBottom: '30px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
           <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: '#64748b', marginBottom: '15px' }}>🆕 新規店舗の発行</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -173,16 +179,12 @@ function SuperAdmin() {
             <button onClick={createNewShop} style={{ padding: '14px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>店舗を発行する</button>
           </div>
         </div>
-
-        {/* 店舗リスト */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {getSortedShops().map(shop => (
             <div key={shop.id} style={{ background: '#fff', padding: '15px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-              
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '0.65rem', color: '#2563eb', fontWeight: 'bold' }}>No.{shop.displayNumber}</div>
-                  
                   {editingShopId === shop.id ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
                       <div style={{ display: 'flex', gap: '5px' }}>
@@ -208,7 +210,6 @@ function SuperAdmin() {
                         <label style={{ fontSize: '0.6rem', color: '#d97706', fontWeight: 'bold' }}>PW設定</label>
                         <input value={editPassword} onChange={(e) => setEditPassword(e.target.value)} style={{ ...smallInput, border: '1px solid #fcd34d' }} />
                       </div>
-                      
                       <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
                         <button onClick={() => updateShopInfo(shop.id)} style={{ flex: 1, padding: '12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>保存</button>
                         <button onClick={() => setEditingShopId(null)} style={{ flex: 1, padding: '12px', background: '#94a3b8', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>取消</button>
@@ -221,7 +222,6 @@ function SuperAdmin() {
                     </>
                   )}
                 </div>
-                
                 <div style={{ display: 'flex', gap: '5px' }}>
                   <button onClick={() => {
                     setEditingShopId(shop.id);
@@ -237,8 +237,6 @@ function SuperAdmin() {
                   <button onClick={() => deleteShop(shop)} style={{ ...actionBtnStyle, color: '#ef4444' }}>消去</button>
                 </div>
               </div>
-
-              {/* URLセクション */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 {[
                   { label: '🔑 店舗主用設定', url: `${window.location.origin}/admin/${shop.id}`, color: '#2563eb' },
@@ -255,7 +253,6 @@ function SuperAdmin() {
                   </div>
                 ))}
               </div>
-
               <div style={{ marginTop: '15px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
                 <button onClick={() => toggleSuspension(shop)} style={{ width: '100%', padding: '8px', borderRadius: '8px', border: 'none', fontWeight: 'bold', background: shop.is_suspended ? '#10b981' : '#fee2e2', color: shop.is_suspended ? '#fff' : '#ef4444', fontSize: '0.75rem' }}>
                   {shop.is_suspended ? '公開を再開する' : '公開を一時停止する'}
