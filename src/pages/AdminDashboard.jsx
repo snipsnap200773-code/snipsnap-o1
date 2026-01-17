@@ -107,22 +107,34 @@ function AdminDashboard() {
     if (optRes.data) setOptions(optRes.data);
   };
 
-  // 🆕 パスワードハッシュ化に対応した認証ロジック
+  // 🆕 パスワードハッシュ化に対応した【修正版】認証ロジック
   const handleAuth = (e) => {
     e.preventDefault();
     
     let isMatch = false;
-    // ハッシュ化されたパスワード（hashed_password）がある場合はそれと比較、なければ旧来の生パスワードと比較
-    if (shopData?.hashed_password) {
-      isMatch = bcrypt.compareSync(passwordInput, shopData.hashed_password);
-    } else {
+
+    // 1. ハッシュ化されたパスワード（hashed_password）があるかチェック
+    // 伏せ字（********）や生パスワード（admin_password）と同一でない場合のみハッシュ照合を実行
+    if (shopData?.hashed_password && shopData.hashed_password !== '********' && shopData.hashed_password !== shopData.admin_password) {
+      try {
+        isMatch = bcrypt.compareSync(passwordInput, shopData.hashed_password);
+      } catch (err) {
+        console.error("Bcrypt comparison error:", err);
+        isMatch = false;
+      }
+    }
+
+    // 2. ハッシュで一致しない、またはハッシュ未設定の場合は「生パスワード」で比較
+    if (!isMatch) {
       isMatch = passwordInput === shopData?.admin_password;
     }
 
     if (isMatch) {
       setIsAuthorized(true);
       fetchMenuDetails(); 
-    } else { alert("パスワードが違います"); }
+    } else { 
+      alert("パスワードが違います"); 
+    }
   };
 
   // 🆕 運営者からも見えなくなるパスワード更新関数（ハッシュ化）
@@ -246,7 +258,7 @@ function AdminDashboard() {
   if (!isAuthorized) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', fontFamily: 'sans-serif' }}>
-        <form onSubmit={handleAuth} style={{ background: '#fff', padding: '40px', borderRadius: '20px', textAlign: 'center', width: '90%', maxWidth: '350px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', boxSizing: 'border-box' }}>
+        <form onSubmit={handleAuth} style={{ background: '#fff', padding: '40px', borderRadius: '20px', textAlign: 'center', width: '90%', maxWidth: '350px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', boxSizing: 'border-box' }}>
           <h2>管理者認証 🔒</h2>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '25px' }}>設定を変更するには合言葉を入力してください</p>
           <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} placeholder="パスワードを入力" style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', marginBottom: '20px', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.1rem' }} />
@@ -264,7 +276,7 @@ function AdminDashboard() {
     <div style={{ fontFamily: 'sans-serif', maxWidth: '700px', margin: '0 auto', paddingBottom: '120px', boxSizing: 'border-box', width: '100%' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', borderBottom: '1px solid #eee', padding: '10px' }}>
         <div style={{ display: 'flex', gap: '5px' }}>
-          {['menu', 'hours', 'info', 'security'].map(tab => ( // 🆕 'security'タブを追加
+          {['menu', 'hours', 'info', 'security'].map(tab => ( 
             <button key={tab} onClick={() => changeTab(tab)} style={{ flex: 1, padding: '12px 5px', border: 'none', borderRadius: '8px', background: activeTab === tab ? '#2563eb' : '#f1f5f9', color: activeTab === tab ? '#fff' : '#475569', fontWeight: 'bold', fontSize: '0.85rem' }}>
               {tab === 'menu' ? 'メニュー' : tab === 'hours' ? '営業時間' : tab === 'info' ? '店舗情報' : '🔒 安全'}
             </button>
@@ -552,7 +564,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* 🆕 --- 🔒 安全設定タブ (追加セクション) --- */}
+        {/* --- 🔒 安全設定タブ --- */}
         {activeTab === 'security' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
