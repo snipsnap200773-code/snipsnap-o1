@@ -6,7 +6,7 @@ function SuperAdmin() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [inputPass, setInputPass] = useState('');
   // 💡 三土手さん、ここを好きなパスワードに変えてください！
-  const MASTER_PASSWORD = "infec4994"; 
+  const MASTER_PASSWORD = import.meta.env.VITE_SUPER_ADMIN_PASSWORD; 
 
   // --- 既存のState群 ---
   const [newShopName, setNewShopName] = useState('');
@@ -32,7 +32,7 @@ function SuperAdmin() {
   const [editLineToken, setEditLineToken] = useState('');
   const [editLineAdminId, setEditLineAdminId] = useState('');
 
-  const DELETE_PASSWORD = "Dmhkaaaamm0216";
+  const DELETE_PASSWORD = import.meta.env.VITE_SUPER_ADMIN_PASSWORD;
 
   // ログイン済みの場合のみデータを取得するよう修正
   useEffect(() => { 

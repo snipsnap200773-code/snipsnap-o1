@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-// 開発を優先するため、直接書き込みます
-const supabaseUrl = "https://fpylnjqwswjttipnabjn.supabase.co"
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZweWxuanF3c3dqdHRpcG5hYmpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2NDk5ODUsImV4cCI6MjA4MzIyNTk4NX0.OD1GY8TjjfmunXZPEyW5GEWehNaQfBTIQ6mYHYKJW_A"
+// 環境変数（.envファイル）から読み込むように変更しました
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+// もし環境変数が読み込めていない場合にエラーを出して教えてくれるガード
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("Supabaseの接続情報が読み込めません。.envファイルとVercelの設定を確認してください。");
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
