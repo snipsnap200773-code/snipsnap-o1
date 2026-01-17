@@ -107,21 +107,21 @@ function AdminDashboard() {
     if (optRes.data) setOptions(optRes.data);
   };
 
-  // 🆕 【追加ロジック】スマホ撮影・画像自動アップロード関数
+  // 🆕 【修正ロジック】画像が溜まらない「上書き（upsert）」アップロード関数
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // ファイル名をユニークにする（店舗IDと時刻）
+    // ファイル名を店舗ID固定にすることで、古い画像が自動的に上書きされます
     const fileExt = file.name.split('.').pop();
-    const fileName = `${shopId}-${Date.now()}.${fileExt}`;
+    const fileName = `${shopId}-main.${fileExt}`;
 
-    showMsg('画像を送信中...');
+    showMsg('画像を更新中...');
 
-    // Supabase Storageの shop-images バケットへアップロード
+    // Supabase Storageへアップロード。upsert: true を指定して上書きを許可
     const { error: uploadError } = await supabase.storage
       .from('shop-images')
-      .upload(fileName, file);
+      .upload(fileName, file, { upsert: true });
 
     if (uploadError) {
       alert('アップロード失敗: ' + uploadError.message);
@@ -133,92 +133,48 @@ function AdminDashboard() {
       .from('shop-images')
       .getPublicUrl(fileName);
 
-    // Stateを更新（これでプレビューが表示され、保存時にDBへ送られます）
-    setImageUrl(publicUrl);
+    // 💡 キャッシュ対策：URL末尾にタイムスタンプを付与し、ブラウザに「最新画像」と認識させます
+    const finalUrl = `${publicUrl}?t=${Date.now()}`;
+    setImageUrl(finalUrl);
     showMsg('画像を読み込みました。下の「保存」ボタンで確定してください。');
   };
 
   // 🆕 パスワードハッシュ化に対応した【修正版】認証ロジック
   const handleAuth = (e) => {
     e.preventDefault();
-    
     let isMatch = false;
-
-    // 1. ハッシュ化されたパスワード（hashed_password）があるかチェック
     if (shopData?.hashed_password && shopData.hashed_password !== '********' && shopData.hashed_password !== shopData.admin_password) {
-      try {
-        isMatch = bcrypt.compareSync(passwordInput, shopData.hashed_password);
-      } catch (err) {
-        console.error("Bcrypt comparison error:", err);
-        isMatch = false;
-      }
+      try { isMatch = bcrypt.compareSync(passwordInput, shopData.hashed_password); } catch (err) { isMatch = false; }
     }
-
-    // 2. ハッシュで一致しない、またはハッシュ未設定の場合は「生パスワード」で比較
-    if (!isMatch) {
-      isMatch = passwordInput === shopData?.admin_password;
-    }
-
-    if (isMatch) {
-      setIsAuthorized(true);
-      fetchMenuDetails(); 
-    } else { 
-      alert("パスワードが違います"); 
-    }
+    if (!isMatch) { isMatch = passwordInput === shopData?.admin_password; }
+    if (isMatch) { setIsAuthorized(true); fetchMenuDetails(); } else { alert("パスワードが違います"); }
   };
 
-  // 🆕 運営者からも見えなくなるパスワード更新関数（ハッシュ化）
+  // 🆕 パスワード更新関数
   const handleUpdatePassword = async () => {
-    if (newPassword.length < 8) {
-      alert("セキュリティのため、パスワードは8文字以上に設定してください。");
-      return;
-    }
-
+    if (newPassword.length < 8) { alert("セキュリティのため、パスワードは8文字以上に設定してください。"); return; }
     if (window.confirm("パスワードを更新します。一度更新されると運営者（三土手）もあなたのパスワードを知ることはできなくなります。よろしいですか？")) {
       const salt = bcrypt.genSaltSync(10);
       const hashedPassword = bcrypt.hashSync(newPassword, salt);
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          hashed_password: hashedPassword,
-          admin_password: '********' // 生パスワードを伏せ字にして上書き
-        })
-        .eq('id', shopId);
-
-      if (!error) {
-        showMsg('パスワードを安全に更新しました！');
-        setNewPassword('');
-        setIsChangingPassword(false);
-        fetchInitialShopData(); // 最新状態に更新
-      } else {
-        alert('パスワードの更新に失敗しました。');
-      }
+      const { error } = await supabase.from('profiles').update({ hashed_password: hashedPassword, admin_password: '********' }).eq('id', shopId);
+      if (!error) { showMsg('パスワードを安全に更新しました！'); setNewPassword(''); setIsChangingPassword(false); fetchInitialShopData(); }
+      else { alert('パスワードの更新に失敗しました。'); }
     }
   };
 
   const showMsg = (txt) => { setMessage(txt); setTimeout(() => setMessage(''), 3000); };
-
   const changeTab = (tabName) => { setActiveTab(tabName); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   const handleFinalSave = async () => {
-    const updatedBusinessHours = {
-      ...businessHours,
-      regular_holidays: regularHolidays
-    };
+    const updatedBusinessHours = { ...businessHours, regular_holidays: regularHolidays };
     const { error } = await supabase.from('profiles').update({
-        business_name: businessName, business_name_kana: businessNameKana,
-        phone, email_contact: emailContact, address, description, notes, 
-        business_hours: updatedBusinessHours,
-        allow_multiple_services: allowMultiple, max_last_slots: maxLastSlots,
-        slot_interval_min: slotIntervalMin, buffer_preparation_min: bufferPreparationMin,
-        min_lead_time_hours: minLeadTimeHours, auto_fill_logic: autoFillLogic,
-        image_url: imageUrl, official_url: officialUrl, line_official_url: lineOfficialUrl,
-        notify_line_enabled: notifyLineEnabled, owner_name: ownerName, owner_name_kana: ownerNameKana,
+        business_name: businessName, business_name_kana: businessNameKana, phone, email_contact: emailContact, address, description, notes, 
+        business_hours: updatedBusinessHours, allow_multiple_services: allowMultiple, max_last_slots: maxLastSlots,
+        slot_interval_min: slotIntervalMin, buffer_preparation_min: bufferPreparationMin, min_lead_time_hours: minLeadTimeHours, auto_fill_logic: autoFillLogic,
+        image_url: imageUrl, official_url: officialUrl, line_official_url: lineOfficialUrl, notify_line_enabled: notifyLineEnabled, owner_name: ownerName, owner_name_kana: ownerNameKana,
         business_type: businessType, line_channel_access_token: lineToken, line_admin_user_id: lineAdminId
       }).eq('id', shopId);
-    if (!error) showMsg('すべての設定を保存しました！');
-    else alert('保存に失敗しました。');
+    if (!error) showMsg('すべての設定を保存しました！'); else alert('保存に失敗しました。');
   };
 
   const toggleHoliday = (weekKey, dayKey) => {
@@ -280,10 +236,7 @@ function AdminDashboard() {
   const deleteService = async (id) => { if (window.confirm('削除しますか？')) { await supabase.from('services').delete().eq('id', id); fetchMenuDetails(); } };
   const deleteOption = async (id) => { await supabase.from('service_options').delete().eq('id', id); fetchMenuDetails(); };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    showMsg('コピーしました！');
-  };
+  const copyToClipboard = (text) => { navigator.clipboard.writeText(text); showMsg('コピーしました！'); };
 
   // 🛡️ --- セキュリティ・アピール付きログイン画面 ---
   if (!isAuthorized) {
@@ -291,14 +244,9 @@ function AdminDashboard() {
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', fontFamily: 'sans-serif', padding: '20px', boxSizing: 'border-box' }}>
         <form onSubmit={handleAuth} style={{ background: '#fff', padding: '40px', borderRadius: '24px', textAlign: 'center', width: '100%', maxWidth: '380px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', boxSizing: 'border-box' }}>
           <h2 style={{ marginBottom: '10px' }}>店舗管理ログイン 🔒</h2>
-          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '25px' }}>
-            SnipSnapは世界基準のセキュリティで<br/>あなたの店舗データを保護しています
-          </p>
-          
+          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '25px' }}>SnipSnapは世界基準のセキュリティで<br/>あなたの店舗データを保護しています</p>
           <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} placeholder="合言葉を入力" style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '2px solid #e2e8f0', marginBottom: '20px', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.1rem' }} />
           <button type="submit" style={{ width: '100%', padding: '15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>ダッシュボードを開く</button>
-          
-          {/* 🛡️ 安心アピールセクション */}
           <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid #f1f5f9', textAlign: 'left' }}>
             <p style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 'bold', marginBottom: '10px', textAlign: 'center' }}>🛡️ 安心のトリプルガード</p>
             <ul style={{ padding: 0, margin: 0, listStyle: 'none', fontSize: '0.7rem', color: '#64748b', lineHeight: '1.6' }}>
@@ -307,7 +255,6 @@ function AdminDashboard() {
               <li style={{ marginBottom: '8px' }}>✅ <b>SSL通信保護</b>：すべての通信は銀行レベルの暗号化によって保護されています。</li>
             </ul>
           </div>
-
           <Link to="/" style={{ display: 'block', marginTop: '20px', fontSize: '0.8rem', color: '#94a3b8', textDecoration: 'none' }}>← ポータルへ戻る</Link>
         </form>
       </div>
@@ -332,7 +279,7 @@ function AdminDashboard() {
       <div style={{ padding: '15px', boxSizing: 'border-box', width: '100%' }}>
         {message && <div style={{ position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)', width: '90%', padding: '15px', background: '#dcfce7', color: '#166534', borderRadius: '8px', zIndex: 1001, textAlign: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>{message}</div>}
 
-        {/* --- 🛠️ メニュータブ --- */}
+        {/* --- 🛠️ メニュータブ (全ロジック維持) --- */}
         {activeTab === 'menu' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '1px solid #2563eb' }}>
@@ -342,7 +289,6 @@ function AdminDashboard() {
                 <span style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>メニューの複数選択を許可する</span>
               </label>
             </section>
-
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📂 カテゴリ設定</h3>
               <form onSubmit={handleCategorySubmit} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
@@ -387,7 +333,6 @@ function AdminDashboard() {
                 ))}
               </div>
             </section>
-
             <section ref={menuFormRef} style={{ ...cardStyle, background: '#f8fafc' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メニュー登録・編集</h3>
               <form onSubmit={handleServiceSubmit}>
@@ -405,7 +350,6 @@ function AdminDashboard() {
                 <button type="submit" style={{ width: '100%', padding: '15px', background: editingServiceId ? '#f97316' : '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>メニューを保存</button>
               </form>
             </section>
-
             {categories.map((cat) => (
               <div key={cat.id} style={{ marginBottom: '25px', width: '100%', boxSizing: 'border-box' }}>
                 <h4 style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '10px', borderLeft: '4px solid #cbd5e1', paddingLeft: '8px' }}>{cat.name}</h4>
@@ -417,42 +361,11 @@ function AdminDashboard() {
                         <div style={{ fontSize: '0.8rem', color: '#2563eb' }}>{s.slots * slotIntervalMin}分 ({s.slots}コマ)</div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button 
-                          onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} 
-                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333' }}
-                        >
-                          枝
-                        </button>
-                        <button 
-                          onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} 
-                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-                        >
-                          ▲
-                        </button>
-                        <button 
-                          onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} 
-                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-                        >
-                          ▼
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setEditingServiceId(s.id); 
-                            setNewServiceName(s.name); 
-                            setNewServiceSlots(s.slots); 
-                            setSelectedCategory(s.category);
-                            menuFormRef.current?.scrollIntoView({ behavior: 'smooth' });
-                          }} 
-                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-                        >
-                          ✎
-                        </button>
-                        <button 
-                          onClick={() => deleteService(s.id)} 
-                          style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-                        >
-                          ×
-                        </button>
+                        <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', color: activeServiceForOptions?.id === s.id ? '#2563eb' : '#333' }}>枝</button>
+                        <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>▲</button>
+                        <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>▼</button>
+                        <button onClick={() => { setEditingServiceId(s.id); setNewServiceName(s.name); setNewServiceSlots(s.slots); setSelectedCategory(s.category); menuFormRef.current?.scrollIntoView({ behavior: 'smooth' }); }} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>✎</button>
+                        <button onClick={() => deleteService(s.id)} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>×</button>
                       </div>                    
                     </div>
                     {activeServiceForOptions?.id === s.id && (
@@ -486,7 +399,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- ⏰ 営業時間・定休日タブ --- */}
+        {/* --- ⏰ 営業時間・定休日タブ (全ロジック維持) --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
@@ -494,16 +407,13 @@ function AdminDashboard() {
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>1コマの単位</label>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {[15, 30].map(min => (
-                    <button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? '#2563eb' : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '8px' }}>{min}分</button>
-                  ))}
+                  {[15, 30].map(min => (<button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? '#2563eb' : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '8px' }}>{min}分</button>))}
                 </div>
               </div>
               <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>インターバル（準備時間）</label><select value={bufferPreparationMin} onChange={(e) => setBufferPreparationMin(parseInt(e.target.value))} style={inputStyle}><option value={0}>なし</option><option value={15}>15分</option><option value={30}>30分</option></select></div>
               <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>直近の予約制限</label><select value={minLeadTimeHours} onChange={(e) => setMinLeadTimeHours(parseInt(e.target.value))} style={inputStyle}><option value={0}>当日OK</option><option value={24}>前日まで</option><option value={48}>2日前まで</option><option value={72}>3日前まで</option></select></div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><input type="checkbox" checked={autoFillLogic} onChange={(e) => setAutoFillLogic(e.target.checked)} style={{ width: '22px', height: '22px' }} /><b>自動詰め機能を有効にする</b></label>
             </section>
-            
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>⏰ 曜日別営業時間・休憩</h3>
               {Object.keys(dayMap).map(day => (
@@ -526,49 +436,20 @@ function AdminDashboard() {
                 </div>
               ))}
             </section>
-
             <section style={{ ...cardStyle, border: '2px solid #ef4444' }}>
               <h3 style={{ marginTop: 0, color: '#ef4444' }}>📅 定休日の設定</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '450px' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ padding: '8px', fontSize: '0.7rem', color: '#94a3b8' }}>週 \ 曜日</th>
-                      {Object.keys(dayMap).map(d => <th key={d} style={{ padding: '8px', fontSize: '0.8rem' }}>{dayMap[d].charAt(0)}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {weekLabels.map(week => (
-                      <tr key={week.key} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px 5px', fontSize: '0.7rem', fontWeight: 'bold', color: '#64748b' }}>{week.label}</td>
-                        {Object.keys(dayMap).map(day => {
-                          const isActive = regularHolidays[`${week.key}-${day}`];
-                          return (
-                            <td key={day} style={{ padding: '4px', textAlign: 'center' }}>
-                              <button onClick={() => toggleHoliday(week.key, day)} style={{ width: '35px', height: '35px', borderRadius: '8px', border: '1px solid #eee', background: isActive ? '#ef4444' : '#fff', color: isActive ? '#fff' : '#cbd5e1', fontWeight: 'bold', fontSize: '0.7rem', cursor: 'pointer' }}>{isActive ? '休' : '◯'}</button>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
+                  <thead><tr><th style={{ padding: '8px', fontSize: '0.7rem', color: '#94a3b8' }}>週 \ 曜日</th>{Object.keys(dayMap).map(d => <th key={d} style={{ padding: '8px', fontSize: '0.8rem' }}>{dayMap[d].charAt(0)}</th>)}</tr></thead>
+                  <tbody>{weekLabels.map(week => (<tr key={week.key} style={{ borderBottom: '1px solid #f1f5f9' }}><td style={{ padding: '10px 5px', fontSize: '0.7rem', fontWeight: 'bold', color: '#64748b' }}>{week.label}</td>{Object.keys(dayMap).map(day => { const isActive = regularHolidays[`${week.key}-${day}`]; return (<td key={day} style={{ padding: '4px', textAlign: 'center' }}><button onClick={() => toggleHoliday(week.key, day)} style={{ width: '35px', height: '35px', borderRadius: '8px', border: '1px solid #eee', background: isActive ? '#ef4444' : '#fff', color: isActive ? '#fff' : '#cbd5e1', fontWeight: 'bold', fontSize: '0.7rem', cursor: 'pointer' }}>{isActive ? '休' : '◯'}</button></td>);})}</tr>))}</tbody>
                 </table>
               </div>
-              <div style={{ marginTop: '25px', padding: '15px', background: '#fef2f2', borderRadius: '12px', border: '1px dashed #ef4444' }}>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#991b1b' }}>定休日が祝日の場合は営業する</span>
-                  </div>
-                  <div onClick={() => setRegularHolidays(prev => ({...prev, open_on_holiday: !prev.open_on_holiday}))} style={{ width: '60px', height: '32px', background: regularHolidays.open_on_holiday ? '#10b981' : '#cbd5e1', borderRadius: '20px', position: 'relative', transition: '0.3s' }}>
-                    <div style={{ position: 'absolute', top: '3px', left: regularHolidays.open_on_holiday ? '31px' : '3px', width: '26px', height: '26px', background: '#fff', borderRadius: '50%', transition: '0.3s' }} />
-                  </div>
-                </label>
-              </div>
+              <div style={{ marginTop: '25px', padding: '15px', background: '#fef2f2', borderRadius: '12px', border: '1px dashed #ef4444' }}><label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}><div style={{ flex: 1 }}><span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#991b1b' }}>定休日が祝日の場合は営業する</span></div><div onClick={() => setRegularHolidays(prev => ({...prev, open_on_holiday: !prev.open_on_holiday}))} style={{ width: '60px', height: '32px', background: regularHolidays.open_on_holiday ? '#10b981' : '#cbd5e1', borderRadius: '20px', position: 'relative', transition: '0.3s' }}><div style={{ position: 'absolute', top: '3px', left: regularHolidays.open_on_holiday ? '31px' : '3px', width: '26px', height: '26px', background: '#fff', borderRadius: '50%', transition: '0.3s' }} /></div></label></div>
             </section>
           </div>
         )}
 
-        {/* --- 🏪 店舗情報タブ --- */}
+        {/* --- 🏪 店舗情報タブ (アップロード機能統合) --- */}
         {activeTab === 'info' && (
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ ...cardStyle, padding: '20px' }}>
@@ -581,29 +462,23 @@ function AdminDashboard() {
 
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィール</h3>
-
-              {/* 🆕 スマホ撮影・画像アップロードセクション */}
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像（スマホで撮影・変更）</label>
+              
+              {/* 🆕 【統合】スマホ撮影・自動上書きアップロードセクション */}
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像（推奨 1:1）</label>
               <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
                 {imageUrl ? (
-                  <img src={imageUrl} alt="preview" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }} />
+                  <img src={imageUrl} alt="preview" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }} />
                 ) : (
-                  <div style={{ width: '100%', height: '120px', background: '#e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.8rem', marginBottom: '12px' }}>画像未設定</div>
+                  <div style={{ width: '120px', height: '120px', background: '#e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.7rem', margin: '0 auto 12px' }}>NO IMAGE</div>
                 )}
                 
                 <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    capture="environment" // スマホで「カメラ」を優先起動させる魔法の属性
-                    onChange={handleFileUpload} 
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }}
-                  />
+                  <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }} />
                   <button type="button" style={{ width: '100%', padding: '12px', background: '#fff', border: '1px solid #2563eb', color: '#2563eb', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem' }}>
                     📸 写真を撮る / 変更する
                   </button>
                 </div>
-                <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '10px' }}>※撮影後、下の「保存」ボタンを必ず押してください</p>
+                <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '10px' }}>※更新すると古い画像は自動で削除されます。最後に下の保存ボタンを押してください。</p>
               </div>
 
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗名 / かな</label>
@@ -612,21 +487,20 @@ function AdminDashboard() {
               <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}><input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} style={inputStyle} /><input value={ownerNameKana} onChange={(e) => setOwnerNameKana(e.target.value)} style={inputStyle} /></div>
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>業種</label>
               <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}><option value="美容室・理容室">美容室・理容室</option><option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option><option value="エステ・リラク">エステ・リラク</option><option value="整体・接骨院">整体・接骨院</option><option value="飲食店">飲食店</option><option value="その他">その他</option></select>
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗画像URL (手入力も可)</label>
+              
+              {/* URL入力欄も利便性のために維持します */}
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗画像URL</label>
               <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="https://..." />
+              
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>メール</label><input type="email" value={emailContact} onChange={(e) => setEmailContact(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>注意事項</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} />
             </section>
-
             <section style={{ ...cardStyle, border: '1px solid #00b900' }}>
               <h3 style={{ marginTop: 0, color: '#00b900' }}>💬 LINE公式アカウント連携</h3>
               <div style={{ marginTop: '10px', padding: '15px', background: '#f0fdf4', borderRadius: '12px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                  <input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} />
-                  <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 LINE通知を有効にする</span>
-                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}><input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} /><span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 LINE通知を有効にする</span></label>
                 <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d' }}>Access Token</label><input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} style={inputStyle} />
                 <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d', marginTop: '10px', display: 'block' }}>Admin User ID</label><input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} style={inputStyle} />
               </div>
@@ -634,47 +508,14 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- 🔒 安全設定タブ --- */}
+        {/* --- 🔒 安全設定タブ (全ロジック維持) --- */}
         {activeTab === 'security' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
               <h3 style={{ marginTop: 0, color: '#2563eb' }}>🔐 セキュリティ設定</h3>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '20px' }}>
-                パスワードを変更すると、開発者（三土手）であっても、データベースからあなたのパスワードを読み取ることが物理的に不可能になります。
-              </p>
-              
-              {!isChangingPassword ? (
-                <button 
-                  onClick={() => setIsChangingPassword(true)}
-                  style={{ width: '100%', padding: '15px', background: '#fff', border: '1px solid #2563eb', color: '#2563eb', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}
-                >
-                  パスワードを変更する
-                </button>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>新しいパスワード (8文字以上)</label>
-                  <input 
-                    type="password" 
-                    value={newPassword} 
-                    onChange={(e) => setNewPassword(e.target.value)} 
-                    style={inputStyle} 
-                    placeholder="新しいパスワードを入力"
-                  />
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button 
-                      onClick={handleUpdatePassword} 
-                      style={{ flex: 1, padding: '15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}
-                    >
-                      安全に保存
-                    </button>
-                    <button 
-                      onClick={() => setIsChangingPassword(false)} 
-                      style={{ flex: 1, padding: '15px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}
-                    >
-                      キャンセル
-                    </button>
-                  </div>
-                </div>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '20px' }}>パスワードを変更すると、開発者（三土手）であっても、データベースからあなたのパスワードを読み取ることが物理的に不可能になります。</p>
+              {!isChangingPassword ? (<button onClick={() => setIsChangingPassword(true)} style={{ width: '100%', padding: '15px', background: '#fff', border: '1px solid #2563eb', color: '#2563eb', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>パスワードを変更する</button>) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}><label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>新しいパスワード (8文字以上)</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={inputStyle} placeholder="新しいパスワードを入力" /><div style={{ display: 'flex', gap: '10px' }}><button onClick={handleUpdatePassword} style={{ flex: 1, padding: '15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>安全に保存</button><button onClick={() => setIsChangingPassword(false)} style={{ flex: 1, padding: '15px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>キャンセル</button></div></div>
               )}
             </section>
           </div>
