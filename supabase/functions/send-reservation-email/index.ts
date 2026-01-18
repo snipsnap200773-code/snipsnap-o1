@@ -42,8 +42,8 @@ Deno.serve(async (req) => {
       customerEmail,      // 予約用
       customerName,       // 予約用
       shopName,           // 共通
-      startTime,           // 予約用
-      services,           // 予約用
+      startTime,          // 予約用
+      services,           // 予約用（※フロントエンドで整形済みが渡される）
       shopEmail,          // 予約用
       cancelUrl,          // 予約用
       lineUserId,         // 予約用
@@ -94,10 +94,16 @@ Deno.serve(async (req) => {
         const shop = res.profiles;
         const resTime = new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         
-        // 複数名対応のメニュー作成
-        const menuDisplay = res.options?.people 
+        // 🆕 💡 リマインド送信時も「1名予約なら番号なし」にするスマートロジック
+        const isMulti = res.options?.people && res.options.people.length > 1;
+        
+        const menuDisplayHtml = isMulti 
           ? res.options.people.map((p: any, i: number) => `${i + 1}人目: ${p.services.map((s: any) => s.name).join(', ')}`).join('<br>')
-          : res.customer_name;
+          : (res.options?.people?.[0]?.services?.map((s: any) => s.name).join(', ') || res.customer_name);
+
+        const menuDisplayText = isMulti 
+          ? res.options.people.map((p: any, i: number) => `${i + 1}人目: ${p.services.map((s: any) => s.name).join(', ')}`).join('\n')
+          : (res.options?.people?.[0]?.services?.map((s: any) => s.name).join(', ') || res.customer_name);
 
         // 1. 【標準】リマインドメール送信
         const mailRes = await fetch('https://api.resend.com/emails', {
@@ -114,7 +120,7 @@ Deno.serve(async (req) => {
                 <p>いつもご利用ありがとうございます。ご予約日の前日となりましたので、念のためご確認のご連絡です。</p>
                 <div style="background: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
                   <p style="margin: 5px 0;">📅 <strong>日時:</strong> ${dateStr.replace(/-/g, '/')} ${resTime}〜</p>
-                  <p style="margin: 5px 0;">📋 <strong>内容:</strong><br>${menuDisplay}</p>
+                  <p style="margin: 5px 0;">📋 <strong>内容:</strong><br>${menuDisplayHtml}</p>
                   <p style="margin: 5px 0;">📍 <strong>場所:</strong> ${shop.address || '店舗までお越しください'}</p>
                 </div>
                 <p style="font-size: 0.85rem; color: #64748b;">※キャンセルの場合は、予約確定時にお送りしたメールのリンク、または店舗へお電話にてご連絡ください。</p>
@@ -126,7 +132,7 @@ Deno.serve(async (req) => {
         // 2. 【オプション】リマインドLINE送信
         let lineOk = false;
         if (shop.notify_line_remind_enabled && shop.line_channel_access_token && res.line_user_id) {
-          const lineText = `【リマインド】\n明日 ${resTime} よりご予約を承っております。\n\nお名前：${res.customer_name} 様\n店舗：${shop.business_name}\n\nお気をつけてお越しくださいませ！`;
+          const lineText = `【リマインド】\n明日 ${resTime} よりご予約を承っております。\n\nお名前：${res.customer_name} 様\n店舗：${shop.business_name}\n\n📋 内容：\n${menuDisplayText}\n\nお気をつけてお越しくださいませ！`;
           lineOk = await safePushToLine(res.line_user_id, lineText, shop.line_channel_access_token, "REMIND");
         }
 

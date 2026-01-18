@@ -148,7 +148,11 @@ function ConfirmReservation() {
           }]);
       }
 
-      const menuLabel = people.map((p, i) => `${i + 1}人目: ${p.services.map(s => s.name).join(', ')}`).join(' / ');
+      // 🆕 💡 通知用テキストのスマート化ロジック
+      // 人数が1人の時はメニュー名だけ、2名以上の時は「1人目: 〇〇」という形式にします
+      const menuLabel = people.length > 1
+        ? people.map((p, i) => `${i + 1}人目: ${p.services.map(s => s.name).join(', ')}`).join(' / ')
+        : (people[0]?.services?.map(s => s.name).join(', ') || 'メニューなし');
 
       const { error: dbError } = await supabase.from('reservations').insert([
         {
@@ -223,7 +227,7 @@ function ConfirmReservation() {
         <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
           {people && people.map((person, idx) => (
             <div key={idx} style={{ marginBottom: idx < people.length - 1 ? '10px' : 0, paddingBottom: idx < people.length - 1 ? '10px' : 0, borderBottom: idx < people.length - 1 ? '1px dashed #eee' : 'none' }}>
-              {/* 🆕 複数名の時だけ「1人目」などを表示する条件分岐 */}
+              {/* 🆕 💡 複数名の時だけ「1人目」などを表示する条件分岐 */}
               {people.length > 1 && (
                 <div style={{ fontWeight: 'bold', color: '#2563eb', marginBottom: '4px' }}>{idx + 1}人目</div>
               )}
