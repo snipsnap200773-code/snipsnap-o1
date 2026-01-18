@@ -17,7 +17,7 @@ function ReservationForm() {
   // 💡 移植：LINE経由（URLに ?source=line があるか、またはLINEアプリ内か）を判定
   const queryParams = new URLSearchParams(location.search);
   const isLineSource = queryParams.get('source') === 'line';
-  const isLineApp = /Line/i.test(navigator.userAgent); // 以前の index.html からの移植
+  const isLineApp = /Line/i.test(navigator.userAgent);
 
   // 基本データState
   const [shop, setShop] = useState(null);
@@ -25,12 +25,12 @@ function ReservationForm() {
   const [services, setServices] = useState([]);
   const [options, setOptions] = useState([]);
 
-  // ユーザー選択State
-  const [selectedServices, setSelectedServices] = useState([]); 
-  const [selectedOptions, setSelectedOptions] = useState({}); 
+  // --- 🆕 複数名予約用のState ---
+  const [people, setPeople] = useState([]); // 確定した人のリスト: [{services, options, slots}]
+  const [selectedServices, setSelectedServices] = useState([]); // 現在編集中の人のメニュー
+  const [selectedOptions, setSelectedOptions] = useState({}); // 現在編集中の人の枝メニュー
   
   const [loading, setLoading] = useState(true);
-  // 💡 移植：LINEユーザー情報を保持するState
   const [lineUser, setLineUser] = useState(null);
 
   const categoryRefs = useRef({});
@@ -38,24 +38,18 @@ function ReservationForm() {
 
   useEffect(() => {
     fetchData();
-    // 💡 移植：LINE経由またはLINEアプリ内ならLIFFを即時初期化
     if (isLineSource || isLineApp) {
       initLiff();
     }
   }, [shopId]);
 
-  // 💡 移植：LINEログイン（LIFF）初期化・オートジャンプ・名前取得ロジック
   const initLiff = async () => {
     try {
-      // 三土手さんの LIFF ID (2008606267-eJadD70Z) を設定
       await liff.init({ liffId: '2008606267-eJadD70Z' }); 
-      
       if (liff.isLoggedIn()) {
         const profile = await liff.getProfile();
         setLineUser(profile);
-        console.log("LINE Profile Fetched:", profile.displayName);
       } else {
-        // 💡 移植：未ログインかつLINEアプリ内なら自動でログイン画面へ飛ばす
         liff.login(); 
       }
     } catch (err) {
@@ -81,11 +75,19 @@ function ReservationForm() {
     setLoading(false);
   };
 
-  // 合計必要コマ数
-  const totalSlotsNeeded = selectedServices.reduce((sum, s) => sum + s.slots, 0) + 
+  // --- 🆕 複数名対応の計算ロジック ---
+
+  // 今編集中の人の必要コマ数
+  const currentPersonSlots = selectedServices.reduce((sum, s) => sum + s.slots, 0) + 
     Object.values(selectedOptions).reduce((sum, opt) => sum + (opt.additional_slots || 0), 0);
 
-  // 必須条件チェック
+  // すでに確定した人たちの合計コマ数
+  const pastPeopleSlots = people.reduce((sum, p) => sum + p.slots, 0);
+
+  // 全員分の合計必要コマ数
+  const totalSlotsNeeded = pastPeopleSlots + currentPersonSlots;
+
+  // 必須条件チェック (現在編集中の一人分に対して)
   const checkRequiredMet = () => {
     return selectedServices.every(s => {
       const cat = categories.find(c => c.name === s.category);
@@ -101,7 +103,35 @@ function ReservationForm() {
   const isTotalTimeOk = totalSlotsNeeded > 0;
   const isRequiredMet = checkRequiredMet();
 
-  // UI制御
+  // --- 🆕 複数名予約用のアクション ---
+
+  // 「追加でもう一人」を押した時
+  const handleAddPerson = () => {
+    if (people.length >= 3) return; // 最大4名まで（リストに3人＋編集中1人）
+    
+    // 現在の選択をリストに保存
+    setPeople([...people, { 
+      services: selectedServices, 
+      options: selectedOptions, 
+      slots: currentPersonSlots 
+    }]);
+
+    // 入力状態をリセット
+    setSelectedServices([]);
+    setSelectedOptions({});
+
+    // 🆕 画面を一番上までスクロール
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // 追加した人を削除する場合
+  const removePerson = (index) => {
+    const newPeople = [...people];
+    newPeople.splice(index, 1);
+    setPeople(newPeople);
+  };
+
+  // UI制御：無効化されたカテゴリ
   const disabledCategoryNames = selectedServices.reduce((acc, s) => {
     const cat = categories.find(c => c.name === s.category);
     if (cat?.disable_categories) return [...acc, ...cat.disable_categories.split(',').map(n => n.trim())];
@@ -173,28 +203,19 @@ function ReservationForm() {
 
   const handleNextStep = () => {
     window.scrollTo(0,0);
-    // 💡 移植：LINE情報 (lineUser) を確実に state に乗せて次の画面へ渡す
+    // 💡 移植：全員分のデータを state に乗せて次の画面へ渡す
     const commonState = { 
-      selectedServices, 
-      selectedOptions, 
+      people: [...people, { services: selectedServices, options: selectedOptions, slots: currentPersonSlots }],
       totalSlotsNeeded,
       lineUser 
     };
 
     if (isAdminMode) {
       navigate(`/shop/${shopId}/confirm`, { 
-        state: { 
-          ...commonState,
-          date: adminDate,
-          time: adminTime,
-          adminDate,
-          adminTime
-        } 
+        state: { ...commonState, date: adminDate, time: adminTime, adminDate, adminTime } 
       });
     } else {
-      navigate(`/shop/${shopId}/reserve/time`, { 
-        state: commonState 
-      });
+      navigate(`/shop/${shopId}/reserve/time`, { state: commonState });
     }
   };
 
@@ -223,11 +244,23 @@ function ReservationForm() {
       <div style={{ marginTop: '30px', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '20px' }}>
         <h2 style={{ margin: '0 0 10px 0', fontSize: '1.4rem' }}>{shop.business_name}</h2>
         
-        {/* 💡 移植：LINEログイン済みの場合のバナー表示 */}
         {lineUser && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', padding: '10px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
             <img src={lineUser.pictureUrl} style={{ width: '30px', height: '30px', borderRadius: '50%' }} alt="LINE" />
             <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#166534' }}>{lineUser.displayName} さん、こんにちは！</span>
+          </div>
+        )}
+
+        {/* 🆕 確定済みの人数リストを表示 */}
+        {people.length > 0 && (
+          <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold', marginBottom: '8px' }}>現在の予約内容：</p>
+            {people.map((p, idx) => (
+              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', padding: '4px 0', borderBottom: idx < people.length - 1 ? '1px dashed #eee' : 'none' }}>
+                <span>{idx + 1}人目：{p.services.map(s => s.name).join(', ')}</span>
+                <button onClick={() => removePerson(idx)} style={{ border: 'none', background: 'none', color: '#ef4444', fontSize: '0.9rem', cursor: 'pointer' }}>×</button>
+              </div>
+            ))}
           </div>
         )}
 
@@ -237,16 +270,13 @@ function ReservationForm() {
           </div>
         )}
         {shop.description && <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6' }}>{shop.description}</p>}
-        {shop.notes && (
-          <div style={{ marginTop: '20px', padding: '15px', background: '#fff1f2', borderRadius: '12px', border: '1px solid #fecdd3' }}>
-            <h5 style={{ margin: '0 0 5px 0', color: '#e11d48', fontSize: '0.8rem' }}>⚠️ 予約時の注意事項</h5>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: '#be123c' }}>{shop.notes}</p>
-          </div>
-        )}
       </div>
 
       <div>
-        <h3 style={{ fontSize: '1rem', borderLeft: '4px solid #2563eb', paddingLeft: '10px', marginBottom: '20px' }}>1. メニューを選択</h3>
+        <h3 style={{ fontSize: '1rem', borderLeft: '4px solid #2563eb', paddingLeft: '10px', marginBottom: '20px' }}>
+          {people.length + 1}人目のメニューを選択
+        </h3>
+        
         {categories.map((cat, idx) => {
           const isDisabled = disabledCategoryNames.includes(cat.name);
           return (
@@ -293,35 +323,43 @@ function ReservationForm() {
           );
         })}
 
-        {selectedServices.length > 0 && (
-          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)', padding: '15px 20px', borderTop: '1px solid #e2e8f0', textAlign: 'center', zIndex: 1000, boxShadow: '0 -4px 12px rgba(0,0,0,0.05)' }}>
-            
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', marginBottom: '12px', maxHeight: '45px', overflowY: 'auto' }}>
-              {selectedServices.map(s => (
-                <span key={s.id} style={{ fontSize: '0.65rem', background: '#eff6ff', color: '#2563eb', padding: '2px 8px', borderRadius: '10px', border: '1px solid #dbeafe', fontWeight: 'bold' }}>
-                  {s.name}
-                </span>
-              ))}
-            </div>
+        {/* 🆕 縦書きの「追加でもう一人」札 */}
+        {selectedServices.length > 0 && people.length < 3 && allOptionsSelected && isRequiredMet && (
+          <button 
+            onClick={handleAddPerson}
+            style={{ 
+              position: 'fixed', bottom: '100px', right: '15px', zIndex: 999, 
+              writingMode: 'vertical-rl', // 縦書き
+              background: '#f97316', color: 'white', padding: '15px 8px', 
+              borderRadius: '8px 0 0 8px', border: 'none', fontWeight: 'bold', 
+              fontSize: '0.85rem', boxShadow: '-4px 4px 12px rgba(0,0,0,0.1)', 
+              cursor: 'pointer', animation: 'slideIn 0.3s ease-out'
+            }}
+          >
+            追加でもう一人 ＋
+          </button>
+        )}
 
+        <style>{`
+          @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        `}</style>
+
+        {/* 下部固定アンダーバー */}
+        {(selectedServices.length > 0 || people.length > 0) && (
+          <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(10px)', padding: '15px 20px', borderTop: '1px solid #e2e8f0', textAlign: 'center', zIndex: 1000, boxShadow: '0 -4px 12px rgba(0,0,0,0.05)' }}>
             <button 
               disabled={!allOptionsSelected || !isRequiredMet || !isTotalTimeOk} 
               onClick={handleNextStep} 
               style={{ 
                 width: '100%', maxWidth: '400px', padding: '16px', 
                 background: (!allOptionsSelected || !isRequiredMet || !isTotalTimeOk) ? '#cbd5e1' : '#2563eb', 
-                color: 'white', border: 'none', borderRadius: '14px', fontWeight: 'bold', fontSize: '1rem', transition: '0.3s'
+                color: 'white', border: 'none', borderRadius: '14px', fontWeight: 'bold', fontSize: '1rem'
               }}
             >
-              {!allOptionsSelected 
-                ? 'オプションを選択してください' 
-                : !isRequiredMet 
-                  ? '必須メニューが未選択です' 
-                  : !isTotalTimeOk
-                    ? 'メニューを組み合わせて選択してください'
-                    : isAdminMode 
-                      ? `このメニューで予約をねじ込む (${totalSlotsNeeded * (shop.slot_interval_min || 15)}分)`
-                      : `日時選択へ進む (${totalSlotsNeeded * (shop.slot_interval_min || 15)}分)`}
+              {!allOptionsSelected ? 'オプションを選択してください' 
+               : !isRequiredMet ? '必須メニューが未選択です' 
+               : isAdminMode ? `予約をねじ込む (${totalSlotsNeeded * (shop.slot_interval_min || 15)}分)`
+               : `日時選択へ進む (${totalSlotsNeeded * (shop.slot_interval_min || 15)}分)`}
             </button>
           </div>
         )}
