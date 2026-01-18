@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
     // 🚀 パターンA：店主様への歓迎メール ＆ 三土手さんへの通知送信
     // ==========================================
     if (type === 'welcome') {
-      // 1. 店主様への歓迎メール送信（LINE専用URL案内を追加）
+      // 1. 店主様への歓迎メール送信（ベータ版表記に更新）
       const welcomeRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -161,12 +161,12 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: 'SnipSnap 運営事務局 <infec@snipsnap.biz>',
           to: [owner_email],
-          subject: `【SnipSnap】ご登録ありがとうございます！`,
+          subject: `【SnipSnap】ベータ版へのご登録ありがとうございます！`, // 🆕 変更
           html: `
             <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 30px; border-radius: 12px;">
               <h1 style="color: #2563eb; font-size: 1.5rem; margin-top: 0;">${shopName} 様</h1>
-              <p>この度は予約システム <strong>SnipSnap（スニップスナップ）</strong> にお申し込みいただき、誠にありがとうございます。</p>
-              <p>本日より1ヶ月間の無料トライアルが開始されました。まずは以下の専用URLより、メニューの登録や店舗の設定を行ってください。</p>
+              <p>この度は <strong>SnipSnap（スニップスナップ）</strong> にお申し込みいただき、誠にありがとうございます。</p>
+              <p>現在、SnipSnapは <strong>ベータ版として全機能を無料</strong> で提供しております。 まずは以下の専用URLより、メニューの登録や店舗の設定を行ってください。</p>
               
               <div style="background: #f1f5f9; padding: 20px; border-radius: 10px; margin: 25px 0;">
                 <h2 style="font-size: 1rem; margin-top: 0; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px;">🔑 管理者用ログイン情報</h2>
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
         }),
       });
 
-      // 💡 2. 三土手さん（運営側）への新規申込通知メール
+      // 💡 2. 三土手さん（運営側）への新規申込通知メール（ベータ版表記に更新）
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -209,10 +209,10 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: 'SnipSnap システム通知 <infec@snipsnap.biz>',
           to: ['snipsnap.2007.7.3@gmail.com'],
-          subject: `【新規申込】${shopName} 様がトライアルを開始しました`,
+          subject: `【新規申込】${shopName} 様がベータ版の利用を開始しました`, // 🆕 変更
           html: `
             <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 2px solid #2563eb; padding: 25px; border-radius: 12px;">
-              <h2 style="color: #2563eb; margin-top: 0;">🚀 新規トライアル申し込み通知</h2>
+              <h2 style="color: #2563eb; margin-top: 0;">🚀 新規ベータ版申し込み通知</h2>
               <p>運営事務局 三土手様、お疲れ様です。新しい店舗の登録がありました！</p>
               <div style="background: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
                 <p style="margin: 5px 0;">🏪 <strong>店舗名:</strong> ${shopName} 様</p>
@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
                 <p style="margin: 5px 0;">📞 <strong>電話番号:</strong> ${ownerPhone || '未入力'}</p>
                 <p style="margin: 5px 0;">🏢 <strong>業種:</strong> ${businessType || '未選択'}</p>
               </div>
-              <p style="font-size: 0.9rem; color: #64748b;">管理画面（秘密のパス）から店舗の状態を確認できます。</p>
+              <p style="font-size: 0.9rem; color: #64748b;">管理画面から店舗の状態を確認できます。</p>
             </div>
           `,
         }),
@@ -319,13 +319,13 @@ Deno.serve(async (req) => {
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    });
 
   } catch (error) {
-    console.error("Error:", error.message)
+    console.error("Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    });
   }
-})
+});
