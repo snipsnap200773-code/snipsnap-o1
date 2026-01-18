@@ -41,15 +41,52 @@ function CancelReservation() {
     }
   };
 
+  // 🆕 【強化版】キャンセル実行 ＆ 名簿自動クリーニング
   const execCancel = async () => {
     if (!reservation || !window.confirm("本当にキャンセルしますか？")) return;
     setView('loading');
+    
     try {
-      // 💡 移植：旧システムのストアドプロシージャをそのまま実行
-      const { error } = await supabase.rpc("delete_reservation_smart", { p_res_id: reservation.id });
-      if (error) throw error;
+      const { id, customer_name, shop_id } = reservation;
+
+      // 1. 予約を削除
+      const { error: deleteError } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) throw deleteError;
+
+      // 2. 名簿の自動クリーニングロジック (AdminReservations.jsxと同等)
+      // そのお客様の残りの予約数をカウント
+      const { count } = await supabase
+        .from('reservations')
+        .select('*', { count: 'exact', head: true })
+        .eq('shop_id', shop_id)
+        .eq('customer_name', customer_name);
+
+      if (count === 0) {
+        // 他に予約が1件もなければ名簿から完全に削除（ゴミデータの掃除）
+        await supabase.from('customers').delete().eq('shop_id', shop_id).eq('name', customer_name);
+      } else {
+        // 他に予約があるなら、来店回数を-1調整する
+        const { data: cust } = await supabase
+          .from('customers')
+          .select('id, total_visits')
+          .eq('shop_id', shop_id)
+          .eq('name', customer_name)
+          .maybeSingle();
+          
+        if (cust) {
+          await supabase.from('customers')
+            .update({ total_visits: Math.max(0, (cust.total_visits || 1) - 1) })
+            .eq('id', cust.id);
+        }
+      }
+
       setView('success');
     } catch (err) {
+      console.error(err);
       showError("処理に失敗しました。店舗へお電話ください。");
     }
   };
@@ -59,7 +96,7 @@ function CancelReservation() {
     setView('error');
   };
 
-  // スタイル設定（旧HTMLのCSSをReact用に移植）
+  // スタイル設定（既存を1ミリも変えずに維持）
   const containerStyle = { maxWidth: '500px', margin: '40px auto', background: '#fff', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', textAlign: 'center', fontFamily: 'sans-serif' };
   const btnStyle = { display: 'block', width: '100%', padding: '14px', marginTop: '12px', borderRadius: '10px', fontSize: '16px', fontWeight: 'bold', border: 'none', cursor: 'pointer', textDecoration: 'none', boxSizing: 'border-box' };
   const detailsStyle = { textAlign: 'left', background: '#f8fafc', padding: '15px', borderRadius: '8px', margin: '20px 0', fontSize: '14px', border: '1px solid #e2e8f0', lineHeight: '1.8' };
@@ -84,7 +121,12 @@ function CancelReservation() {
         <div style={detailsStyle}>
           <strong>日時:</strong> {dateStr}<br />
           <strong>お名前:</strong> {reservation.customer_name} 様<br />
-          <strong>メニュー:</strong> {reservation.options?.services?.map(s => s.name).join(', ') || 'なし'}
+          <strong>メニュー:</strong> {
+            /* 🆕 複数名データ（people）と 従来データ（services）の両方に対応 */
+            reservation.options?.people 
+              ? reservation.options.people.map(p => p.services.map(s => s.name).join(', ')).join(' / ')
+              : reservation.options?.services?.map(s => s.name).join(', ') || 'なし'
+          }
         </div>
         <p style={{ fontSize: '12px', color: '#666' }}>※変更の場合は一度キャンセルして再度ご予約ください。</p>
         <button style={{ ...btnStyle, background: '#e74c3c', color: '#fff' }} onClick={execCancel}>予約をキャンセルする</button>
