@@ -10,12 +10,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
 /**
  * 🛡️ 1. メインクライアント（データベース・ストレージ用）
  * RLSガード（x-shop-id）を添えて通信します。
- * 通常の「名簿保存」「予約取得」などはこちらの supabase を使います。
+ * 標準の保存キー（sb-auth-token）を使用します。
  */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
-      // URLから shopId を取得して身分証として添える
       'x-shop-id': window.location.pathname.split('/')[2] || '' 
     }
   }
@@ -23,13 +22,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 /**
  * ✉️ 2. 通知専用クライアント（Edge Functions用）
- * 通知を送る際、CORSエラーを回避するために使います。
- * auth設定を追加し、メインクライアントと喧嘩しないように完全に隔離しました。
+ * 🆕 別の storageKey を指定することで、メインクライアントとの衝突を物理的に回避します。
  */
 export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: false,   // 🆕 ログイン情報をブラウザに保存しない（喧嘩防止）
-    autoRefreshToken: false, // 🆕 自動更新をオフにする
-    detectSessionInUrl: false // 🆕 URLからのセッション検知をオフにする
+    storageKey: 'sb-notification-auth-token', // 🆕 衝突を避けるための別名
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false
   }
 });
