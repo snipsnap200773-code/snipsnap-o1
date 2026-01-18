@@ -41,7 +41,9 @@ function AdminReservations() {
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerFullHistory, setCustomerFullHistory] = useState([]);
-  const [editFields, setEditFields] = useState({ name: '', phone: '', email: '', memo: '' });
+  
+  // 🆕 line_user_id を含めた編集ステート
+  const [editFields, setEditFields] = useState({ name: '', phone: '', email: '', memo: '', line_user_id: null });
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -74,7 +76,14 @@ function AdminReservations() {
 
   const openCustomerDetail = async (customer) => {
     setSelectedCustomer(customer);
-    setEditFields({ name: customer.name, phone: customer.phone || '', email: customer.email || '', memo: customer.memo || '' });
+    // 🆕 line_user_id を取得
+    setEditFields({ 
+      name: customer.name, 
+      phone: customer.phone || '', 
+      email: customer.email || '', 
+      memo: customer.memo || '',
+      line_user_id: customer.line_user_id || null 
+    });
     setSearchTerm('');
     const { data } = await supabase.from('reservations').select('*').eq('shop_id', shopId).eq('customer_name', customer.name).order('start_time', { ascending: false });
     setCustomerFullHistory(data || []);
@@ -83,11 +92,34 @@ function AdminReservations() {
 
   const openDetail = async (res) => {
     setSelectedRes(res);
-    const { data: cust } = await supabase.from('customers').select('*').eq('shop_id', shopId).eq('name', res.customer_name).maybeSingle();
-    if (cust) {
-      setEditFields({ name: cust.name, phone: cust.phone || '', email: cust.email || '', memo: cust.memo || '' });
+    // 🆕 LINE ID での顧客照合を優先
+    let query = supabase.from('customers').select('*').eq('shop_id', shopId);
+    if (res.line_user_id) {
+      query = query.eq('line_user_id', res.line_user_id);
     } else {
-      setEditFields({ name: res.customer_name, phone: res.customer_phone || '', email: res.customer_email || '', memo: '' });
+      query = query.eq('name', res.customer_name);
+    }
+    
+    const { data: cust } = await query.maybeSingle();
+
+    if (cust) {
+      setSelectedCustomer(cust);
+      setEditFields({ 
+        name: cust.name, 
+        phone: cust.phone || '', 
+        email: cust.email || '', 
+        memo: cust.memo || '',
+        line_user_id: cust.line_user_id || res.line_user_id || null
+      });
+    } else {
+      setSelectedCustomer(null);
+      setEditFields({ 
+        name: res.customer_name, 
+        phone: res.customer_phone || '', 
+        email: res.customer_email || '', 
+        memo: '',
+        line_user_id: res.line_user_id || null
+      });
     }
     const history = reservations.filter(r => r.res_type === 'normal' && r.id !== res.id && (r.customer_name === res.customer_name) && new Date(r.start_time) < new Date(res.start_time)).sort((a, b) => new Date(b.start_time) - new Date(a.start_time)).slice(0, 5);
     setCustomerHistory(history);
@@ -95,61 +127,55 @@ function AdminReservations() {
   };
 
   const handleUpdateCustomer = async () => {
-    const { error } = await supabase
-      .from('customers')
-      .upsert({
-        shop_id: shopId,
-        name: editFields.name,
-        phone: editFields.phone,
-        email: editFields.email,
-        memo: editFields.memo,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'shop_id, name' });
-    if (error) { alert('保存エラー: ' + error.message); } 
-    else { alert('名簿情報を更新しました'); setShowCustomerModal(false); setShowDetailModal(false); fetchData(); }
+    // 🆕 紐付け情報を守りつつ更新するペイロード
+    const payload = {
+      shop_id: shopId,
+      name: editFields.name,
+      phone: editFields.phone,
+      email: editFields.email,
+      memo: editFields.memo,
+      line_user_id: editFields.line_user_id, // 紐付けを維持
+      updated_at: new Date().toISOString()
+    };
+
+    // 🆕 IDがあればID指定で更新（これで名前を変えても別の顧客にならずに済む）
+    if (selectedCustomer?.id) {
+      payload.id = selectedCustomer.id;
+    }
+
+    const { error } = await supabase.from('customers').upsert(payload, { onConflict: 'id' });
+
+    if (error) { 
+      alert('保存エラー: ' + error.message); 
+    } else { 
+      alert('名簿情報を更新しました'); 
+      setShowCustomerModal(false); 
+      setShowDetailModal(false); 
+      fetchData(); 
+    }
   };
 
-  // --- 🆕 【強化版】予約消去 ＆ 名簿自動クリーニング ---
   const deleteRes = async (id) => {
     const isBlock = selectedRes?.res_type === 'blocked';
     const msg = isBlock ? 'このブロックを解除して予約を「可能」に戻しますか？' : 'この予約データを消去して予約を「可能」に戻しますか？';
     
     if (window.confirm(msg)) {
-      const { customer_name, res_type } = selectedRes; // 削除前に情報を控える
-
-      // 1. 予約を削除
+      const { customer_name, res_type } = selectedRes;
       const { error: deleteError } = await supabase.from('reservations').delete().eq('id', id);
-      
-      if (deleteError) {
-        alert('削除に失敗しました: ' + deleteError.message);
-        return;
-      }
+      if (deleteError) { alert('削除に失敗しました: ' + deleteError.message); return; }
 
-      // 2. 実予約(normal)だった場合、顧客名簿の整理を行う
       if (res_type === 'normal') {
-        // そのお客様の残りの予約数をカウント
-        const { count } = await supabase
-          .from('reservations')
-          .select('*', { count: 'exact', head: true })
-          .eq('shop_id', shopId)
-          .eq('customer_name', customer_name);
-
+        const { count } = await supabase.from('reservations').select('*', { count: 'exact', head: true }).eq('shop_id', shopId).eq('customer_name', customer_name);
         if (count === 0) {
-          // 他に予約が1件もなければ名簿から完全に削除（テストデータの掃除）
           await supabase.from('customers').delete().eq('shop_id', shopId).eq('name', customer_name);
         } else {
-          // 他に予約があるなら、来店回数を-1調整する
           const { data: cust } = await supabase.from('customers').select('id, total_visits').eq('shop_id', shopId).eq('name', customer_name).maybeSingle();
           if (cust) {
-            await supabase.from('customers')
-              .update({ total_visits: Math.max(0, (cust.total_visits || 1) - 1) })
-              .eq('id', cust.id);
+            await supabase.from('customers').update({ total_visits: Math.max(0, (cust.total_visits || 1) - 1) }).eq('id', cust.id);
           }
         }
       }
-
-      setShowDetailModal(false);
-      fetchData();
+      setShowDetailModal(false); fetchData();
     }
   };
 
@@ -214,33 +240,25 @@ function AdminReservations() {
     if (checkIsRegularHoliday(dateObj)) {
       return { res_type: 'blocked', customer_name: '定休日', start_time: `${dateStr}T${timeStr}:00`, isRegularHoliday: true };
     }
-
     const currentSlotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
-    
     const matches = reservations.filter(r => {
       const start = new Date(r.start_time).getTime();
       const end = new Date(r.end_time).getTime();
       return currentSlotStart >= start && currentSlotStart < end;
     });
-
     if (matches.length > 0) {
       const exact = matches.find(r => new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === timeStr);
       return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
     }
-
     const buffer = shop?.buffer_preparation_min || 0;
     const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal');
-
     const isInBuffer = dayRes.some(r => {
       const resEnd = new Date(r.end_time).getTime();
       return currentSlotStart >= resEnd && currentSlotStart < (resEnd + buffer * 60 * 1000);
     });
     if (isInBuffer) return { res_type: 'system_blocked', customer_name: 'ｲﾝﾀｰﾊﾞﾙ', isBuffer: true };
-
     if (shop?.auto_fill_logic && dayRes.length > 0) {
-      const primeSeats = [];
-      const gapCandidates = [];
-
+      const primeSeats = []; const gapCandidates = [];
       dayRes.forEach(r => {
         const resEnd = new Date(r.end_time).getTime();
         const earliest = resEnd + (buffer * 60 * 1000);
@@ -258,7 +276,6 @@ function AdminReservations() {
         const startIdx = timeSlots.indexOf(rStartStr);
         if (startIdx >= 3) gapCandidates.push(timeSlots[startIdx - 3]);
       });
-
       if (gapCandidates.includes(timeStr) && !primeSeats.includes(timeStr)) {
         return { res_type: 'system_blocked', customer_name: '－', isGap: true };
       }
@@ -270,17 +287,10 @@ function AdminReservations() {
     const start = new Date(`${selectedDate}T${targetTime}:00`);
     const end = new Date(start.getTime() + (shop.slot_interval_min || 30) * 60000);
     const insertData = {
-      shop_id: shopId,
-      customer_name: '管理者ブロック',
-      res_type: 'blocked',
-      start_at: start.toISOString(),
-      end_at: end.toISOString(),
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-      total_slots: 1,
-      customer_email: 'admin@example.com',
-      customer_phone: '---',
-      options: { services: [] }
+      shop_id: shopId, customer_name: '管理者ブロック', res_type: 'blocked',
+      start_at: start.toISOString(), end_at: end.toISOString(),
+      start_time: start.toISOString(), end_time: end.toISOString(),
+      total_slots: 1, customer_email: 'admin@example.com', customer_phone: '---', options: { services: [] }
     };
     const { error } = await supabase.from('reservations').insert([insertData]);
     if (error) alert(`エラー: ${error.message}`); else { setShowMenuModal(false); fetchData(); }
@@ -295,21 +305,14 @@ function AdminReservations() {
     const closeStr = (hours && !hours.is_closed && hours.close) ? hours.close : "18:00";
     const start = new Date(`${selectedDate}T${openStr}:00`);
     const end = new Date(`${selectedDate}T${closeStr}:00`);
-    const [oh, om] = openStr.split(':').map(Number);
-    const [ch, cm] = closeStr.split(':').map(Number);
+    const [oh, om] = openStr.split(':').map(Number); const [ch, cm] = closeStr.split(':').map(Number);
     const totalMinutes = (ch * 60 + cm) - (oh * 60 + om);
     const slotsCount = Math.ceil(totalMinutes / interval);
     const insertData = {
-      shop_id: shopId,
-      customer_name: '臨時休業',
-      res_type: 'blocked',
-      start_at: start.toISOString(),
-      end_at: end.toISOString(),
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-      total_slots: slotsCount,
-      customer_email: 'admin@example.com',
-      customer_phone: '---',
+      shop_id: shopId, customer_name: '臨時休業', res_type: 'blocked',
+      start_at: start.toISOString(), end_at: end.toISOString(),
+      start_time: start.toISOString(), end_time: end.toISOString(),
+      total_slots: slotsCount, customer_email: 'admin@example.com', customer_phone: '---',
       options: { services: [], isFullDay: true }
     };
     const { error } = await supabase.from('reservations').insert([insertData]);
@@ -340,9 +343,8 @@ function AdminReservations() {
   const modalContentStyle = { background: '#fff', width: '95%', borderRadius: '25px', padding: '30px', maxHeight: '85vh', overflowY: 'auto' };
   const headerBtnStylePC = { padding: '10px 20px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', fontSize: '0.9rem', fontWeight: 'bold', cursor: 'pointer' };
   const mobileArrowBtnStyle = { background: '#f1f5f9', border: 'none', width: '40px', height: '40px', borderRadius: '50%', fontSize: '1rem', cursor: 'pointer' };
-
   const labelStyle = { fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' };
-  const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '0.9rem', boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '1rem', boxSizing: 'border-box' };
 
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#fff', overflow: 'hidden', position: 'fixed', inset: 0 }}>
@@ -400,7 +402,7 @@ function AdminReservations() {
           )}
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: isPC ? 'auto' : 'hidden', paddingBottom: !isPC ? '80px' : '0' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: isPC ? 'auto' : 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: isPC ? '900px' : '100%' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff' }}>
               <tr>
@@ -495,6 +497,15 @@ function AdminReservations() {
                         </div>
                       </div>
                     )}
+
+                    {/* 🆕 LINE連携済みバッジの表示 */}
+                    {editFields.line_user_id && (
+                      <div style={{ background: '#f0fdf4', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bbf7d0', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1rem' }}>💬</span>
+                        <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 'bold' }}>LINE連携済み（次回からこのお名前が自動表示されます）</span>
+                      </div>
+                    )}
+
                     <label style={labelStyle}>お客様名</label>
                     <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={inputStyle} />
                     <label style={labelStyle}>電話番号</label>
@@ -503,6 +514,7 @@ function AdminReservations() {
                     <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={inputStyle} placeholder="未登録" />
                     <label style={labelStyle}>顧客メモ</label>
                     <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ ...inputStyle, height: '80px' }} placeholder="好み、注意事項など" />
+                    
                     <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
                     {showDetailModal && selectedRes && (
                       <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? '#2563eb' : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>

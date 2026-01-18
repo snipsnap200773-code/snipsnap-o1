@@ -27,11 +27,36 @@ function ConfirmReservation() {
       navigate(`/shop/${shopId}/reserve`); 
       return;
     }
-    if (lineUser && lineUser.displayName) {
-      setCustomerName(lineUser.displayName);
-    }
+
+    // 🆕 【最優先ロジック】LINE ID で名簿を照合
+    const checkLineCustomer = async () => {
+      if (lineUser?.userId) {
+        const { data: cust } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('shop_id', shopId)
+          .eq('line_user_id', lineUser.userId)
+          .maybeSingle();
+
+        if (cust) {
+          // 名簿にいた場合は、三土手さんが管理画面で直した「正しい名前」をセット
+          setCustomerName(cust.name);
+          setCustomerPhone(cust.phone || '');
+          setCustomerEmail(cust.email || '');
+          setSelectedCustomerId(cust.id);
+          return; // 照合成功したので終了
+        }
+      }
+      
+      // 名簿にいなかった、またはLINE経由でない場合は従来通り
+      if (lineUser && lineUser.displayName) {
+        setCustomerName(lineUser.displayName);
+      }
+    };
+
+    checkLineCustomer();
     fetchShop();
-  }, []);
+  }, [lineUser, shopId]);
 
   const fetchShop = async () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', shopId).single();
@@ -84,25 +109,32 @@ function ConfirmReservation() {
     const cancelUrl = `${window.location.origin}/cancel?token=${cancelToken}`;
 
     try {
-      const { data: existingCust } = await supabase
-        .from('customers')
-        .select('id, total_visits')
-        .eq('shop_id', shopId)
-        .eq('name', customerName)
-        .maybeSingle();
+      // 🆕 💡 紐付けチェック：LINE ID または 名前 で検索
+      let query = supabase.from('customers').select('id, total_visits').eq('shop_id', shopId);
+      
+      if (lineUser?.userId) {
+        query = query.eq('line_user_id', lineUser.userId);
+      } else {
+        query = query.eq('name', customerName);
+      }
+      
+      const { data: existingCust } = await query.maybeSingle();
 
       if (existingCust) {
+        // 既存客ならアップデート（名前は上書きせず、来店情報を更新）
         await supabase
           .from('customers')
           .update({
             phone: customerPhone || undefined,
             email: customerEmail || undefined,
+            line_user_id: lineUser?.userId || undefined, // 🆕 IDを未登録ならここで紐付け
             total_visits: (existingCust.total_visits || 0) + 1,
             last_arrival_at: startDateTime.toISOString(),
             updated_at: new Date().toISOString()
           })
           .eq('id', existingCust.id);
       } else {
+        // 完全新規客なら登録
         await supabase
           .from('customers')
           .insert([{
@@ -110,12 +142,12 @@ function ConfirmReservation() {
             name: customerName,
             phone: customerPhone,
             email: customerEmail,
+            line_user_id: lineUser?.userId || null, // 🆕 LINE ID も保存
             total_visits: 1,
             last_arrival_at: startDateTime.toISOString()
           }]);
       }
 
-      // 全員のメニュー名を結合してラベルを作成
       const menuLabel = people.map((p, i) => `${i + 1}人目: ${p.services.map(s => s.name).join(', ')}`).join(' / ');
 
       const { error: dbError } = await supabase.from('reservations').insert([
@@ -132,15 +164,13 @@ function ConfirmReservation() {
           res_type: 'normal',
           line_user_id: lineUser?.userId || null,
           cancel_token: cancelToken,
-          options: { people: people } // 複数名データをまるごと保存
+          options: { people: people }
         }
       ]);
 
       if (dbError) throw dbError;
 
-      // --- ✉️ 通知処理 (CORSエラー回避版) ---
       if (!isAdminEntry) {
-        // 🆕 supabase ではなく supabaseAnon を使うことで x-shop-id ヘッダーを送らずに済みます
         await supabaseAnon.functions.invoke('send-reservation-email', {
           body: {
             shopId, customerEmail, customerName, shopName: shop.business_name,
@@ -186,7 +216,6 @@ function ConfirmReservation() {
         </div>
       )}
 
-      {/* 予約内容カード (複数名対応) */}
       <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '15px', marginBottom: '25px', border: '1px solid #e2e8f0' }}>
         <p style={{ margin: '0 0 12px 0' }}>📅 <b>日時：</b> {displayDate} {displayTime} 〜</p>
         <p style={{ margin: '0 0 8px 0' }}>📋 <b>選択メニュー：</b></p>
