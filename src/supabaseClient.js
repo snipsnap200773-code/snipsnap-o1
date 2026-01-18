@@ -9,13 +9,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 /**
  * 🛡️ 1. データベース・ストレージ用クライアント
- * RLS（鉄壁のガード）に対応するため、リクエストごとに shopId をヘッダーに添えます。
- * 通常のデータ取得・保存にはこちらを使います。
+ * RLSガード（x-shop-id）を添えて通信します。
  */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
-      // URLから shopId を取得して身分証として添える
       'x-shop-id': window.location.pathname.split('/')[2] || '' 
     }
   }
@@ -23,7 +21,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 /**
  * ✉️ 2. 通知・Edge Functions専用クライアント
- * Edge Functions を呼び出す際、CORSエラー（通信遮断）を回避するために使います。
- * RLSガード用のカスタムヘッダーを含まない「真っさらな」状態のクライアントです。
+ * CORSエラーを防ぐため、カスタムヘッダーを一切含みません。
+ * また、重複警告を防ぐために認証情報の保持（persistSession）をオフにします。
  */
-export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false // 🆕 重複警告を消すための設定
+  }
+});

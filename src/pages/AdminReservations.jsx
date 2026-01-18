@@ -173,7 +173,7 @@ function AdminReservations() {
 
     const currentSlotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
     
-    // 1. 実予約（normal/blocked）を最優先。これでメニュー情報を保持
+    // 1. 実予約（normal/blocked）を最優先。
     const matches = reservations.filter(r => {
       const start = new Date(r.start_time).getTime();
       const end = new Date(r.end_time).getTime();
@@ -241,11 +241,11 @@ function AdminReservations() {
       shop_id: shopId,
       customer_name: '管理者ブロック',
       res_type: 'blocked',
-      start_at: start.toISOString(), // 必須
-      end_at: end.toISOString(),     // 必須
+      start_at: start.toISOString(),
+      end_at: end.toISOString(),
       start_time: start.toISOString(),
       end_time: end.toISOString(),
-      total_slots: 1,               // 個別ブロック
+      total_slots: 1,
       customer_email: 'admin@example.com',
       customer_phone: '---',
       options: { services: [] }
@@ -271,8 +271,8 @@ function AdminReservations() {
       shop_id: shopId,
       customer_name: '臨時休業',
       res_type: 'blocked',
-      start_at: start.toISOString(), // 必須
-      end_at: end.toISOString(),     // 必須
+      start_at: start.toISOString(),
+      end_at: end.toISOString(),
       start_time: start.toISOString(),
       end_time: end.toISOString(),
       total_slots: slotsCount,
@@ -302,7 +302,6 @@ function AdminReservations() {
 
   if (loading) return <div style={{textAlign:'center', padding:'50px'}}>読み込み中...</div>;
 
-  // --- PC サイドバー用スタイル ---
   const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', color: '#2563eb' };
   const floatNavBtnStyle = { border: 'none', background: 'none', width: '60px', height: '50px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
   const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' };
@@ -410,7 +409,6 @@ function AdminReservations() {
                         {res && (
                           <div style={{ 
                             position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                            // 🆕 名前のみ左寄せ、記号等は中央寄せ
                             alignItems: isNormalRes ? 'flex-start' : 'center',
                             textAlign: isNormalRes ? 'left' : 'center'
                           }}>
@@ -455,9 +453,20 @@ function AdminReservations() {
                       <div style={{ background: '#f0f9ff', padding: '10px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #bae6fd' }}>
                         <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#0369a1' }}>📋 予約メニュー</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
-                          {selectedRes.options?.services?.map((s, idx) => (
-                            <span key={idx} style={{ background: '#2563eb', color: '#fff', padding: '2px 8px', borderRadius: '15px', fontSize: '0.7rem', fontWeight: 'bold' }}>{s.name}</span>
-                          )) || <span style={{fontSize:'0.75rem', color:'#94a3b8'}}>メニュー情報なし</span>}
+                          {/* 🆕 複数名データ（people）と 従来データ（services）の両方に対応 */}
+                          {selectedRes.options?.people ? (
+                            selectedRes.options.people.map((person, pIdx) => (
+                              person.services.map((s, sIdx) => (
+                                <span key={`${pIdx}-${sIdx}`} style={{ background: '#2563eb', color: '#fff', padding: '2px 8px', borderRadius: '15px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                                  {selectedRes.options.people.length > 1 ? `(${pIdx + 1})${s.name}` : s.name}
+                                </span>
+                              ))
+                            ))
+                          ) : (
+                            selectedRes.options?.services?.map((s, idx) => (
+                              <span key={idx} style={{ background: '#2563eb', color: '#fff', padding: '2px 8px', borderRadius: '15px', fontSize: '0.7rem', fontWeight: 'bold' }}>{s.name}</span>
+                            )) || <span style={{fontSize:'0.75rem', color:'#94a3b8'}}>メニュー情報なし</span>
+                          )}
                         </div>
                       </div>
                     )}
@@ -484,7 +493,12 @@ function AdminReservations() {
                   {!selectedRes?.isRegularHoliday && (showCustomerModal ? customerFullHistory : customerHistory).map(h => (
                     <div key={h.id} style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
                       <div style={{ fontWeight: 'bold' }}>{new Date(h.start_time).toLocaleDateString('ja-JP')}</div>
-                      <div style={{ color: '#2563eb', marginTop: '2px' }}>{h.options?.services?.map(s => s.name).join(', ')}</div>
+                      <div style={{ color: '#2563eb', marginTop: '2px' }}>
+                        {/* 🆕 履歴表示でも複数名データに対応 */}
+                        {h.options?.people 
+                          ? h.options.people.map(p => p.services.map(s => s.name).join(', ')).join(' / ')
+                          : h.options?.services?.map(s => s.name).join(', ') || 'メニュー情報なし'}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+// 🆕 修正：通知専用の supabaseAnon をインポートに追加
+import { supabase, supabaseAnon } from '../supabaseClient';
 
 function ConfirmReservation() {
   const { shopId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 🆕 前の画面から引き継いだデータ (selectedServicesからpeopleに変更)
+  // 前の画面から引き継いだデータ
   const { people, totalSlotsNeeded, date, time, adminDate, adminTime, lineUser } = location.state || {};
   const isAdminEntry = !!adminDate; 
 
@@ -37,7 +38,6 @@ function ConfirmReservation() {
     if (data) setShop(data);
   };
 
-  // 🆕 名前入力時のリアルタイム検索ロジック
   useEffect(() => {
     const searchCustomers = async () => {
       if (!customerName || customerName.length < 1 || selectedCustomerId) {
@@ -56,7 +56,6 @@ function ConfirmReservation() {
     return () => clearTimeout(timer);
   }, [customerName, selectedCustomerId]);
 
-  // 🆕 候補から顧客を選択した時の処理
   const handleSelectCustomer = (c) => {
     setCustomerName(c.name);
     setCustomerPhone(c.phone || '');
@@ -66,21 +65,13 @@ function ConfirmReservation() {
   };
 
   const handleReserve = async () => {
-    // --- 💡 1. バリデーション ---
-    if (!customerName) {
-      alert('お客様名を入力してください');
-      return;
-    }
+    if (!customerName) { alert('お客様名を入力してください'); return; }
     if (!isAdminEntry) {
-      if (!customerPhone || !customerEmail) {
-        alert('電話番号とメールアドレスを入力してください');
-        return;
-      }
+      if (!customerPhone || !customerEmail) { alert('電話番号とメールアドレスを入力してください'); return; }
     }
 
     setIsSubmitting(true);
 
-    // --- 💡 2. 日時・時間の計算 ---
     const targetDate = adminDate || date;
     const targetTime = adminTime || time;
     const startDateTime = new Date(`${targetDate}T${targetTime}`);
@@ -93,7 +84,6 @@ function ConfirmReservation() {
     const cancelUrl = `${window.location.origin}/cancel?token=${cancelToken}`;
 
     try {
-      // --- 🆕 💡 3. 顧客テーブル (customers) の自動更新・登録 ---
       const { data: existingCust } = await supabase
         .from('customers')
         .select('id, total_visits')
@@ -125,10 +115,9 @@ function ConfirmReservation() {
           }]);
       }
 
-      // 🆕 💡 全員のメニュー名を結合してラベルを作成 (通知用)
+      // 全員のメニュー名を結合してラベルを作成
       const menuLabel = people.map((p, i) => `${i + 1}人目: ${p.services.map(s => s.name).join(', ')}`).join(' / ');
 
-      // --- 💡 4. 予約データをテーブルに保存 ---
       const { error: dbError } = await supabase.from('reservations').insert([
         {
           shop_id: shopId,
@@ -143,16 +132,16 @@ function ConfirmReservation() {
           res_type: 'normal',
           line_user_id: lineUser?.userId || null,
           cancel_token: cancelToken,
-          // 🆕 複数名データをまるごと保存
-          options: { people: people }
+          options: { people: people } // 複数名データをまるごと保存
         }
       ]);
 
       if (dbError) throw dbError;
 
-      // --- 💡 5. 通知処理 ---
+      // --- ✉️ 通知処理 (CORSエラー回避版) ---
       if (!isAdminEntry) {
-        await supabase.functions.invoke('send-reservation-email', {
+        // 🆕 supabase ではなく supabaseAnon を使うことで x-shop-id ヘッダーを送らずに済みます
+        await supabaseAnon.functions.invoke('send-reservation-email', {
           body: {
             shopId, customerEmail, customerName, shopName: shop.business_name,
             shopEmail: shop.email_contact, startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
@@ -163,7 +152,6 @@ function ConfirmReservation() {
       }
 
       alert(isAdminEntry ? '爆速ねじ込み完了！' : '予約が完了しました！');
-
       if (isAdminEntry) {
         navigate(`/admin/${shopId}/reservations?date=${targetDate}`);
       } else {
@@ -191,7 +179,6 @@ function ConfirmReservation() {
         {isAdminEntry ? '⚡ 店舗ねじ込み予約（入力短縮）' : '予約内容の確認'}
       </h2>
 
-      {/* LINEプロフィール表示 */}
       {lineUser && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', padding: '12px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
           <img src={lineUser.pictureUrl} style={{ width: '40px', height: '40px', borderRadius: '50%' }} alt="LINE" />
@@ -199,7 +186,7 @@ function ConfirmReservation() {
         </div>
       )}
 
-      {/* 🆕 予約内容カード (複数名対応の二重ループ) */}
+      {/* 予約内容カード (複数名対応) */}
       <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '15px', marginBottom: '25px', border: '1px solid #e2e8f0' }}>
         <p style={{ margin: '0 0 12px 0' }}>📅 <b>日時：</b> {displayDate} {displayTime} 〜</p>
         <p style={{ margin: '0 0 8px 0' }}>📋 <b>選択メニュー：</b></p>
@@ -213,18 +200,10 @@ function ConfirmReservation() {
         </div>
       </div>
 
-      {/* 入力フォーム */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div style={{ position: 'relative' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>お客様名 (必須)</label>
-          <input 
-            type="text" 
-            value={customerName} 
-            onChange={(e) => { setCustomerName(e.target.value); setSelectedCustomerId(null); }} 
-            placeholder="お名前を入力" 
-            style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} 
-          />
-          {/* 🆕 顧客サジェスト表示 */}
+          <input type="text" value={customerName} onChange={(e) => { setCustomerName(e.target.value); setSelectedCustomerId(null); }} placeholder="お名前を入力" style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} />
           {suggestedCustomers.length > 0 && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '10px', zIndex: 100, border: '1px solid #eee' }}>
               {suggestedCustomers.map(c => (
@@ -249,12 +228,7 @@ function ConfirmReservation() {
           </>
         )}
 
-        <button onClick={handleReserve} disabled={isSubmitting} 
-          style={{ 
-            marginTop: '10px', padding: '18px', 
-            background: isSubmitting ? '#94a3b8' : (isAdminEntry ? '#e11d48' : '#2563eb'), 
-            color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer'
-          }}>
+        <button onClick={handleReserve} disabled={isSubmitting} style={{ marginTop: '10px', padding: '18px', background: isSubmitting ? '#94a3b8' : (isAdminEntry ? '#e11d48' : '#2563eb'), color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer' }}>
           {isSubmitting ? '処理中...' : (isAdminEntry ? '🚀 ねじ込んで名簿登録' : '予約を確定する')}
         </button>
       </div>
