@@ -109,6 +109,50 @@ function AdminReservations() {
     else { alert('名簿情報を更新しました'); setShowCustomerModal(false); setShowDetailModal(false); fetchData(); }
   };
 
+  // --- 🆕 【強化版】予約消去 ＆ 名簿自動クリーニング ---
+  const deleteRes = async (id) => {
+    const isBlock = selectedRes?.res_type === 'blocked';
+    const msg = isBlock ? 'このブロックを解除して予約を「可能」に戻しますか？' : 'この予約データを消去して予約を「可能」に戻しますか？';
+    
+    if (window.confirm(msg)) {
+      const { customer_name, res_type } = selectedRes; // 削除前に情報を控える
+
+      // 1. 予約を削除
+      const { error: deleteError } = await supabase.from('reservations').delete().eq('id', id);
+      
+      if (deleteError) {
+        alert('削除に失敗しました: ' + deleteError.message);
+        return;
+      }
+
+      // 2. 実予約(normal)だった場合、顧客名簿の整理を行う
+      if (res_type === 'normal') {
+        // そのお客様の残りの予約数をカウント
+        const { count } = await supabase
+          .from('reservations')
+          .select('*', { count: 'exact', head: true })
+          .eq('shop_id', shopId)
+          .eq('customer_name', customer_name);
+
+        if (count === 0) {
+          // 他に予約が1件もなければ名簿から完全に削除（テストデータの掃除）
+          await supabase.from('customers').delete().eq('shop_id', shopId).eq('name', customer_name);
+        } else {
+          // 他に予約があるなら、来店回数を-1調整する
+          const { data: cust } = await supabase.from('customers').select('id, total_visits').eq('shop_id', shopId).eq('name', customer_name).maybeSingle();
+          if (cust) {
+            await supabase.from('customers')
+              .update({ total_visits: Math.max(0, (cust.total_visits || 1) - 1) })
+              .eq('id', cust.id);
+          }
+        }
+      }
+
+      setShowDetailModal(false);
+      fetchData();
+    }
+  };
+
   const checkIsRegularHoliday = (date) => {
     if (!shop?.business_hours?.regular_holidays) return false;
     const holidays = shop.business_hours.regular_holidays;
@@ -173,7 +217,6 @@ function AdminReservations() {
 
     const currentSlotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
     
-    // 1. 実予約（normal/blocked）を最優先。
     const matches = reservations.filter(r => {
       const start = new Date(r.start_time).getTime();
       const end = new Date(r.end_time).getTime();
@@ -185,11 +228,9 @@ function AdminReservations() {
       return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
     }
 
-    // 2. パズル判定ロジックの計算
     const buffer = shop?.buffer_preparation_min || 0;
     const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal');
 
-    // ｲﾝﾀｰﾊﾞﾙ判定
     const isInBuffer = dayRes.some(r => {
       const resEnd = new Date(r.end_time).getTime();
       return currentSlotStart >= resEnd && currentSlotStart < (resEnd + buffer * 60 * 1000);
@@ -201,7 +242,6 @@ function AdminReservations() {
       const gapCandidates = [];
 
       dayRes.forEach(r => {
-        // 後ろパズル：特等席の次（2マス目）をブロック候補
         const resEnd = new Date(r.end_time).getTime();
         const earliest = resEnd + (buffer * 60 * 1000);
         const nextPrime = timeSlots.find(s => {
@@ -214,24 +254,16 @@ function AdminReservations() {
           const pIdx = timeSlots.indexOf(nextPrime);
           if (pIdx + 1 < timeSlots.length) gapCandidates.push(timeSlots[pIdx + 1]);
         }
-        // 前パズル：3マス前をブロック候補
         const rStartStr = new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
         const startIdx = timeSlots.indexOf(rStartStr);
         if (startIdx >= 3) gapCandidates.push(timeSlots[startIdx - 3]);
       });
 
-      // 死守：特等席（primeSeats）に指定されている場合はブロックを回避
       if (gapCandidates.includes(timeStr) && !primeSeats.includes(timeStr)) {
         return { res_type: 'system_blocked', customer_name: '－', isGap: true };
       }
     }
     return null;
-  };
-
-  const deleteRes = async (id) => {
-    const isBlock = selectedRes?.res_type === 'blocked';
-    const msg = isBlock ? 'このブロックを解除して予約を「可能」に戻しますか？' : 'この予約データを消去して予約を「可能」に戻しますか？';
-    if (window.confirm(msg)) { await supabase.from('reservations').delete().eq('id', id); setShowDetailModal(false); fetchData(); }
   };
 
   const handleBlockTime = async () => {
@@ -394,9 +426,7 @@ function AdminReservations() {
                     const dStr = getJapanDateStr(date); const res = getStatusAt(dStr, time);
                     const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === time;
                     let bgColor = '#fff'; let borderColor = '#f1f5f9'; let textColor = '#cbd5e1';
-                    
                     const isNormalRes = res && res.res_type === 'normal';
-
                     if (res) {
                       if (res.isRegularHoliday) { bgColor = '#f3f4f6'; textColor = '#94a3b8'; }
                       else if (res.res_type === 'blocked') { bgColor = '#fee2e2'; textColor = '#ef4444'; borderColor = '#ef4444'; }
@@ -407,11 +437,7 @@ function AdminReservations() {
                     return (
                       <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                         {res && (
-                          <div style={{ 
-                            position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                            alignItems: isNormalRes ? 'flex-start' : 'center',
-                            textAlign: isNormalRes ? 'left' : 'center'
-                          }}>
+                          <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: isNormalRes ? 'flex-start' : 'center', textAlign: isNormalRes ? 'left' : 'center' }}>
                             {res.res_type === 'blocked' ? (res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')) : (res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・'))}
                           </div>
                         )}
@@ -453,7 +479,6 @@ function AdminReservations() {
                       <div style={{ background: '#f0f9ff', padding: '10px', borderRadius: '8px', marginBottom: '15px', border: '1px solid #bae6fd' }}>
                         <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#0369a1' }}>📋 予約メニュー</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
-                          {/* 🆕 複数名データ（people）と 従来データ（services）の両方に対応 */}
                           {selectedRes.options?.people ? (
                             selectedRes.options.people.map((person, pIdx) => (
                               person.services.map((s, sIdx) => (
@@ -481,7 +506,7 @@ function AdminReservations() {
                     <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
                     {showDetailModal && selectedRes && (
                       <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? '#2563eb' : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
-                        {selectedRes.res_type === 'blocked' ? (selectedRes.customer_name === '臨時休業' ? '🔓 休みを解除' : '🔓 ブロック解除') : '予約を消去'}
+                        {selectedRes.res_type === 'blocked' ? (selectedRes.customer_name === '臨時休業' ? '🔓 休みを解除' : '🔓 ブロック解除') : '予約を消去 ＆ 名簿掃除'}
                       </button>
                     )}
                   </div>
@@ -494,7 +519,6 @@ function AdminReservations() {
                     <div key={h.id} style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
                       <div style={{ fontWeight: 'bold' }}>{new Date(h.start_time).toLocaleDateString('ja-JP')}</div>
                       <div style={{ color: '#2563eb', marginTop: '2px' }}>
-                        {/* 🆕 履歴表示でも複数名データに対応 */}
                         {h.options?.people 
                           ? h.options.people.map(p => p.services.map(s => s.name).join(', ')).join(' / ')
                           : h.options?.services?.map(s => s.name).join(', ') || 'メニュー情報なし'}
@@ -505,12 +529,7 @@ function AdminReservations() {
               </div>
             </div>
             {!isPC && (
-              <button 
-                onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} 
-                style={{ position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', border: 'none', padding: '12px 40px', borderRadius: '50px', fontWeight: 'bold', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 4000 }}
-              >
-                閉じる ✕
-              </button>
+              <button onClick={() => { setShowCustomerModal(false); setShowDetailModal(false); }} style={{ position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', border: 'none', padding: '12px 40px', borderRadius: '50px', fontWeight: 'bold', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 4000 }}>閉じる ✕</button>
             )}
           </div>
         </div>
@@ -530,12 +549,7 @@ function AdminReservations() {
               <button onClick={() => setShowMenuModal(false)} style={{ padding: '15px', border: 'none', background: 'none', color: '#94a3b8' }}>キャンセル</button>
             </div>
             {!isPC && (
-              <button 
-                onClick={() => setShowMenuModal(false)} 
-                style={{ position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', border: 'none', padding: '12px 40px', borderRadius: '50px', fontWeight: 'bold', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 4000 }}
-              >
-                閉じる ✕
-              </button>
+              <button onClick={() => setShowMenuModal(false)} style={{ position: 'fixed', bottom: '30px', left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', border: 'none', padding: '12px 40px', borderRadius: '50px', fontWeight: 'bold', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', zIndex: 4000 }}>閉じる ✕</button>
             )}
           </div>
         </div>
