@@ -216,13 +216,17 @@ function ConfirmReservation() {
         </div>
       )}
 
+      {/* 予約内容カード (複数名対応) */}
       <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '15px', marginBottom: '25px', border: '1px solid #e2e8f0' }}>
         <p style={{ margin: '0 0 12px 0' }}>📅 <b>日時：</b> {displayDate} {displayTime} 〜</p>
         <p style={{ margin: '0 0 8px 0' }}>📋 <b>選択メニュー：</b></p>
         <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
           {people && people.map((person, idx) => (
             <div key={idx} style={{ marginBottom: idx < people.length - 1 ? '10px' : 0, paddingBottom: idx < people.length - 1 ? '10px' : 0, borderBottom: idx < people.length - 1 ? '1px dashed #eee' : 'none' }}>
-              <div style={{ fontWeight: 'bold', color: '#2563eb', marginBottom: '4px' }}>{idx + 1}人目</div>
+              {/* 🆕 複数名の時だけ「1人目」などを表示する条件分岐 */}
+              {people.length > 1 && (
+                <div style={{ fontWeight: 'bold', color: '#2563eb', marginBottom: '4px' }}>{idx + 1}人目</div>
+              )}
               {person.services.map(s => <div key={s.id}>・{s.name}</div>)}
             </div>
           ))}

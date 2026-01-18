@@ -37,12 +37,12 @@ Deno.serve(async (req) => {
     // 💡 受取パラメーター
     const payload = await req.json();
     const { 
-      type,               // 💡 'welcome' かどうかを判定
+      type,               // 'welcome' or 'remind_all' or undefined (normal)
       shopId,             // 共通
       customerEmail,      // 予約用
       customerName,       // 予約用
       shopName,           // 共通
-      startTime,          // 予約用
+      startTime,           // 予約用
       services,           // 予約用
       shopEmail,          // 予約用
       cancelUrl,          // 予約用
@@ -65,6 +65,81 @@ Deno.serve(async (req) => {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // ==========================================
+    // 🆕 パターンC：一斉リマインド送信 (毎日定期実行用)
+    // ==========================================
+    if (type === 'remind_all') {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dateStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
+
+      // 明日の予約を取得（店舗情報も結合）
+      const { data: resList, error: resError } = await supabaseAdmin
+        .from('reservations')
+        .select('*, profiles(*)')
+        .gte('start_time', `${dateStr}T00:00:00`)
+        .lte('start_time', `${dateStr}T23:59:59`)
+        .eq('remind_sent', false)
+        .eq('res_type', 'normal');
+
+      if (resError) throw resError;
+      if (!resList || resList.length === 0) {
+        return new Response(JSON.stringify({ message: 'リマインド対象なし' }), { headers: corsHeaders });
+      }
+
+      const report = [];
+
+      for (const res of resList) {
+        const shop = res.profiles;
+        const resTime = new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        
+        // 複数名対応のメニュー作成
+        const menuDisplay = res.options?.people 
+          ? res.options.people.map((p: any, i: number) => `${i + 1}人目: ${p.services.map((s: any) => s.name).join(', ')}`).join('<br>')
+          : res.customer_name;
+
+        // 1. 【標準】リマインドメール送信
+        const mailRes = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
+          body: JSON.stringify({
+            from: `${shop.business_name} <infec@snipsnap.biz>`,
+            to: [res.customer_email],
+            subject: `【リマインド】明日のお越しをお待ちしております（${shop.business_name}）`,
+            html: `
+              <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 25px; border-radius: 12px;">
+                <h2 style="color: #2563eb;">明日、ご来店をお待ちしております</h2>
+                <p>${res.customer_name} 様</p>
+                <p>いつもご利用ありがとうございます。ご予約日の前日となりましたので、念のためご確認のご連絡です。</p>
+                <div style="background: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
+                  <p style="margin: 5px 0;">📅 <strong>日時:</strong> ${dateStr.replace(/-/g, '/')} ${resTime}〜</p>
+                  <p style="margin: 5px 0;">📋 <strong>内容:</strong><br>${menuDisplay}</p>
+                  <p style="margin: 5px 0;">📍 <strong>場所:</strong> ${shop.address || '店舗までお越しください'}</p>
+                </div>
+                <p style="font-size: 0.85rem; color: #64748b;">※キャンセルの場合は、予約確定時にお送りしたメールのリンク、または店舗へお電話にてご連絡ください。</p>
+              </div>
+            `
+          })
+        });
+
+        // 2. 【オプション】リマインドLINE送信
+        let lineOk = false;
+        if (shop.notify_line_remind_enabled && shop.line_channel_access_token && res.line_user_id) {
+          const lineText = `【リマインド】\n明日 ${resTime} よりご予約を承っております。\n\nお名前：${res.customer_name} 様\n店舗：${shop.business_name}\n\nお気をつけてお越しくださいませ！`;
+          lineOk = await safePushToLine(res.line_user_id, lineText, shop.line_channel_access_token, "REMIND");
+        }
+
+        // 送信済みフラグを更新
+        await supabaseAdmin.from('reservations').update({ remind_sent: true }).eq('id', res.id);
+        report.push({ id: res.id, email: mailRes.ok, line: lineOk });
+      }
+
+      return new Response(JSON.stringify({ report }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // ==========================================
     // 🚀 パターンA：店主様への歓迎メール ＆ 三土手さんへの通知送信
