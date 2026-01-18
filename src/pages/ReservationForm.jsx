@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+// 🆕 修正：通知専用の supabaseAnon もインポートに追加
+import { supabase, supabaseAnon } from '../supabaseClient';
 // 💡 重要：LINEログイン（LIFF）を操作するためのSDK
 import liff from '@line/liff';
 
@@ -107,16 +108,14 @@ function ReservationForm() {
 
   // 「追加でもう一人」を押した時
   const handleAddPerson = () => {
-    if (people.length >= 3) return; // 最大4名まで（リストに3人＋編集中1人）
+    if (people.length >= 3) return; // 最大4名まで
     
-    // 現在の選択をリストに保存
     setPeople([...people, { 
       services: selectedServices, 
       options: selectedOptions, 
       slots: currentPersonSlots 
     }]);
 
-    // 入力状態をリセット
     setSelectedServices([]);
     setSelectedOptions({});
 
@@ -203,7 +202,6 @@ function ReservationForm() {
 
   const handleNextStep = () => {
     window.scrollTo(0,0);
-    // 💡 移植：全員分のデータを state に乗せて次の画面へ渡す
     const commonState = { 
       people: [...people, { services: selectedServices, options: selectedOptions, slots: currentPersonSlots }],
       totalSlotsNeeded,
@@ -251,7 +249,6 @@ function ReservationForm() {
           </div>
         )}
 
-        {/* 🆕 確定済みの人数リストを表示 */}
         {people.length > 0 && (
           <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
             <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold', marginBottom: '8px' }}>現在の予約内容：</p>
@@ -329,7 +326,7 @@ function ReservationForm() {
             onClick={handleAddPerson}
             style={{ 
               position: 'fixed', bottom: '100px', right: '15px', zIndex: 999, 
-              writingMode: 'vertical-rl', // 縦書き
+              writingMode: 'vertical-rl',
               background: '#f97316', color: 'white', padding: '15px 8px', 
               borderRadius: '8px 0 0 8px', border: 'none', fontWeight: 'bold', 
               fontSize: '0.85rem', boxShadow: '-4px 4px 12px rgba(0,0,0,0.1)', 

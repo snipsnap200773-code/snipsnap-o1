@@ -7,12 +7,23 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error("Supabaseの接続情報が読み込めません。");
 }
 
-// 🆕 RLS（鉄壁のガード）に対応するための設定を追加
+/**
+ * 🛡️ 1. データベース・ストレージ用クライアント
+ * RLS（鉄壁のガード）に対応するため、リクエストごとに shopId をヘッダーに添えます。
+ * 通常のデータ取得・保存にはこちらを使います。
+ */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
-      // 🛡️ リクエストのたびに、URLに含まれるshopIdなどを自動でヘッダーに添える
+      // URLから shopId を取得して身分証として添える
       'x-shop-id': window.location.pathname.split('/')[2] || '' 
     }
   }
 });
+
+/**
+ * ✉️ 2. 通知・Edge Functions専用クライアント
+ * Edge Functions を呼び出す際、CORSエラー（通信遮断）を回避するために使います。
+ * RLSガード用のカスタムヘッダーを含まない「真っさらな」状態のクライアントです。
+ */
+export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
