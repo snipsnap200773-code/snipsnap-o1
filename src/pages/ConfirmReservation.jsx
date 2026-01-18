@@ -7,8 +7,8 @@ function ConfirmReservation() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 前の画面から引き継いだデータ
-  const { selectedServices, selectedOptions, totalSlotsNeeded, date, time, adminDate, adminTime, lineUser } = location.state || {};
+  // 🆕 前の画面から引き継いだデータ (selectedServicesからpeopleに変更)
+  const { people, totalSlotsNeeded, date, time, adminDate, adminTime, lineUser } = location.state || {};
   const isAdminEntry = !!adminDate; 
 
   const [shop, setShop] = useState(null);
@@ -94,7 +94,6 @@ function ConfirmReservation() {
 
     try {
       // --- 🆕 💡 3. 顧客テーブル (customers) の自動更新・登録 ---
-      // 名前と電話番号（またはLINE ID）で既存客を特定
       const { data: existingCust } = await supabase
         .from('customers')
         .select('id, total_visits')
@@ -103,7 +102,6 @@ function ConfirmReservation() {
         .maybeSingle();
 
       if (existingCust) {
-        // 既存客なら来店回数と最終来店日を更新
         await supabase
           .from('customers')
           .update({
@@ -115,7 +113,6 @@ function ConfirmReservation() {
           })
           .eq('id', existingCust.id);
       } else {
-        // 新規客なら名簿に登録
         await supabase
           .from('customers')
           .insert([{
@@ -128,11 +125,14 @@ function ConfirmReservation() {
           }]);
       }
 
+      // 🆕 💡 全員のメニュー名を結合してラベルを作成 (通知用)
+      const menuLabel = people.map((p, i) => `${i + 1}人目: ${p.services.map(s => s.name).join(', ')}`).join(' / ');
+
       // --- 💡 4. 予約データをテーブルに保存 ---
       const { error: dbError } = await supabase.from('reservations').insert([
         {
           shop_id: shopId,
-          customer_name: customerName, // 死守：(店舗受付)は付けない
+          customer_name: customerName,
           customer_phone: customerPhone || '---',
           customer_email: customerEmail || 'admin@example.com',
           start_at: startDateTime.toISOString(),
@@ -143,7 +143,8 @@ function ConfirmReservation() {
           res_type: 'normal',
           line_user_id: lineUser?.userId || null,
           cancel_token: cancelToken,
-          options: { services: selectedServices, options: selectedOptions }
+          // 🆕 複数名データをまるごと保存
+          options: { people: people }
         }
       ]);
 
@@ -151,7 +152,6 @@ function ConfirmReservation() {
 
       // --- 💡 5. 通知処理 ---
       if (!isAdminEntry) {
-        const menuLabel = selectedServices.map(s => s.name).join(', ');
         await supabase.functions.invoke('send-reservation-email', {
           body: {
             shopId, customerEmail, customerName, shopName: shop.business_name,
@@ -164,12 +164,11 @@ function ConfirmReservation() {
 
       alert(isAdminEntry ? '爆速ねじ込み完了！' : '予約が完了しました！');
 
-if (isAdminEntry) {
-  // 🆕 管理者ねじ込み時は、予約した日付（targetDate）をパラメータに付けて戻る
-  navigate(`/admin/${shopId}/reservations?date=${targetDate}`);
-} else {
-  navigate('/');
-}
+      if (isAdminEntry) {
+        navigate(`/admin/${shopId}/reservations?date=${targetDate}`);
+      } else {
+        navigate('/');
+      }
 
     } catch (err) {
       console.error(err);
@@ -200,12 +199,17 @@ if (isAdminEntry) {
         </div>
       )}
 
-      {/* 予約内容カード */}
+      {/* 🆕 予約内容カード (複数名対応の二重ループ) */}
       <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '15px', marginBottom: '25px', border: '1px solid #e2e8f0' }}>
         <p style={{ margin: '0 0 12px 0' }}>📅 <b>日時：</b> {displayDate} {displayTime} 〜</p>
         <p style={{ margin: '0 0 8px 0' }}>📋 <b>選択メニュー：</b></p>
         <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
-          {selectedServices.map(s => <div key={s.id}>・{s.name}</div>)}
+          {people && people.map((person, idx) => (
+            <div key={idx} style={{ marginBottom: idx < people.length - 1 ? '10px' : 0, paddingBottom: idx < people.length - 1 ? '10px' : 0, borderBottom: idx < people.length - 1 ? '1px dashed #eee' : 'none' }}>
+              <div style={{ fontWeight: 'bold', color: '#2563eb', marginBottom: '4px' }}>{idx + 1}人目</div>
+              {person.services.map(s => <div key={s.id}>・{s.name}</div>)}
+            </div>
+          ))}
         </div>
       </div>
 
