@@ -8,24 +8,28 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 /**
- * 🛡️ 1. データベース・ストレージ用クライアント
+ * 🛡️ 1. メインクライアント（データベース・ストレージ用）
  * RLSガード（x-shop-id）を添えて通信します。
+ * 通常の「名簿保存」「予約取得」などはこちらの supabase を使います。
  */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
+      // URLから shopId を取得して身分証として添える
       'x-shop-id': window.location.pathname.split('/')[2] || '' 
     }
   }
 });
 
 /**
- * ✉️ 2. 通知・Edge Functions専用クライアント
- * CORSエラーを防ぐため、カスタムヘッダーを一切含みません。
- * また、重複警告を防ぐために認証情報の保持（persistSession）をオフにします。
+ * ✉️ 2. 通知専用クライアント（Edge Functions用）
+ * 通知を送る際、CORSエラーを回避するために使います。
+ * auth設定を追加し、メインクライアントと喧嘩しないように完全に隔離しました。
  */
 export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: false // 🆕 重複警告を消すための設定
+    persistSession: false,   // 🆕 ログイン情報をブラウザに保存しない（喧嘩防止）
+    autoRefreshToken: false, // 🆕 自動更新をオフにする
+    detectSessionInUrl: false // 🆕 URLからのセッション検知をオフにする
   }
 });
