@@ -57,6 +57,8 @@ function AdminDashboard() {
   const [officialUrl, setOfficialUrl] = useState('');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('');
   const [notifyLineEnabled, setNotifyLineEnabled] = useState(true);
+  // 🆕 リマインドLINE設定用のState
+  const [notifyLineRemindEnabled, setNotifyLineRemindEnabled] = useState(false);
   const [lineToken, setLineToken] = useState('');
   const [lineAdminId, setLineAdminId] = useState('');
 
@@ -91,7 +93,10 @@ function AdminDashboard() {
       setSlotIntervalMin(data.slot_interval_min || 15); setBufferPreparationMin(data.buffer_preparation_min || 0);
       setMinLeadTimeHours(data.min_lead_time_hours || 0); setAutoFillLogic(data.auto_fill_logic ?? true);
       setImageUrl(data.image_url || ''); setOfficialUrl(data.official_url || ''); setLineOfficialUrl(data.line_official_url || '');
-      setNotifyLineEnabled(data.notify_line_enabled ?? true); setBusinessName(data.business_name || '');
+      setNotifyLineEnabled(data.notify_line_enabled ?? true);
+      // 🆕 データベースからリマインド設定を読み込み
+      setNotifyLineRemindEnabled(data.notify_line_remind_enabled ?? false);
+      setBusinessName(data.business_name || '');
       setBusinessNameKana(data.business_name_kana || ''); setOwnerName(data.owner_name || '');
       setOwnerNameKana(data.owner_name_kana || ''); setBusinessType(data.business_type || '');
       setLineToken(data.line_channel_access_token || ''); setLineAdminId(data.line_admin_user_id || '');
@@ -107,39 +112,20 @@ function AdminDashboard() {
     if (optRes.data) setOptions(optRes.data);
   };
 
-  // 🆕 【修正ロジック】画像が溜まらない「上書き（upsert）」アップロード関数
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    // ファイル名を店舗ID固定にすることで、古い画像が自動的に上書きされます
     const fileExt = file.name.split('.').pop();
     const fileName = `${shopId}-main.${fileExt}`;
-
     showMsg('画像を更新中...');
-
-    // Supabase Storageへアップロード。upsert: true を指定して上書きを許可
-    const { error: uploadError } = await supabase.storage
-      .from('shop-images')
-      .upload(fileName, file, { upsert: true });
-
-    if (uploadError) {
-      alert('アップロード失敗: ' + uploadError.message);
-      return;
-    }
-
-    // 公開URLを取得
-    const { data: { publicUrl } } = supabase.storage
-      .from('shop-images')
-      .getPublicUrl(fileName);
-
-    // 💡 キャッシュ対策：URL末尾にタイムスタンプを付与し、ブラウザに「最新画像」と認識させます
+    const { error: uploadError } = await supabase.storage.from('shop-images').upload(fileName, file, { upsert: true });
+    if (uploadError) { alert('アップロード失敗: ' + uploadError.message); return; }
+    const { data: { publicUrl } } = supabase.storage.from('shop-images').getPublicUrl(fileName);
     const finalUrl = `${publicUrl}?t=${Date.now()}`;
     setImageUrl(finalUrl);
     showMsg('画像を読み込みました。下の「保存」ボタンで確定してください。');
   };
 
-  // 🆕 パスワードハッシュ化に対応した【修正版】認証ロジック
   const handleAuth = (e) => {
     e.preventDefault();
     let isMatch = false;
@@ -150,7 +136,6 @@ function AdminDashboard() {
     if (isMatch) { setIsAuthorized(true); fetchMenuDetails(); } else { alert("パスワードが違います"); }
   };
 
-  // 🆕 パスワード更新関数
   const handleUpdatePassword = async () => {
     if (newPassword.length < 8) { alert("セキュリティのため、パスワードは8文字以上に設定してください。"); return; }
     if (window.confirm("パスワードを更新します。一度更新されると運営者（三土手）もあなたのパスワードを知ることはできなくなります。よろしいですか？")) {
@@ -171,7 +156,10 @@ function AdminDashboard() {
         business_name: businessName, business_name_kana: businessNameKana, phone, email_contact: emailContact, address, description, notes, 
         business_hours: updatedBusinessHours, allow_multiple_services: allowMultiple, max_last_slots: maxLastSlots,
         slot_interval_min: slotIntervalMin, buffer_preparation_min: bufferPreparationMin, min_lead_time_hours: minLeadTimeHours, auto_fill_logic: autoFillLogic,
-        image_url: imageUrl, official_url: officialUrl, line_official_url: lineOfficialUrl, notify_line_enabled: notifyLineEnabled, owner_name: ownerName, owner_name_kana: ownerNameKana,
+        image_url: imageUrl, official_url: officialUrl, line_official_url: lineOfficialUrl, notify_line_enabled: notifyLineEnabled, 
+        // 🆕 リマインド設定をデータベースへ保存
+        notify_line_remind_enabled: notifyLineRemindEnabled,
+        owner_name: ownerName, owner_name_kana: ownerNameKana,
         business_type: businessType, line_channel_access_token: lineToken, line_admin_user_id: lineAdminId
       }).eq('id', shopId);
     if (!error) showMsg('すべての設定を保存しました！'); else alert('保存に失敗しました。');
@@ -238,7 +226,6 @@ function AdminDashboard() {
 
   const copyToClipboard = (text) => { navigator.clipboard.writeText(text); showMsg('コピーしました！'); };
 
-  // 🛡️ --- セキュリティ・アピール付きログイン画面 ---
   if (!isAuthorized) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', fontFamily: 'sans-serif', padding: '20px', boxSizing: 'border-box' }}>
@@ -279,7 +266,7 @@ function AdminDashboard() {
       <div style={{ padding: '15px', boxSizing: 'border-box', width: '100%' }}>
         {message && <div style={{ position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)', width: '90%', padding: '15px', background: '#dcfce7', color: '#166534', borderRadius: '8px', zIndex: 1001, textAlign: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>{message}</div>}
 
-        {/* --- 🛠️ メニュータブ (全ロジック維持) --- */}
+        {/* --- 🛠️ メニュータブ --- */}
         {activeTab === 'menu' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '1px solid #2563eb' }}>
@@ -366,7 +353,7 @@ function AdminDashboard() {
                         <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>▼</button>
                         <button onClick={() => { setEditingServiceId(s.id); setNewServiceName(s.name); setNewServiceSlots(s.slots); setSelectedCategory(s.category); menuFormRef.current?.scrollIntoView({ behavior: 'smooth' }); }} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>✎</button>
                         <button onClick={() => deleteService(s.id)} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>×</button>
-                      </div>                    
+                      </div>                     
                     </div>
                     {activeServiceForOptions?.id === s.id && (
                       <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
@@ -399,7 +386,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- ⏰ 営業時間・定休日タブ (全ロジック維持) --- */}
+        {/* --- ⏰ 営業時間・定休日タブ --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
@@ -449,7 +436,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- 🏪 店舗情報タブ (アップロード機能統合) --- */}
+        {/* --- 🏪 店舗情報タブ --- */}
         {activeTab === 'info' && (
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ ...cardStyle, padding: '20px' }}>
@@ -463,7 +450,6 @@ function AdminDashboard() {
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィール</h3>
               
-              {/* 🆕 【統合】スマホ撮影・自動上書きアップロードセクション */}
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像（推奨 1:1）</label>
               <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
                 {imageUrl ? (
@@ -488,19 +474,34 @@ function AdminDashboard() {
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>業種</label>
               <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}><option value="美容室・理容室">美容室・理容室</option><option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option><option value="エステ・リラク">エステ・リラク</option><option value="整体・接骨院">整体・接骨院</option><option value="飲食店">飲食店</option><option value="その他">その他</option></select>
               
-              {/* URL入力欄も利便性のために維持します */}
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗画像URL</label>
               <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="https://..." />
               
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>メール</label><input type="email" value={emailContact} onChange={(e) => setEmailContact(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>注意事項</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} />
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗紹介文（ポータルサイト用）</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, minHeight: '80px', marginBottom: '15px' }} placeholder="お店のこだわりや特徴を入力してください" />
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>注意事項（予約画面用）</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} />
             </section>
+
             <section style={{ ...cardStyle, border: '1px solid #00b900' }}>
               <h3 style={{ marginTop: 0, color: '#00b900' }}>💬 LINE公式アカウント連携</h3>
               <div style={{ marginTop: '10px', padding: '15px', background: '#f0fdf4', borderRadius: '12px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}><input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} /><span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 LINE通知を有効にする</span></label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                  <input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} />
+                  <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 新着予約のLINE通知を有効にする</span>
+                </label>
+
+                {/* 🆕 リマインドLINEチェック項目の追加 */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', padding: '10px', background: '#fff', borderRadius: '8px', border: '1px dashed #00b900' }}>
+                  <input type="checkbox" checked={notifyLineRemindEnabled} onChange={(e) => setNotifyLineRemindEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} />
+                  <div>
+                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>⏰ リマインドLINEを送る</span>
+                    <span style={{ fontSize: '0.7rem', color: '#059669', display: 'block' }}>※24時間前に自動送信します（有料版機能）</span>
+                  </div>
+                </label>
+
                 <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d' }}>Access Token</label><input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} style={inputStyle} />
                 <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d', marginTop: '10px', display: 'block' }}>Admin User ID</label><input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} style={inputStyle} />
               </div>
@@ -508,7 +509,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- 🔒 安全設定タブ (全ロジック維持) --- */}
+        {/* --- 🔒 安全設定タブ --- */}
         {activeTab === 'security' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
