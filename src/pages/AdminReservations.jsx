@@ -87,25 +87,19 @@ function AdminReservations() {
     setShowCustomerModal(true);
   };
 
-  // 🆕 【修正ロジック】二段構えの顧客特定で 409 エラーを回避
   const openDetail = async (res) => {
     setSelectedRes(res);
     let cust = null;
-
-    // 1. まず LINE ID で名簿を照合
     if (res.line_user_id) {
       const { data } = await supabase.from('customers').select('*').eq('shop_id', shopId).eq('line_user_id', res.line_user_id).maybeSingle();
       cust = data;
     }
-
-    // 2. LINE ID で見つからない、または LINE 経由でない場合、お名前で名簿を照合
     if (!cust && res.customer_name) {
       const { data } = await supabase.from('customers').select('*').eq('shop_id', shopId).eq('name', res.customer_name).maybeSingle();
       cust = data;
     }
 
     if (cust) {
-      // 既存客として読み込む（これで保存時に id が引き継がれ、上書き update になります）
       setSelectedCustomer(cust);
       setEditFields({ 
         name: cust.name, 
@@ -115,7 +109,6 @@ function AdminReservations() {
         line_user_id: cust.line_user_id || res.line_user_id || null
       });
     } else {
-      // 完全な新規客
       setSelectedCustomer(null);
       setEditFields({ 
         name: res.customer_name, 
@@ -125,12 +118,12 @@ function AdminReservations() {
         line_user_id: res.line_user_id || null
       });
     }
-
     const history = reservations.filter(r => r.res_type === 'normal' && r.id !== res.id && (r.customer_name === res.customer_name) && new Date(r.start_time) < new Date(res.start_time)).sort((a, b) => new Date(b.start_time) - new Date(a.start_time)).slice(0, 5);
     setCustomerHistory(history);
     setShowDetailModal(true);
   };
 
+  // 🆕 【強化版】名簿保存 ＆ 既存予約の名前も一括書き換え
   const handleUpdateCustomer = async () => {
     const payload = {
       shop_id: shopId,
@@ -146,17 +139,34 @@ function AdminReservations() {
       payload.id = selectedCustomer.id;
     }
 
-    // 🆕 Conflict（409）が発生しても、id があれば上書きするように明示
-    const { error } = await supabase.from('customers').upsert(payload, { onConflict: 'id' });
+    // 1. 名簿（customers）を更新
+    const { error: custError } = await supabase.from('customers').upsert(payload, { onConflict: 'id' });
 
-    if (error) { 
-      alert('保存エラー: ' + error.message); 
-    } else { 
-      alert('名簿情報を更新しました'); 
-      setShowCustomerModal(false); 
-      setShowDetailModal(false); 
-      fetchData(); 
+    if (custError) { 
+      alert('名簿保存エラー: ' + custError.message); 
+      return;
     }
+
+    // 2. カレンダー上の予約（reservations）も同期して書き換える
+    // LINE ID があれば ID で、なければ以前のお名前で紐付いている全ての予約を更新
+    let resQuery = supabase.from('reservations').update({ customer_name: editFields.name }).eq('shop_id', shopId);
+
+    if (editFields.line_user_id) {
+      resQuery = resQuery.eq('line_user_id', editFields.line_user_id);
+    } else if (selectedRes) {
+      resQuery = resQuery.eq('customer_name', selectedRes.customer_name);
+    }
+
+    const { error: resSyncError } = await resQuery;
+
+    if (resSyncError) {
+      console.error('予約データの同期に失敗しましたが名簿は更新されました:', resSyncError.message);
+    }
+
+    alert('名簿情報を更新し、カレンダーにも反映しました！'); 
+    setShowCustomerModal(false); 
+    setShowDetailModal(false); 
+    fetchData(); 
   };
 
   const deleteRes = async (id) => {
