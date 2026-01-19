@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom'; // 👈 カテゴリ移動に必要
 import { Scissors, Activity, Sparkles, Heart, ChevronRight, Search } from 'lucide-react';
 
 const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // 1. スワイプ用画像（将来的にはDBから取得）
+  // 1. スワイプ用画像データ
   const topics = [
     { 
       id: 1, 
@@ -50,7 +51,7 @@ const Home = () => {
         ))}
       </section>
 
-      {/* 🔍 検索バー（ETCサイト風のアクセント） */}
+      {/* 🔍 検索バー */}
       <div className="max-w-4xl mx-auto px-4 -mt-8 relative z-10">
         <div className="bg-white p-2 rounded-full shadow-xl flex items-center border border-slate-200">
           <div className="flex-1 flex items-center px-4 gap-2">
@@ -69,7 +70,7 @@ const Home = () => {
 
       <div className="max-w-5xl mx-auto px-4 py-12">
         
-        {/* 2. インフォメーション（ETCサイトの構成をオマージュ） */}
+        {/* 2. インフォメーション */}
         <section className="mb-12 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="bg-slate-800 text-white px-6 py-3 flex justify-between items-center">
             <span className="text-sm font-bold tracking-wider">インフォメーション</span>
@@ -78,8 +79,7 @@ const Home = () => {
           <div className="divide-y divide-slate-100">
             {[
               { date: "2026.01.19", tag: "新店", title: "町田駅徒歩5分に整体サロン『ほぐし処』がオープン！" },
-              { date: "2026.01.15", tag: "重要", title: "【ワンプレ】システムメンテナンスによる一部サービス停止のお知らせ" },
-              { date: "2026.01.10", tag: "注目", title: "美容室『One Hair』が月間予約数No.1に輝きました" }
+              { date: "2026.01.15", tag: "重要", title: "【ワンプレ】システムメンテナンスによる一部サービス停止のお知らせ" }
             ].map((news, i) => (
               <div key={i} className="p-4 flex flex-col md:flex-row gap-2 md:gap-6 hover:bg-slate-50 transition cursor-pointer">
                 <div className="flex gap-3 items-center min-w-[150px]">
@@ -96,7 +96,7 @@ const Home = () => {
           </div>
         </section>
 
-        {/* 3. カテゴリタイル（ワンコン・スタイル） */}
+        {/* 3. カテゴリタイル（Linkタグに修正済み） */}
         <section>
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-xl font-extrabold flex items-center gap-3">
@@ -106,13 +106,14 @@ const Home = () => {
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { name: "理容・美容室", icon: <Scissors size={32} />, color: "border-blue-100 hover:bg-blue-50 text-blue-600" },
-              { name: "整体・接骨院", icon: <Activity size={32} />, color: "border-green-100 hover:bg-green-50 text-green-600" },
-              { name: "ネイル・アイ", icon: <Sparkles size={32} />, color: "border-pink-100 hover:bg-pink-50 text-pink-600" },
-              { name: "エステ・癒やし", icon: <Heart size={32} />, color: "border-purple-100 hover:bg-purple-50 text-purple-600" }
+              { id: 'beauty', name: "理容・美容室", icon: <Scissors size={32} />, color: "border-blue-100 hover:bg-blue-50 text-blue-600" },
+              { id: 'health', name: "整体・接骨院", icon: <Activity size={32} />, color: "border-green-100 hover:bg-green-50 text-green-600" },
+              { id: 'nail', name: "ネイル・アイ", icon: <Sparkles size={32} />, color: "border-pink-100 hover:bg-pink-50 text-pink-600" },
+              { id: 'esthe', name: "エステ・癒やし", icon: <Heart size={32} />, color: "border-purple-100 hover:bg-purple-50 text-purple-600" }
             ].map((cat, i) => (
-              <button 
+              <Link 
                 key={i} 
+                to={`/category/${cat.id}`}
                 className={`bg-white border-2 ${cat.color} p-8 rounded-3xl flex flex-col items-center justify-center gap-4 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-2 group`}
               >
                 <div className="transform group-hover:scale-110 transition-transform duration-300">
@@ -120,7 +121,7 @@ const Home = () => {
                 </div>
                 <span className="font-extrabold text-slate-700 tracking-tighter">{cat.name}</span>
                 <div className="w-8 h-1 bg-slate-200 group-hover:w-12 group-hover:bg-current transition-all"></div>
-              </button>
+              </Link>
             ))}
           </div>
         </section>
