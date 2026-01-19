@@ -28,122 +28,115 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20">
       
-      {/* 1. ヘッダー：背景は白、下線は太く、中身は最大幅制限で中央寄せ */}
+      {/* 1. ヘッダー：両端配置とアンダーバー */}
       <header className="sticky top-0 z-50 bg-white border-b-4 border-slate-800 shadow-sm">
-        <div className="max-w-[480px] mx-auto px-4 py-3 flex justify-between items-center">
+        <div className="max-w-[480px] mx-auto px-4 py-3 flex justify-between items-end">
           <div className="flex flex-col">
             <h1 className="text-xl font-black tracking-tighter text-slate-800 leading-none">
-              OnePlay <span className="text-xs font-bold ml-1 text-slate-500">ワンプレ</span>
+              OnePlay <span className="text-[10px] font-bold ml-1 text-slate-500">ワンプレ</span>
             </h1>
-            <p className="text-[10px] text-slate-500 font-bold mt-1">総合予約ポータルサイト</p>
+            <p className="text-[9px] text-slate-400 font-bold mt-1 tracking-tighter">総合予約ポータルサイト</p>
           </div>
-          <button className="p-2 hover:bg-slate-100 rounded-md transition">
-            <Menu size={24} className="text-slate-800" />
+          <button className="p-1 hover:bg-slate-100 transition">
+            <Menu size={28} className="text-slate-800" />
           </button>
         </div>
       </header>
 
-      {/* コンテンツエリア：スマホ幅（480px）で中央に固定 */}
-      <div className="max-w-[480px] mx-auto bg-white min-h-screen shadow-x">
+      {/* メインコンテナ（480px制限で中央寄せ） */}
+      <div className="max-w-[480px] mx-auto bg-white min-h-screen shadow-sm">
         
-        {/* 2. ヒーローセクション（自動スワイプ）：高さを抑えて中央配置 */}
-        <section className="relative h-56 w-full overflow-hidden bg-slate-200">
+        {/* 2. ヒーローセクション：高さを極限まで抑えて「次」を見せる */}
+        <section className="relative h-40 w-full overflow-hidden bg-slate-200 border-b border-slate-100">
           {topics.map((topic, index) => (
             <div
               key={topic.id}
               className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
             >
               <img src={topic.url} alt="" className="w-full h-full object-cover" />
-              <div className="absolute inset-x-0 bottom-0 bg-slate-800/80 p-4 text-center">
-                <h2 className="text-white text-sm font-bold tracking-widest">
+              <div className="absolute inset-x-0 bottom-0 bg-slate-800/70 p-2 text-center">
+                <h2 className="text-white text-[11px] font-bold tracking-widest leading-none">
                   {topic.title}
                 </h2>
               </div>
             </div>
           ))}
-          {/* スライドのドット（ETC風） */}
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2">
+          {/* インジケーター */}
+          <div className="absolute top-2 right-2 flex gap-1">
             {topics.map((_, i) => (
-              <div key={i} className={`w-2 h-2 rounded-full ${i === currentSlide ? 'bg-white' : 'bg-white/40'}`} />
+              <div key={i} className={`w-1.5 h-1.5 rounded-full ${i === currentSlide ? 'bg-white' : 'bg-white/30'}`} />
             ))}
           </div>
         </section>
 
-        {/* 🔍 検索バーエリア */}
-        <div className="bg-slate-50 px-4 py-6 border-b border-slate-200">
-          <div className="bg-white p-1 rounded border-2 border-slate-300 flex items-center shadow-inner">
-            <div className="flex-1 flex items-center px-3 gap-2">
-              <Search size={16} className="text-slate-400" />
+        {/* 🔍 検索エリア（コンパクト） */}
+        <div className="bg-slate-50 px-4 py-4 border-b border-slate-200">
+          <div className="bg-white p-0.5 rounded border border-slate-300 flex items-center shadow-inner">
+            <div className="flex-1 flex items-center px-2 gap-2">
+              <Search size={14} className="text-slate-400" />
               <input 
                 type="text" 
-                placeholder="エリア・店名で探す" 
-                className="w-full py-1.5 outline-none text-sm"
+                placeholder="店名、エリア、サービスで検索" 
+                className="w-full py-1.5 outline-none text-[11px]"
               />
             </div>
-            <button className="bg-slate-800 text-white px-4 py-1.5 font-bold text-xs hover:bg-slate-700">
+            <button className="bg-slate-800 text-white px-4 py-1.5 font-bold text-[10px] hover:bg-slate-700 transition">
               検索
             </button>
           </div>
         </div>
 
-        {/* メインコンテンツ */}
-        <div className="px-4 py-8">
+        {/* 3. カテゴリメニュー（チラ見せのためにここに配置） */}
+        <div className="px-4 py-6 bg-white">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-1.5 h-4 bg-slate-800"></span>
+            <h3 className="text-[13px] font-black text-slate-800 uppercase tracking-wider">Category</h3>
+            <span className="text-[9px] text-slate-400 font-bold ml-1">カテゴリから探す</span>
+          </div>
           
-          {/* 3. インフォメーション */}
-          <section className="mb-10">
-            <h3 className="text-sm font-bold bg-slate-100 px-3 py-1 border-l-4 border-slate-800 mb-4 italic">
-              INFORMATION
-            </h3>
-            <div className="border border-slate-200 divide-y divide-slate-100 rounded-sm">
-              {[
-                { date: "2026.01.19", tag: "新店", title: "町田駅前に新しい美容室が追加されました" },
-                { date: "2026.01.15", tag: "重要", title: "システムメンテナンスのお知らせ" }
-              ].map((news, i) => (
-                <div key={i} className="p-3 flex gap-3 hover:bg-slate-50 transition group cursor-pointer">
-                  <div className="flex flex-col gap-1 min-w-[70px]">
-                    <span className="text-[10px] text-slate-400 font-mono">{news.date}</span>
-                    <span className={`text-[9px] w-8 text-center py-0.5 rounded font-bold border ${
-                      news.tag === '重要' ? 'bg-red-600 text-white border-red-600' : 'bg-blue-600 text-white border-blue-600'
-                    }`}>
-                      {news.tag}
-                    </span>
-                  </div>
-                  <span className="text-xs font-bold text-slate-700 group-hover:underline leading-relaxed">
-                    {news.title}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* 4. カテゴリメニュー（ETC風アイコン配置） */}
-          <section>
-            <h3 className="text-sm font-bold bg-slate-100 px-3 py-1 border-l-4 border-slate-800 mb-4 italic">
-              CATEGORY
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { id: 'beauty', name: "理容・美容室", icon: <Scissors size={24} /> },
-                { id: 'health', name: "整体・接骨院", icon: <Activity size={24} /> },
-                { id: 'nail', name: "ネイル・アイ", icon: <Sparkles size={24} /> },
-                { id: 'esthe', name: "エステ・癒やし", icon: <Heart size={24} /> }
-              ].map((cat, i) => (
-                <Link 
-                  key={i} 
-                  to={`/category/${cat.id}`}
-                  className="bg-white border border-slate-200 p-5 flex flex-col items-center gap-2 hover:border-slate-800 hover:shadow-sm transition group rounded-sm"
-                >
+          <div className="grid grid-cols-2 gap-2.5">
+            {[
+              { id: 'beauty', name: "理容・美容室", icon: <Scissors size={22} /> },
+              { id: 'health', name: "整体・接骨院", icon: <Activity size={22} /> },
+              { id: 'nail', name: "ネイル・アイ", icon: <Sparkles size={22} /> },
+              { id: 'esthe', name: "エステ・癒やし", icon: <Heart size={22} /> }
+            ].map((cat, i) => (
+              <Link 
+                key={i} 
+                to={`/category/${cat.id}`}
+                className="bg-white border border-slate-200 p-4 flex items-center justify-between hover:border-slate-800 hover:bg-slate-50 transition group rounded-sm shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+              >
+                <div className="flex flex-col gap-2">
                   <div className="text-slate-400 group-hover:text-slate-800 transition-colors">
                     {cat.icon}
                   </div>
-                  <span className="font-bold text-slate-700 text-[11px]">{cat.name}</span>
-                  <ChevronRight size={12} className="text-slate-300 group-hover:text-slate-800" />
-                </Link>
-              ))}
-            </div>
-          </section>
-
+                  <span className="font-bold text-slate-700 text-[10px] leading-none">{cat.name}</span>
+                </div>
+                <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-800" />
+              </Link>
+            ))}
+          </div>
         </div>
+
+        {/* 4. インフォメーション */}
+        <section className="px-4 py-4 border-t border-slate-100">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="w-1.5 h-4 bg-slate-400"></span>
+            <h3 className="text-[13px] font-black text-slate-400 uppercase tracking-wider">News</h3>
+          </div>
+          <div className="divide-y divide-slate-100 bg-slate-50 rounded-sm border border-slate-100">
+            {[
+              { date: "2026.01.19", tag: "新店", title: "町田駅前に新しい美容室が追加されました" },
+              { date: "2026.01.15", tag: "重要", title: "システムメンテナンスのお知らせ" }
+            ].map((news, i) => (
+              <div key={i} className="p-3 flex gap-3 items-start hover:bg-white transition cursor-pointer">
+                <span className="text-[9px] text-slate-400 font-mono mt-0.5">{news.date}</span>
+                <span className="text-[11px] font-bold text-slate-600 leading-snug">{news.title}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
       </div>
     </div>
   );
