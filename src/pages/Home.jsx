@@ -1,179 +1,132 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import React, { useState, useEffect } from 'react';
+import { Scissors, Activity, Sparkles, Heart, ChevronRight, Search } from 'lucide-react';
 
-function Home() {
-  const [shops, setShops] = useState([]);
+const Home = () => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // 1. スワイプ用画像（将来的にはDBから取得）
+  const topics = [
+    { 
+      id: 1, 
+      url: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=80", 
+      title: "一人ひとりに、最高の体験を。",
+      subtitle: "ワンプレで見つける、あなただけの専属パートナー"
+    },
+    { 
+      id: 2, 
+      url: "https://images.unsplash.com/photo-1512690199101-83749a7448d4?auto=format&fit=crop&w=1200&q=80", 
+      title: "プロの技術を、もっと身近に。",
+      subtitle: "少人数サロンだから叶う、深いおもてなし"
+    },
+  ];
 
   useEffect(() => {
-    // 🆕 1. 最強のスクロールリセット
-    // ブラウザの「スクロール位置復元」よりも後に実行されるよう、わずかな遅延（100ms）を設けて強制実行します
-    const scrollTimer = setTimeout(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-    }, 100);
-
-    const fetchShops = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('is_suspended', false)
-        .not('business_name', 'is', null)
-        .order('business_name_kana', { ascending: true });
-      
-      if (data) {
-        // 🆕 2. 「美容室SnipSnap」をトップに、それ以外をあいうえお順にする並び替え
-        const sortedShops = [...data].sort((a, b) => {
-          if (a.business_name === '美容室SnipSnap') return -1;
-          if (b.business_name === '美容室SnipSnap') return 1;
-          return (a.business_name_kana || "").localeCompare(b.business_name_kana || "", 'ja');
-        });
-        setShops(sortedShops);
-      }
-    };
-
-    fetchShops();
-
-    // クリーンアップ
-    return () => clearTimeout(scrollTimer);
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % topics.length);
+    }, 5000);
+    return () => clearInterval(timer);
   }, []);
 
   return (
-    <div style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', fontFamily: '"Hiragino Sans", "Meiryo", sans-serif', color: '#333' }}>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20">
       
-      <div style={{ background: '#fff', padding: '15px 20px', borderBottom: '2px solid #e60012', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', alignItems: 'center' }}>
-          <h1 style={{ color: '#e60012', fontSize: '1.6rem', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>SnipSnap</h1>
-          <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '10px', marginTop: '5px' }}>予約ポータルサイト</span>
+      {/* 1. ヒーローセクション（自動スワイプ） */}
+      <section className="relative h-72 md:h-[450px] w-full overflow-hidden shadow-lg">
+        {topics.map((topic, index) => (
+          <div
+            key={topic.id}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
+          >
+            <img src={topic.url} alt="" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center px-4">
+              <h2 className="text-white text-3xl md:text-5xl font-bold tracking-widest drop-shadow-lg mb-4">
+                {topic.title}
+              </h2>
+              <p className="text-white/90 text-sm md:text-lg font-light tracking-wider">
+                {topic.subtitle}
+              </p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* 🔍 検索バー（ETCサイト風のアクセント） */}
+      <div className="max-w-4xl mx-auto px-4 -mt-8 relative z-10">
+        <div className="bg-white p-2 rounded-full shadow-xl flex items-center border border-slate-200">
+          <div className="flex-1 flex items-center px-4 gap-2">
+            <Search size={20} className="text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="エリア、店名、サービスで検索..." 
+              className="w-full py-2 outline-none text-sm"
+            />
+          </div>
+          <button className="bg-slate-800 text-white px-8 py-2 rounded-full font-bold text-sm hover:bg-slate-700 transition">
+            検索
+          </button>
         </div>
       </div>
 
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+      <div className="max-w-5xl mx-auto px-4 py-12">
         
-        <div style={{ borderBottom: '1px solid #ddd', paddingBottom: '10px', marginBottom: '20px' }}>
-          <p style={{ fontSize: '0.9rem', color: '#333', margin: 0 }}>
-            現在掲載中の店舗：<b>{shops.length}</b> 件
-          </p>
-        </div>
-        
-        {shops.length === 0 ? (
-          <div style={{ padding: '80px 20px', textAlign: 'center', background: '#fff', borderRadius: '8px' }}>
-            <p style={{ color: '#999' }}>掲載店舗を準備中です。</p>
+        {/* 2. インフォメーション（ETCサイトの構成をオマージュ） */}
+        <section className="mb-12 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-slate-800 text-white px-6 py-3 flex justify-between items-center">
+            <span className="text-sm font-bold tracking-wider">インフォメーション</span>
+            <ChevronRight size={16} />
           </div>
-        ) : (
-          <div style={{ display: 'grid', gap: '20px' }}>
-            {shops.map(shop => (
-              <div key={shop.id} style={{ 
-                background: '#fff', 
-                border: '1px solid #ddd', 
-                display: 'flex', 
-                overflow: 'hidden',
-                borderRadius: '8px',
-                flexDirection: 'column'
-              }}>
-                <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
-                  {/* 左側：店舗画像 */}
-                  <div style={{ 
-                    width: '120px', 
-                    minWidth: '120px', 
-                    background: '#eeeeee',
-                    backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', 
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.7rem',
-                    color: '#ccc'
-                  }}>
-                    {!shop.image_url && 'NO IMAGE'}
-                  </div>
-
-                  {/* 右側：店舗情報 */}
-                  <div style={{ padding: '15px', flex: 1 }}>
-                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', color: '#333', fontWeight: 'bold' }}>
-                      {shop.business_name}
-                    </h3>
-                    <div style={{ fontSize: '0.85rem', color: '#666', lineHeight: '1.5', marginBottom: '10px' }}>
-                      {shop.description || '店舗の詳細情報は準備中です。'}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#999' }}>
-                      📍 {shop.address || '住所未登録'}
-                    </div>
-                  </div>
+          <div className="divide-y divide-slate-100">
+            {[
+              { date: "2026.01.19", tag: "新店", title: "町田駅徒歩5分に整体サロン『ほぐし処』がオープン！" },
+              { date: "2026.01.15", tag: "重要", title: "【ワンプレ】システムメンテナンスによる一部サービス停止のお知らせ" },
+              { date: "2026.01.10", tag: "注目", title: "美容室『One Hair』が月間予約数No.1に輝きました" }
+            ].map((news, i) => (
+              <div key={i} className="p-4 flex flex-col md:flex-row gap-2 md:gap-6 hover:bg-slate-50 transition cursor-pointer">
+                <div className="flex gap-3 items-center min-w-[150px]">
+                  <span className="text-xs text-slate-400 font-mono">{news.date}</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
+                    news.tag === '重要' ? 'border-red-200 bg-red-50 text-red-500' : 'border-blue-200 bg-blue-50 text-blue-500'
+                  }`}>
+                    {news.tag}
+                  </span>
                 </div>
-
-                {/* 3つのボタンエリア */}
-                <div style={{ display: 'flex', padding: '10px', gap: '8px', background: '#fafafa' }}>
-                  
-                  {/* LINEで予約ボタン */}
-                  {shop.line_official_url ? (
-                    <a href={shop.line_official_url} target="_blank" rel="noreferrer" style={{ flex: 1, textDecoration: 'none' }}>
-                      <div style={{ background: '#00b900', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>💬 LINE予約</div>
-                    </a>
-                  ) : (
-                    <div style={{ flex: 1, background: '#e2e8f0', color: '#94a3b8', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'not-allowed' }}>💬 LINE予約</div>
-                  )}
-
-                  {/* メールで予約（SnipSnapシステム内） */}
-                  <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1, textDecoration: 'none' }}>
-                    <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>✉️ メール予約</div>
-                  </Link>
-
-                  {/* オフィシャルサイトボタン */}
-                  {shop.official_url ? (
-                    <a href={shop.official_url} target="_blank" rel="noreferrer" style={{ flex: 1, textDecoration: 'none' }}>
-                      <div style={{ background: '#475569', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>🌐 公式サイト</div>
-                    </a>
-                  ) : (
-                    <div style={{ flex: 1, background: '#e2e8f0', color: '#94a3b8', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'not-allowed' }}>🌐 公式サイト</div>
-                  )}
-
-                </div>
+                <span className="text-sm font-medium text-slate-700">{news.title}</span>
               </div>
             ))}
           </div>
-        )}
+        </section>
 
-        {/* 💡 3. トライアルバナー（文言をベータ版に更新） */}
-        <div style={{ 
-          marginTop: '60px', 
-          padding: '40px 20px', 
-          background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)', 
-          borderRadius: '20px', 
-          textAlign: 'center', 
-          color: '#fff',
-          boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)'
-        }}>
-          <h2 style={{ fontSize: '1.4rem', marginBottom: '10px', fontWeight: '900' }}>🚀 店舗オーナー様へ</h2>
-          <p style={{ fontSize: '0.85rem', opacity: 0.9, marginBottom: '25px', lineHeight: '1.6' }}>
-            SnipSnapで、あなたの店舗専用の予約システムを作りませんか？<br />
-            今ならベータ版を無料で全機能お試しいただけます。
-          </p>
-          <Link to="/trial-registration" style={{ 
-            display: 'inline-block',
-            background: '#fff', 
-            color: '#2563eb', 
-            padding: '14px 35px', 
-            borderRadius: '50px', 
-            textDecoration: 'none', 
-            fontWeight: 'bold',
-            fontSize: '1rem',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-          }}>
-            ベータ版はこちら
-          </Link>
-          <p style={{ fontSize: '0.7rem', marginTop: '15px', opacity: 0.7 }}>
-            ※正式リリース後に自動的に課金されることはありません。
-          </p>
-        </div>
-
-      </div>
-
-      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999', fontSize: '0.7rem' }}>
-        © 2026 SnipSnap 予約ポータル
+        {/* 3. カテゴリタイル（ワンコン・スタイル） */}
+        <section>
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xl font-extrabold flex items-center gap-3">
+              <span className="w-2 h-8 bg-slate-800 rounded-full"></span>
+              カテゴリから探す
+            </h3>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { name: "理容・美容室", icon: <Scissors size={32} />, color: "border-blue-100 hover:bg-blue-50 text-blue-600" },
+              { name: "整体・接骨院", icon: <Activity size={32} />, color: "border-green-100 hover:bg-green-50 text-green-600" },
+              { name: "ネイル・アイ", icon: <Sparkles size={32} />, color: "border-pink-100 hover:bg-pink-50 text-pink-600" },
+              { name: "エステ・癒やし", icon: <Heart size={32} />, color: "border-purple-100 hover:bg-purple-50 text-purple-600" }
+            ].map((cat, i) => (
+              <button 
+                key={i} 
+                className={`bg-white border-2 ${cat.color} p-8 rounded-3xl flex flex-col items-center justify-center gap-4 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-2 group`}
+              >
+                <div className="transform group-hover:scale-110 transition-transform duration-300">
+                  {cat.icon}
+                </div>
+                <span className="font-extrabold text-slate-700 tracking-tighter">{cat.name}</span>
+                <div className="w-8 h-1 bg-slate-200 group-hover:w-12 group-hover:bg-current transition-all"></div>
+              </button>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
-}
+};
 
 export default Home;
