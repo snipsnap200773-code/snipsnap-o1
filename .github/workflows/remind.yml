@@ -1,0 +1,18 @@
+name: Daily Reservation Reminder
+
+on:
+  schedule:
+    # 毎日 日本時間 午前9:00（世界標準時 UTC 00:00）に自動実行
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Actionsタブから手動で実行ボタンを押せるようにする設定
+
+jobs:
+  send_reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Reminder API
+        run: |
+          curl -X POST "${{ secrets.SUPABASE_FUNCTION_URL }}" \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+          -H "Content-Type: application/json" \
+          -d '{"type": "remind_all"}'
