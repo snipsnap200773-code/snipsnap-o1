@@ -9,6 +9,7 @@ import ConfirmReservation from './pages/ConfirmReservation';
 import AdminReservations from './pages/AdminReservations';
 import TrialRegistration from './pages/TrialRegistration';
 import CancelReservation from './pages/CancelReservation';
+import ShopList from './pages/ShopList'; // 👈 新しく追加
 
 function App() {
   return (
@@ -27,7 +28,12 @@ function App() {
           <div className="mobile-container" style={{ margin: '0 auto', maxWidth: '480px' }}>
             <Routes>
               <Route path="/" element={<Home />} />
+              {/* 👈 【新設】カテゴリ別店舗一覧ページ */}
+              <Route path="/category/:categoryId" element={<ShopList />} />
+              
               <Route path="/trial-registration" element={<TrialRegistration />} />
+              {/* 各店舗の個別ページへは /shop/:shopId でアクセス */}
+              <Route path="/shop/:shopId" element={<ReservationForm />} /> 
               <Route path="/shop/:shopId/reserve" element={<ReservationForm />} />
               <Route path="/shop/:shopId/reserve/time" element={<TimeSelection />} />
               <Route path="/shop/:shopId/confirm" element={<ConfirmReservation />} />
