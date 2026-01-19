@@ -10,6 +10,7 @@ import AdminReservations from './pages/AdminReservations';
 import TrialRegistration from './pages/TrialRegistration';
 import CancelReservation from './pages/CancelReservation';
 import ShopList from './pages/ShopList'; // 👈 新しく追加
+import OnePlayPortal from './pages/OnePlayPortal'; // 👈 テスト用に追加
 
 function App() {
   return (
@@ -28,6 +29,10 @@ function App() {
           <div className="mobile-container" style={{ margin: '0 auto', maxWidth: '480px' }}>
             <Routes>
               <Route path="/" element={<Home />} />
+              
+              {/* 🆕 開発・テスト用のポータルページ（現在のHomeからリンクで遷移） */}
+              <Route path="/oneplay-portal" element={<OnePlayPortal />} />
+
               {/* 👈 【新設】カテゴリ別店舗一覧ページ */}
               <Route path="/category/:categoryId" element={<ShopList />} />
               
