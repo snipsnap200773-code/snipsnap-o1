@@ -1,151 +1,167 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Scissors, Activity, Sparkles, Heart, ChevronRight, Search, Menu } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
-const Home = () => {
-  const [currentSlide, setCurrentSlide] = useState(0);
-
-  const topics = [
-    { 
-      id: 1, 
-      url: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=80", 
-      title: "一人ひとりに、最高の体験を。",
-    },
-    { 
-      id: 2, 
-      url: "https://images.unsplash.com/photo-1512690199101-83749a7448d4?auto=format&fit=crop&w=1200&q=80", 
-      title: "プロの技術を、もっと身近に。",
-    },
-  ];
+function Home() {
+  const [shops, setShops] = useState([]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % topics.length);
-    }, 5000);
-    return () => clearInterval(timer);
+    const scrollTimer = setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, 100);
+
+    const fetchShops = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('is_suspended', false)
+        .not('business_name', 'is', null)
+        .order('business_name_kana', { ascending: true });
+      
+      if (data) {
+        const sortedShops = [...data].sort((a, b) => {
+          if (a.business_name === '美容室SnipSnap') return -1;
+          if (b.business_name === '美容室SnipSnap') return 1;
+          return (a.business_name_kana || "").localeCompare(b.business_name_kana || "", 'ja');
+        });
+        setShops(sortedShops);
+      }
+    };
+
+    fetchShops();
+    return () => clearTimeout(scrollTimer);
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans text-slate-800">
+    <div style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', fontFamily: '"Hiragino Sans", "Meiryo", sans-serif', color: '#333' }}>
       
-      {/* 1. ヘッダー：左にロゴ、右に三本線を強制配置 */}
-      <header className="sticky top-0 z-50 bg-white border-b-2 border-slate-800 shadow-sm">
-        <div className="max-w-[480px] mx-auto px-4 py-3 flex justify-between items-center w-full">
-          <div className="flex flex-col">
-            <h1 className="text-xl font-black tracking-tighter text-slate-800 leading-none border-b-2 border-slate-800 pb-1">
-              OnePlay <span className="text-[10px] font-bold text-slate-500">ワンプレ</span>
-            </h1>
-            <p className="text-[8px] text-slate-400 font-bold mt-1 tracking-tighter uppercase">Comprehensive Portal</p>
-          </div>
-          <button className="p-2 active:bg-slate-200 transition">
-            <Menu size={32} className="text-slate-800" />
-          </button>
+      <div style={{ background: '#fff', padding: '15px 20px', borderBottom: '2px solid #e60012', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', alignItems: 'center' }}>
+          <h1 style={{ color: '#e60012', fontSize: '1.6rem', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>SnipSnap</h1>
+          <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '10px', marginTop: '5px' }}>予約ポータルサイト</span>
         </div>
-      </header>
+      </div>
 
-      {/* メインコンテンツ（中央寄せ・白背景） */}
-      <main className="max-w-[480px] mx-auto bg-white min-h-screen">
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+        <div style={{ borderBottom: '1px solid #ddd', paddingBottom: '10px', marginBottom: '20px' }}>
+          <p style={{ fontSize: '0.9rem', color: '#333', margin: 0 }}>
+            現在掲載中の店舗：<b>{shops.length}</b> 件
+          </p>
+        </div>
         
-        {/* 2. ヒーローセクション：高さを抑えて「カテゴリ」をチラ見せさせる */}
-        <section className="relative h-36 w-full overflow-hidden bg-slate-200">
-          {topics.map((topic, index) => (
-            <div
-              key={topic.id}
-              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
-            >
-              <img src={topic.url} alt="" className="w-full h-full object-cover" />
-              <div className="absolute inset-x-0 bottom-0 bg-slate-900/60 p-2 text-center">
-                <h2 className="text-white text-[10px] font-bold tracking-widest uppercase">
-                  {topic.title}
-                </h2>
-              </div>
-            </div>
-          ))}
-          {/* インジケーター（右上に配置） */}
-          <div className="absolute top-2 right-2 flex gap-1">
-            {topics.map((_, i) => (
-              <div key={i} className={`w-1.5 h-1.5 rounded-full ${i === currentSlide ? 'bg-white' : 'bg-white/30'}`} />
-            ))}
+        {shops.length === 0 ? (
+          <div style={{ padding: '80px 20px', textAlign: 'center', background: '#fff', borderRadius: '8px' }}>
+            <p style={{ color: '#999' }}>掲載店舗を準備中です。</p>
           </div>
-        </section>
+        ) : (
+          <div style={{ display: 'grid', gap: '20px' }}>
+            {shops.map(shop => (
+              <div key={shop.id} style={{ 
+                background: '#fff', 
+                border: '1px solid #ddd', 
+                display: 'flex', 
+                overflow: 'hidden',
+                borderRadius: '8px',
+                flexDirection: 'column'
+              }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ 
+                    width: '120px', 
+                    minWidth: '120px', 
+                    background: '#eeeeee',
+                    backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', 
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.7rem',
+                    color: '#ccc'
+                  }}>
+                    {!shop.image_url && 'NO IMAGE'}
+                  </div>
 
-        {/* 🔍 検索バー（よりカッチリした四角いデザイン） */}
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-          <div className="bg-white rounded-sm border border-slate-300 flex items-center overflow-hidden">
-            <div className="flex-1 flex items-center px-2 gap-2">
-              <Search size={14} className="text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="店名・エリア・サービス" 
-                className="w-full py-2 outline-none text-xs"
-              />
-            </div>
-            <button className="bg-slate-800 text-white px-4 py-2 font-bold text-[10px] hover:bg-slate-700 transition">
-              検索
-            </button>
-          </div>
-        </div>
+                  <div style={{ padding: '15px', flex: 1 }}>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', color: '#333', fontWeight: 'bold' }}>
+                      {shop.business_name}
+                    </h3>
+                    <div style={{ fontSize: '0.85rem', color: '#666', lineHeight: '1.5', marginBottom: '10px' }}>
+                      {shop.description || '店舗の詳細情報は準備中です。'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#999' }}>
+                      📍 {shop.address || '住所未登録'}
+                    </div>
+                  </div>
+                </div>
 
-        {/* 3. カテゴリメニュー（チラ見えしている最重要エリア） */}
-        <div className="px-4 py-6">
-          <div className="flex items-center gap-2 mb-4 border-l-4 border-slate-800 pl-3">
-            <h3 className="text-[14px] font-black text-slate-800 uppercase tracking-tighter italic">Category</h3>
-            <span className="text-[9px] text-slate-400 font-bold ml-1">— カテゴリから探す</span>
-          </div>
-          
-          {/* 2枚目・3枚目の画像を再現したタイル型ボタン */}
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { id: 'beauty', name: "理容・美容室", icon: <Scissors size={24} /> },
-              { id: 'health', name: "整体・接骨院", icon: <Activity size={24} /> },
-              { id: 'nail', name: "ネイル・アイ", icon: <Sparkles size={24} /> },
-              { id: 'esthe', name: "エステ・癒やし", icon: <Heart size={24} /> }
-            ].map((cat, i) => (
-              <Link 
-                key={i} 
-                to={`/category/${cat.id}`}
-                className="bg-white border border-slate-200 p-4 aspect-[4/3] flex flex-col justify-between hover:border-slate-800 hover:bg-slate-50 transition group shadow-sm active:shadow-inner"
-              >
-                <div className="text-slate-400 group-hover:text-slate-800 transition-colors">
-                  {cat.icon}
-                </div>
-                <div className="flex justify-between items-end">
-                  <span className="font-bold text-slate-700 text-[11px] leading-tight w-2/3">{cat.name}</span>
-                  <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-800" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
+                <div style={{ display: 'flex', padding: '10px', gap: '8px', background: '#fafafa' }}>
+                  {shop.line_official_url ? (
+                    <a href={shop.line_official_url} target="_blank" rel="noreferrer" style={{ flex: 1, textDecoration: 'none' }}>
+                      <div style={{ background: '#00b900', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>💬 LINE予約</div>
+                    </a>
+                  ) : (
+                    <div style={{ flex: 1, background: '#e2e8f0', color: '#94a3b8', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'not-allowed' }}>💬 LINE予約</div>
+                  )}
 
-        {/* 4. インフォメーション（ETCサイト風リスト） */}
-        <section className="px-4 pb-12">
-          <div className="flex items-center gap-2 mb-4 border-l-4 border-slate-400 pl-3">
-            <h3 className="text-[14px] font-black text-slate-400 uppercase tracking-tighter italic">News</h3>
-          </div>
-          <div className="bg-slate-50 border border-slate-200 divide-y divide-slate-200 rounded-sm">
-            {[
-              { date: "2026.01.19", tag: "新店", title: "町田駅前に新しい美容室が追加されました" },
-              { date: "2026.01.15", tag: "重要", title: "システムメンテナンスのお知らせ（1/25）" }
-            ].map((news, i) => (
-              <div key={i} className="p-3 flex flex-col gap-1 hover:bg-white transition cursor-pointer">
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] text-slate-400 font-mono">{news.date}</span>
-                  <span className={`text-[8px] px-1 rounded font-bold border ${
-                    news.tag === '重要' ? 'text-red-500 border-red-500' : 'text-blue-500 border-blue-500'
-                  }`}>
-                    {news.tag}
-                  </span>
+                  <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1, textDecoration: 'none' }}>
+                    <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>✉️ メール予約</div>
+                  </Link>
+
+                  {shop.official_url ? (
+                    <a href={shop.official_url} target="_blank" rel="noreferrer" style={{ flex: 1, textDecoration: 'none' }}>
+                      <div style={{ background: '#475569', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>🌐 公式サイト</div>
+                    </a>
+                  ) : (
+                    <div style={{ flex: 1, background: '#e2e8f0', color: '#94a3b8', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'not-allowed' }}>🌐 公式サイト</div>
+                  )}
                 </div>
-                <span className="text-[11px] font-bold text-slate-600 leading-snug">{news.title}</span>
               </div>
             ))}
           </div>
-        </section>
+        )}
 
-      </main>
+        <div style={{ 
+          marginTop: '60px', 
+          padding: '40px 20px', 
+          background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)', 
+          borderRadius: '20px', 
+          textAlign: 'center', 
+          color: '#fff',
+          boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)'
+        }}>
+          <h2 style={{ fontSize: '1.4rem', marginBottom: '10px', fontWeight: '900' }}>🚀 店舗オーナー様へ</h2>
+          <p style={{ fontSize: '0.85rem', opacity: 0.9, marginBottom: '25px', lineHeight: '1.6' }}>
+            SnipSnapで、あなたの店舗専用の予約システムを作りませんか？<br />
+            今ならベータ版を無料で全機能お試しいただけます。
+          </p>
+          <Link to="/trial-registration" style={{ 
+            display: 'inline-block',
+            background: '#fff', 
+            color: '#2563eb', 
+            padding: '14px 35px', 
+            borderRadius: '50px', 
+            textDecoration: 'none', 
+            fontWeight: 'bold',
+            fontSize: '1rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+          }}>
+            ベータ版はこちら
+          </Link>
+          <p style={{ fontSize: '0.7rem', marginTop: '15px', opacity: 0.7 }}>
+            ※正式リリース後に自動的に課金されることはありません。
+          </p>
+        </div>
+
+      </div>
+
+      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999', fontSize: '0.7rem' }}>
+        {/* 🆕 隠しリンク：開発中のOnePlayポータルへ */}
+        <Link to="/oneplay-portal" style={{ color: '#999', textDecoration: 'none' }}>
+          © 2026 SnipSnap 予約ポータル
+        </Link>
+      </div>
     </div>
   );
-};
+}
 
 export default Home;
