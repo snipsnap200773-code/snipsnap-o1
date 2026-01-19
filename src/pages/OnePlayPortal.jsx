@@ -1,134 +1,125 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Scissors, Activity, Sparkles, Heart, ChevronRight, Search, Menu } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
-const OnePlayPortal = () => {
-  const [currentSlide, setCurrentSlide] = useState(0);
-
-  const topics = [
-    { id: 1, url: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=80", title: "一人ひとりに、最高の体験を。" },
-    { id: 2, url: "https://images.unsplash.com/photo-1512690199101-83749a7448d4?auto=format&fit=crop&w=1200&q=80", title: "プロの技術を、もっと身近に。" },
-  ];
+function OnePlayPortal() { // コンポーネント名だけOnePlayPortalに合わせました
+  const [shops, setShops] = useState([]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % topics.length);
-    }, 5000);
-    return () => clearInterval(timer);
+    // 🆕 最強のスクロールリセット
+    const scrollTimer = setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, 100);
+
+    const fetchShops = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('is_suspended', false)
+        .not('business_name', 'is', null)
+        .order('business_name_kana', { ascending: true });
+      
+      if (data) {
+        // 「美容室SnipSnap」をトップに、それ以外をあいうえお順にする並び替え
+        const sortedShops = [...data].sort((a, b) => {
+          if (a.business_name === '美容室SnipSnap') return -1;
+          if (b.business_name === '美容室SnipSnap') return 1;
+          return (a.business_name_kana || "").localeCompare(b.business_name_kana || "", 'ja');
+        });
+        setShops(sortedShops);
+      }
+    };
+
+    fetchShops();
+    return () => clearTimeout(scrollTimer);
   }, []);
 
   return (
-    <div className="w-full bg-white font-sans text-slate-800 pb-10">
+    <div style={{ backgroundColor: '#f9f9f9', minHeight: '100vh', fontFamily: '"Hiragino Sans", "Meiryo", sans-serif', color: '#333', width: '100%' }}>
       
-      {/* 1. ヘッダー：ロゴ（左）と三本線（右）を完璧に端へ配置 */}
-      <header className="w-full bg-white border-b-4 border-slate-800 px-4 py-3 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex flex-col">
-          <h1 className="text-xl font-black tracking-tighter text-slate-800 leading-none">
-            OnePlay <span className="text-[10px] font-bold text-slate-500 uppercase">ワンプレ</span>
-          </h1>
-          <div className="h-1 w-full bg-slate-800 mt-1"></div>
-        </div>
-        <button className="p-1 active:bg-slate-100 rounded transition-colors">
-          <Menu size={32} className="text-slate-800" />
-        </button>
-      </header>
-
-      {/* 2. ヒーローバナー：高さを抑えて「カテゴリ」を最初から見せる設計 */}
-      <section className="relative h-32 w-full overflow-hidden bg-slate-200">
-        {topics.map((topic, index) => (
-          <div
-            key={topic.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? 'opacity-100' : 'opacity-0'}`}
-          >
-            <img src={topic.url} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-x-0 bottom-0 bg-slate-900/60 p-2 text-center">
-              <h2 className="text-white text-[10px] font-bold tracking-widest drop-shadow-sm">
-                {topic.title}
-              </h2>
-            </div>
-          </div>
-        ))}
-        <div className="absolute top-2 right-2 flex gap-1">
-          {topics.map((_, i) => (
-            <div key={i} className={`w-1.5 h-1.5 rounded-full ${i === currentSlide ? 'bg-white shadow' : 'bg-white/30'}`} />
-          ))}
-        </div>
-      </section>
-
-      {/* 🔍 検索バー：カッチリした実用的なデザイン */}
-      <div className="w-full px-4 py-3 bg-slate-50 border-b border-slate-200">
-        <div className="bg-white rounded-none border border-slate-300 flex items-center shadow-sm">
-          <div className="flex-1 flex items-center px-2 gap-2">
-            <Search size={14} className="text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="店名、エリア、サービス" 
-              className="w-full py-1.5 outline-none text-xs font-medium"
-            />
-          </div>
-          <button className="bg-slate-800 text-white px-4 py-2 font-bold text-[10px] active:bg-slate-700">
-            検索
-          </button>
+      {/* ヘッダーエリア */}
+      <div style={{ background: '#fff', padding: '15px 20px', borderBottom: '2px solid #e60012', position: 'sticky', top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', alignItems: 'center' }}>
+          <h1 style={{ color: '#e60012', fontSize: '1.6rem', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>OnePlay</h1>
+          <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '10px', marginTop: '5px' }}>開発テスト用ポータル</span>
         </div>
       </div>
 
-      {/* 3. カテゴリメニュー：2枚目画像を再現したタイル形式 */}
-      <div className="w-full px-4 py-6 bg-white">
-        <div className="flex items-center gap-2 mb-4 border-l-4 border-slate-800 pl-3">
-          <h3 className="text-[13px] font-black text-slate-800 tracking-wider uppercase italic">Category</h3>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
+        
+        <div style={{ borderBottom: '1px solid #ddd', paddingBottom: '10px', marginBottom: '20px' }}>
+          <p style={{ fontSize: '0.9rem', color: '#333', margin: 0 }}>
+            テスト表示中の店舗：<b>{shops.length}</b> 件
+          </p>
         </div>
         
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { id: 'beauty', name: "理容・美容室", icon: <Scissors size={28} /> },
-            { id: 'health', name: "整体・接骨院", icon: <Activity size={28} /> },
-            { id: 'nail', name: "ネイル・アイ", icon: <Sparkles size={28} /> },
-            { id: 'esthe', name: "エステ・癒やし", icon: <Heart size={28} /> }
-          ].map((cat, i) => (
-            <Link 
-              key={i} 
-              to={`/category/${cat.id}`}
-              className="bg-white border border-slate-200 p-4 aspect-square flex flex-col items-center justify-center gap-3 hover:border-slate-800 active:bg-slate-50 transition group shadow-sm"
-            >
-              <div className="text-slate-400 group-hover:text-slate-800 transform group-hover:scale-110 transition-all">
-                {cat.icon}
+        {shops.length === 0 ? (
+          <div style={{ padding: '80px 20px', textAlign: 'center', background: '#fff', borderRadius: '8px' }}>
+            <p style={{ color: '#999' }}>掲載店舗を準備中です。</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '20px' }}>
+            {shops.map(shop => (
+              <div key={shop.id} style={{ 
+                background: '#fff', 
+                border: '1px solid #ddd', 
+                display: 'flex', 
+                overflow: 'hidden',
+                borderRadius: '8px',
+                flexDirection: 'column'
+              }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0' }}>
+                  {/* 左側：店舗画像 */}
+                  <div style={{ 
+                    width: '120px', 
+                    minWidth: '120px', 
+                    background: '#eeeeee',
+                    backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', 
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.7rem',
+                    color: '#ccc'
+                  }}>
+                    {!shop.image_url && 'NO IMAGE'}
+                  </div>
+
+                  {/* 右側：店舗情報 */}
+                  <div style={{ padding: '15px', flex: 1 }}>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', color: '#333', fontWeight: 'bold' }}>
+                      {shop.business_name}
+                    </h3>
+                    <div style={{ fontSize: '0.85rem', color: '#666', lineHeight: '1.5', marginBottom: '10px' }}>
+                      {shop.description || '店舗の詳細情報は準備中です。'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#999' }}>
+                      📍 {shop.address || '住所未登録'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ボタンエリア */}
+                <div style={{ display: 'flex', padding: '10px', gap: '8px', background: '#fafafa' }}>
+                  <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1, textDecoration: 'none' }}>
+                    <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>✉️ メール予約</div>
+                  </Link>
+                  <div style={{ flex: 1, background: '#475569', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold' }}>🌐 詳細を見る</div>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="font-bold text-slate-700 text-[11px] tracking-tighter leading-none">{cat.name}</span>
-                <ChevronRight size={12} className="text-slate-300" />
-              </div>
-            </Link>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* 4. インフォメーション：ETC風の整列されたお知らせ */}
-      <section className="w-full px-4 pt-2">
-        <div className="flex items-center gap-2 mb-4 border-l-4 border-slate-300 pl-3">
-          <h3 className="text-[13px] font-black text-slate-300 tracking-wider uppercase italic">News List</h3>
-        </div>
-        <div className="bg-slate-50 border border-slate-200 divide-y divide-slate-100">
-          {[
-            { date: "2026.01.19", tag: "新店", title: "町田駅前に新しい美容室が追加されました" },
-            { date: "2026.01.15", tag: "重要", title: "システムメンテナンスのお知らせ（1/25）" }
-          ].map((news, i) => (
-            <div key={i} className="p-3 flex flex-col gap-1 hover:bg-white transition cursor-pointer">
-              <div className="flex items-center gap-2">
-                <span className="text-[9px] text-slate-400 font-mono tracking-tighter">{news.date}</span>
-                <span className={`text-[8px] px-1 rounded font-bold border ${
-                  news.tag === '重要' ? 'text-red-500 border-red-200' : 'text-blue-500 border-blue-200'
-                }`}>
-                  {news.tag}
-                </span>
-              </div>
-              <span className="text-[11px] font-bold text-slate-600 leading-snug">{news.title}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
+      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999', fontSize: '0.7rem' }}>
+        <Link to="/" style={{ color: '#999', textDecoration: 'none' }}>
+           ← 本番のSnipSnapへ戻る
+        </Link>
+      </div>
     </div>
   );
-};
+}
 
 export default OnePlayPortal;
