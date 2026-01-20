@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
       customerEmail,      // 予約用
       customerName,       // 予約用
       shopName,           // 共通
-      startTime,          // 予約用
+      startTime,           // 予約用
       services,           // 予約用（※フロントエンドで整形済みが渡される）
       shopEmail,          // 予約用
       cancelUrl,          // 予約用
@@ -70,16 +70,18 @@ Deno.serve(async (req) => {
     // 🆕 パターンC：一斉リマインド送信 (毎日定期実行用)
     // ==========================================
     if (type === 'remind_all') {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const dateStr = tomorrow.toISOString().split('T')[0]; // YYYY-MM-DD
+      // 日本時間での「明日」を確実に取得するための計算
+      const nowJST = new Date(new Date().getTime() + (9 * 60 * 60 * 1000));
+      const tomorrowJST = new Date(nowJST);
+      tomorrowJST.setDate(tomorrowJST.getDate() + 1);
+      const dateStr = tomorrowJST.toISOString().split('T')[0]; // YYYY-MM-DD
 
       // 明日の予約を取得（店舗情報も結合）
       const { data: resList, error: resError } = await supabaseAdmin
         .from('reservations')
         .select('*, profiles(*)')
-        .gte('start_time', `${dateStr}T00:00:00`)
-        .lte('start_time', `${dateStr}T23:59:59`)
+        .gte('start_time', `${dateStr}T00:00:00Z`)
+        .lte('start_time', `${dateStr}T23:59:59Z`)
         .eq('remind_sent', false)
         .eq('res_type', 'normal');
 
@@ -92,7 +94,13 @@ Deno.serve(async (req) => {
 
       for (const res of resList) {
         const shop = res.profiles;
-        const resTime = new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        
+        // 💡 修正の要：UTC時間を「日本時間」としてフォーマットする
+        const resTime = new Date(res.start_time).toLocaleTimeString('ja-JP', { 
+          timeZone: 'Asia/Tokyo', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
         
         // 🆕 💡 リマインド送信時も「1名予約なら番号なし」にするスマートロジック
         const isMulti = res.options?.people && res.options.people.length > 1;
@@ -161,7 +169,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: 'SnipSnap 運営事務局 <infec@snipsnap.biz>',
           to: [owner_email],
-          subject: `【SnipSnap】ベータ版へのご登録ありがとうございます！`, // 🆕 変更
+          subject: `【SnipSnap】ベータ版へのご登録ありがとうございます！`,
           html: `
             <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 30px; border-radius: 12px;">
               <h1 style="color: #2563eb; font-size: 1.5rem; margin-top: 0;">${shopName} 様</h1>
@@ -199,7 +207,7 @@ Deno.serve(async (req) => {
         }),
       });
 
-      // 💡 2. 三土手さん（運営側）への新規申込通知メール（ベータ版表記に更新）
+      // 💡 2. 三土手さん（運営側）への新規申込通知メール
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -209,7 +217,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           from: 'SnipSnap システム通知 <infec@snipsnap.biz>',
           to: ['snipsnap.2007.7.3@gmail.com'],
-          subject: `【新規申込】${shopName} 様がベータ版の利用を開始しました`, // 🆕 変更
+          subject: `【新規申込】${shopName} 様がベータ版の利用を開始しました`,
           html: `
             <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 2px solid #2563eb; padding: 25px; border-radius: 12px;">
               <h2 style="color: #2563eb; margin-top: 0;">🚀 新規ベータ版申し込み通知</h2>
@@ -272,14 +280,14 @@ Deno.serve(async (req) => {
                 <p style="margin: 5px 0;">📅 <strong>日時:</strong> ${startTime}</p>
                 <p style="margin: 5px 0;">📋 <strong>メニュー:</strong> ${services}</p>
               </div>
-              ${(!isOwner && cancelUrl) ? `
+              {(!isOwner && cancelUrl) ? \`
               <div style="background: #f1f5f9; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
                 <p style="margin: 0; font-weight: bold; color: #64748b;">■ ご予約のキャンセル・変更について</p>
                 <p style="margin: 10px 0 0 0; font-size: 0.85rem; color: #64748b;">
                   ご予定が変わられた場合は、以下のリンクよりお手続きをお願いいたします。<br>
-                  <a href="${cancelUrl}" style="color: #2563eb; text-decoration: underline;">ご予約のキャンセルはこちら</a>
+                  <a href="\${cancelUrl}" style="color: #2563eb; text-decoration: underline;">ご予約のキャンセルはこちら</a>
                 </p>
-              </div>` : ''}
+              </div>\` : ''}
               <p>ご確認のほど, よろしくお願いいたします。</p>
             </div>
           `,
