@@ -161,7 +161,8 @@ function OnePlayPortal() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '15px' }}>
             {newShops.map(shop => (
-              <Link key={shop.id} to={`/shop/${shop.id}/reserve`} style={{ textDecoration: 'none' }}>
+              /* 🆕 遷移先を reserve から detail へ変更 */
+              <Link key={shop.id} to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none' }}>
                 <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', position: 'relative' }}>
                   <div style={{ width: '100%', height: '160px', background: '#eee', backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
                     <div style={{ position: 'absolute', top: '10px', left: '10px', background: '#e60012', color: '#fff', fontSize: '0.6rem', fontWeight: 'bold', padding: '3px 8px', borderRadius: '4px' }}>NEW</div>
@@ -199,9 +200,10 @@ function OnePlayPortal() {
                 flexDirection: 'column',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
                 transition: 'transform 0.2s',
-                cursor: 'pointer'
+                cursor: 'default'
               }}>
-                <div style={{ display: 'flex', borderBottom: '1px solid #f8f8f8' }}>
+                {/* 🆕 カードの上半分（画像＋情報）をクリックしても詳細ページへ飛ぶようにラッピング */}
+                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', display: 'flex', borderBottom: '1px solid #f8f8f8', color: 'inherit' }}>
                   <div style={{ 
                     width: '140px', 
                     minWidth: '140px', 
@@ -230,13 +232,16 @@ function OnePlayPortal() {
                       📍 {shop.address || '住所未登録'}
                     </div>
                   </div>
-                </div>
+                </Link>
 
                 <div style={{ display: 'flex', padding: '15px', gap: '10px', background: '#fff' }}>
                   <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1.2, textDecoration: 'none' }}>
                     <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '12px 0', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(37,99,235,0.2)' }}>✉️ 予約手続きへ</div>
                   </Link>
-                  <div style={{ flex: 1, background: '#f1f5f9', color: '#475569', textAlign: 'center', padding: '12px 0', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', border: '1px solid #e2e8f0' }}>🌐 詳細・地図</div>
+                  {/* 🆕 詳細ボタンの遷移先を detail へ変更し Link 化 */}
+                  <Link to={`/shop/${shop.id}/detail`} style={{ flex: 1, textDecoration: 'none' }}>
+                    <div style={{ background: '#f1f5f9', color: '#475569', textAlign: 'center', padding: '12px 0', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', border: '1px solid #e2e8f0' }}>🌐 詳細・地図</div>
+                  </Link>
                 </div>
               </div>
             ))}

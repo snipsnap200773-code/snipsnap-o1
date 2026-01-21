@@ -11,6 +11,7 @@ import TrialRegistration from './pages/TrialRegistration';
 import CancelReservation from './pages/CancelReservation';
 import ShopList from './pages/ShopList'; // 👈 新しく追加
 import OnePlayPortal from './pages/OnePlayPortal'; // 👈 テスト用に追加
+import ShopDetail from './pages/ShopDetail'; // 🆕 【新設】店舗詳細ページを追加
 
 function App() {
   return (
@@ -37,6 +38,10 @@ function App() {
               <Route path="/category/:categoryId" element={<ShopList />} />
               
               <Route path="/trial-registration" element={<TrialRegistration />} />
+
+              {/* 🆕 【新設】店舗詳細（クッションページ） 予約フォームより前にこちらを通る導線にします */}
+              <Route path="/shop/:shopId/detail" element={<ShopDetail />} />
+
               {/* 各店舗の個別ページへは /shop/:shopId でアクセス */}
               <Route path="/shop/:shopId" element={<ReservationForm />} /> 
               <Route path="/shop/:shopId/reserve" element={<ReservationForm />} />
