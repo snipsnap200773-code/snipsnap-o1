@@ -14,6 +14,16 @@ function OnePlayPortal() {
     { id: 3, date: '2026.01.15', category: 'お知らせ', title: 'ソロプレ・ベータ版の店舗登録数が30件を突破！' },
   ];
 
+  // 💡 カテゴリリスト（グリッド用）
+  const categoryList = [
+    { id: 'beauty', name: '美容室・理容室', icon: '✂️', color: '#eff6ff' },
+    { id: 'nail', name: 'ネイル・アイラッシュ', icon: '💅', color: '#fdf2f8' },
+    { id: 'esthe', name: 'エステ・リラク', icon: '💆', color: '#f0fdf4' },
+    { id: 'clinic', name: '整体・接骨院', icon: '🏥', color: '#fff7ed' },
+    { id: 'gourmet', name: '飲食店・カフェ', icon: '🍽️', color: '#fff1f2' },
+    { id: 'other', name: 'その他・ライフ', icon: '✨', color: '#f8fafc' },
+  ];
+
   // 💡 スライダーに表示する画像と情報の定義
   const sliderImages = [
     { id: 1, url: 'https://images.unsplash.com/photo-1600880210836-8f8fe100a35c?auto=format&fit=crop&w=1200&q=80', title: '自分らしく、働く。', desc: 'ソロ起業家を支えるポータルサイト' },
@@ -74,7 +84,6 @@ function OnePlayPortal() {
             <div style={{ height: '20px', width: '1px', background: '#ccc', margin: '0 12px' }}></div>
             <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'bold' }}>Solopreneur Portal</span>
           </div>
-          {/* ETC風のハンバーガーメニュー */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', cursor: 'pointer' }}>
             <div style={{ width: '22px', height: '2px', background: '#333' }}></div>
             <div style={{ width: '22px', height: '2px', background: '#333' }}></div>
@@ -115,7 +124,6 @@ function OnePlayPortal() {
             </p>
           </div>
         ))}
-        {/* インジケーター */}
         <div style={{ position: 'absolute', bottom: '20px', width: '100%', display: 'flex', justifyContent: 'center', gap: '10px' }}>
           {sliderImages.map((_, i) => (
             <div
@@ -134,10 +142,9 @@ function OnePlayPortal() {
         </div>
       </div>
 
-      {/* 3. メインコンテンツエリア */}
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
         
-        {/* 最新トピック (NEWS) セクション */}
+        {/* 3. 最新トピック (NEWS) セクション */}
         <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '30px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
           <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ color: '#e60012' }}>●</span> 最新トピック
@@ -153,7 +160,7 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* 新着店舗 (NEW OPEN) セクション */}
+        {/* 4. 新着店舗 (NEW OPEN) セクション */}
         <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', letterSpacing: '1px' }}>NEW OPEN</h3>
@@ -161,7 +168,6 @@ function OnePlayPortal() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '15px' }}>
             {newShops.map(shop => (
-              /* 🆕 遷移先を reserve から detail へ変更 */
               <Link key={shop.id} to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none' }}>
                 <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', position: 'relative' }}>
                   <div style={{ width: '100%', height: '160px', background: '#eee', backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
@@ -177,7 +183,36 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* 掲載店舗一覧 */}
+        {/* 🆕 5. カテゴリグリッドセクション */}
+        <div style={{ marginBottom: '50px' }}>
+          <div style={{ borderLeft: '4px solid #333', paddingLeft: '12px', marginBottom: '20px' }}>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>カテゴリーから探す</h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#666' }}>目的のサービスをタップしてください</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+            {categoryList.map((cat) => (
+              <Link key={cat.id} to={`/category/${cat.name}`} style={{ textDecoration: 'none' }}>
+                <div style={{ 
+                  background: '#fff', 
+                  borderRadius: '16px', 
+                  padding: '20px 10px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                  border: '1px solid #eee',
+                  transition: 'transform 0.1s active',
+                }}>
+                  <span style={{ fontSize: '2.2rem', marginBottom: '10px' }}>{cat.icon}</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#333', textAlign: 'center' }}>{cat.name}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* 6. 掲載店舗一覧 (全件) */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -202,7 +237,6 @@ function OnePlayPortal() {
                 transition: 'transform 0.2s',
                 cursor: 'default'
               }}>
-                {/* 🆕 カードの上半分（画像＋情報）をクリックしても詳細ページへ飛ぶようにラッピング */}
                 <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', display: 'flex', borderBottom: '1px solid #f8f8f8', color: 'inherit' }}>
                   <div style={{ 
                     width: '140px', 
@@ -238,7 +272,6 @@ function OnePlayPortal() {
                   <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1.2, textDecoration: 'none' }}>
                     <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '12px 0', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(37,99,235,0.2)' }}>✉️ 予約手続きへ</div>
                   </Link>
-                  {/* 🆕 詳細ボタンの遷移先を detail へ変更し Link 化 */}
                   <Link to={`/shop/${shop.id}/detail`} style={{ flex: 1, textDecoration: 'none' }}>
                     <div style={{ background: '#f1f5f9', color: '#475569', textAlign: 'center', padding: '12px 0', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', border: '1px solid #e2e8f0' }}>🌐 詳細・地図</div>
                   </Link>
@@ -249,7 +282,7 @@ function OnePlayPortal() {
         </div>
       </div>
 
-      {/* 6. フッター */}
+      {/* 7. フッター */}
       <div style={{ padding: '60px 20px', textAlign: 'center', background: '#fff', marginTop: '40px', borderTop: '1px solid #eee' }}>
         <Link to="/" style={{ color: '#666', textDecoration: 'none', fontSize: '0.8rem', fontWeight: 'bold' }}>
            ← 本番のソロプレへ戻る
