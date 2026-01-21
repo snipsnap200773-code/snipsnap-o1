@@ -43,6 +43,9 @@ function AdminReservations() {
   const [customerFullHistory, setCustomerFullHistory] = useState([]);
   const [editFields, setEditFields] = useState({ name: '', phone: '', email: '', memo: '', line_user_id: null });
 
+  // 🆕 キーボード選択用のIndex管理
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
@@ -64,9 +67,10 @@ function AdminReservations() {
 
   useEffect(() => {
     const searchCustomers = async () => {
-      if (!searchTerm) { setCustomers([]); return; }
+      if (!searchTerm) { setCustomers([]); setSelectedIndex(-1); return; }
       const { data } = await supabase.from('customers').select('*').eq('shop_id', shopId).ilike('name', `%${searchTerm}%`).limit(5);
       setCustomers(data || []);
+      setSelectedIndex(-1); // 検索ワードが変わったら選択位置をリセット
     };
     const timer = setTimeout(searchCustomers, 300);
     return () => clearTimeout(timer);
@@ -82,9 +86,31 @@ function AdminReservations() {
       line_user_id: customer.line_user_id || null 
     });
     setSearchTerm('');
+    setSelectedIndex(-1);
     const { data } = await supabase.from('reservations').select('*').eq('shop_id', shopId).eq('customer_name', customer.name).order('start_time', { ascending: false });
     setCustomerFullHistory(data || []);
     setShowCustomerModal(true);
+  };
+
+  // 🆕 キーボード操作用ハンドラー
+  const handleKeyDown = (e) => {
+    if (customers.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev < customers.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+    } else if (e.key === 'Enter') {
+      if (selectedIndex >= 0) {
+        e.preventDefault();
+        openCustomerDetail(customers[selectedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setSearchTerm('');
+      setCustomers([]);
+    }
   };
 
   const openDetail = async (res) => {
@@ -123,50 +149,77 @@ function AdminReservations() {
     setShowDetailModal(true);
   };
 
-  // 🆕 【強化版】名簿保存 ＆ 既存予約の名前も一括書き換え
+  // 🆕 【重複エラー解決版】名簿保存 ＆ 予約データの同期
   const handleUpdateCustomer = async () => {
-    const payload = {
-      shop_id: shopId,
-      name: editFields.name,
-      phone: editFields.phone,
-      email: editFields.email,
-      memo: editFields.memo,
-      line_user_id: editFields.line_user_id,
-      updated_at: new Date().toISOString()
-    };
+    try {
+      let targetCustomerId = selectedCustomer?.id;
 
-    if (selectedCustomer?.id) {
-      payload.id = selectedCustomer.id;
+      // IDがない場合、同姓同名・同電話番号の顧客がいないか最終確認
+      if (!targetCustomerId) {
+        let checkQuery = supabase.from('customers').select('id').eq('shop_id', shopId).eq('name', editFields.name);
+        if (editFields.line_user_id) {
+          checkQuery = checkQuery.eq('line_user_id', editFields.line_user_id);
+        } else if (editFields.phone) {
+          checkQuery = checkQuery.eq('phone', editFields.phone);
+        }
+        
+        const { data: existingCust } = await checkQuery.maybeSingle();
+        if (existingCust) {
+          targetCustomerId = existingCust.id;
+        }
+      }
+
+      const payload = {
+        shop_id: shopId,
+        name: editFields.name,
+        phone: editFields.phone,
+        email: editFields.email,
+        memo: editFields.memo,
+        line_user_id: editFields.line_user_id,
+        updated_at: new Date().toISOString()
+      };
+
+      if (targetCustomerId) {
+        payload.id = targetCustomerId;
+      }
+
+      // 1. 名簿（customers）を更新 (Upsert) - 重複エラーを回避するためIDで判定
+      const { error: custError } = await supabase.from('customers').upsert(payload, { onConflict: 'id' });
+
+      if (custError) { 
+        alert('名簿保存エラー: ' + custError.message); 
+        return;
+      }
+
+      // 2. カレンダー上の予約（reservations）も同期して書き換える
+      let resQuery = supabase.from('reservations').update({ 
+        customer_name: editFields.name,
+        customer_phone: editFields.phone,
+        customer_email: editFields.email
+      }).eq('shop_id', shopId);
+
+      if (editFields.line_user_id) {
+        // LINE連携済みならそのIDの予約をすべて更新
+        resQuery = resQuery.eq('line_user_id', editFields.line_user_id);
+      } else if (selectedRes) {
+        // それ以外は元の予約時の名前で紐付いているものを更新
+        resQuery = resQuery.eq('customer_name', selectedRes.customer_name);
+      }
+
+      const { error: resSyncError } = await resQuery;
+
+      if (resSyncError) {
+        console.error('予約データの同期に失敗しましたが名簿は更新されました:', resSyncError.message);
+      }
+
+      alert('名簿情報を更新し、カレンダーにも反映しました！'); 
+      setShowCustomerModal(false); 
+      setShowDetailModal(false); 
+      fetchData(); 
+    } catch (err) {
+      console.error(err);
+      alert('予期せぬエラーが発生しました');
     }
-
-    // 1. 名簿（customers）を更新
-    const { error: custError } = await supabase.from('customers').upsert(payload, { onConflict: 'id' });
-
-    if (custError) { 
-      alert('名簿保存エラー: ' + custError.message); 
-      return;
-    }
-
-    // 2. カレンダー上の予約（reservations）も同期して書き換える
-    // LINE ID があれば ID で、なければ以前のお名前で紐付いている全ての予約を更新
-    let resQuery = supabase.from('reservations').update({ customer_name: editFields.name }).eq('shop_id', shopId);
-
-    if (editFields.line_user_id) {
-      resQuery = resQuery.eq('line_user_id', editFields.line_user_id);
-    } else if (selectedRes) {
-      resQuery = resQuery.eq('customer_name', selectedRes.customer_name);
-    }
-
-    const { error: resSyncError } = await resQuery;
-
-    if (resSyncError) {
-      console.error('予約データの同期に失敗しましたが名簿は更新されました:', resSyncError.message);
-    }
-
-    alert('名簿情報を更新し、カレンダーにも反映しました！'); 
-    setShowCustomerModal(false); 
-    setShowDetailModal(false); 
-    fetchData(); 
   };
 
   const deleteRes = async (id) => {
@@ -392,12 +445,23 @@ function AdminReservations() {
                 <button onClick={goNext} style={headerBtnStylePC}>次週</button>
               </div>
               <div style={{ position: 'relative', marginLeft: '10px', width: '300px' }}>
-                <input type="text" placeholder="👤 顧客を検索..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '12px 15px 12px 40px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '0.9rem' }} />
+                {/* 🆕 onKeyDown を追加 */}
+                <input type="text" placeholder="👤 顧客を検索..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={handleKeyDown} style={{ width: '100%', padding: '12px 15px 12px 40px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '0.9rem' }} />
                 <span style={{ position: 'absolute', left: '12px', top: '12px', opacity: 0.4 }}>🔍</span>
                 {customers.length > 0 && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '12px', marginTop: '5px', zIndex: 1000, border: '1px solid #eee' }}>
-                    {customers.map(c => (
-                      <div key={c.id} onClick={() => openCustomerDetail(c)} style={{ padding: '12px', borderBottom: '1px solid #f8fafc', cursor: 'pointer' }}>
+                    {customers.map((c, index) => (
+                      <div 
+                        key={c.id} 
+                        onClick={() => openCustomerDetail(c)} 
+                        style={{ 
+                          padding: '12px', 
+                          borderBottom: '1px solid #f8fafc', 
+                          cursor: 'pointer',
+                          // 🆕 キーボード選択中の背景色ハイライト
+                          background: index === selectedIndex ? '#eff6ff' : 'transparent'
+                        }}
+                      >
                         <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{c.name} 様</div>
                         <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{c.phone || '電話未登録'}</div>
                       </div>

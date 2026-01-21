@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-// 🆕 修正：通知専用の supabaseAnon をインポートに追加
+// ✅ 既存のインポートを維持
 import { supabase, supabaseAnon } from '../supabaseClient';
 
 function ConfirmReservation() {
@@ -21,6 +21,8 @@ function ConfirmReservation() {
   // 🆕 顧客連動用State
   const [suggestedCustomers, setSuggestedCustomers] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  // 🆕 キーボード選択用のIndex
+  const [selectedIndex, setSelectedIndex] = useState(-1);
 
   useEffect(() => {
     if (!date && !adminDate) {
@@ -28,7 +30,7 @@ function ConfirmReservation() {
       return;
     }
 
-    // 🆕 【最優先ロジック】LINE ID で名簿を照合
+    // ✅ 【最優先ロジック】LINE ID で名簿を照合
     const checkLineCustomer = async () => {
       if (lineUser?.userId) {
         const { data: cust } = await supabase
@@ -39,16 +41,14 @@ function ConfirmReservation() {
           .maybeSingle();
 
         if (cust) {
-          // 名簿にいた場合は、三土手さんが管理画面で直した「正しい名前」をセット
           setCustomerName(cust.name);
           setCustomerPhone(cust.phone || '');
           setCustomerEmail(cust.email || '');
           setSelectedCustomerId(cust.id);
-          return; // 照合成功したので終了
+          return; 
         }
       }
       
-      // 名簿にいなかった、またはLINE経由でない場合は従来通り
       if (lineUser && lineUser.displayName) {
         setCustomerName(lineUser.displayName);
       }
@@ -65,7 +65,7 @@ function ConfirmReservation() {
 
   useEffect(() => {
     const searchCustomers = async () => {
-      // 🛑 【重要修正】管理者モード（ねじ込み予約）でない場合は、検索ロジックを完全に停止
+      // 🛑 管理者モード（ねじ込み予約）でない場合は、検索ロジックを停止
       if (!isAdminEntry) {
         setSuggestedCustomers([]);
         return;
@@ -73,6 +73,7 @@ function ConfirmReservation() {
 
       if (!customerName || customerName.length < 1 || selectedCustomerId) {
         setSuggestedCustomers([]);
+        setSelectedIndex(-1);
         return;
       }
       const { data } = await supabase
@@ -81,11 +82,13 @@ function ConfirmReservation() {
         .eq('shop_id', shopId)
         .ilike('name', `%${customerName}%`)
         .limit(5);
+      
       setSuggestedCustomers(data || []);
+      setSelectedIndex(-1); // リストが変わったら選択をリセット
     };
     const timer = setTimeout(searchCustomers, 300);
     return () => clearTimeout(timer);
-  }, [customerName, selectedCustomerId, isAdminEntry]); // isAdminEntry を依存配列に追加
+  }, [customerName, selectedCustomerId, isAdminEntry]);
 
   const handleSelectCustomer = (c) => {
     setCustomerName(c.name);
@@ -93,6 +96,28 @@ function ConfirmReservation() {
     setCustomerEmail(c.email || '');
     setSelectedCustomerId(c.id);
     setSuggestedCustomers([]);
+    setSelectedIndex(-1);
+  };
+
+  // 🆕 キーボード操作ハンドラー
+  const handleKeyDown = (e) => {
+    if (suggestedCustomers.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev < suggestedCustomers.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+    } else if (e.key === 'Enter') {
+      if (selectedIndex >= 0) {
+        e.preventDefault();
+        handleSelectCustomer(suggestedCustomers[selectedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setSuggestedCustomers([]);
+      setSelectedIndex(-1);
+    }
   };
 
   const handleReserve = async () => {
@@ -115,32 +140,28 @@ function ConfirmReservation() {
     const cancelUrl = `${window.location.origin}/cancel?token=${cancelToken}`;
 
     try {
-      // 🆕 💡 紐付けチェック：LINE ID または 名前 で検索
+      // ✅ 紐付けチェック
       let query = supabase.from('customers').select('id, total_visits').eq('shop_id', shopId);
-      
       if (lineUser?.userId) {
         query = query.eq('line_user_id', lineUser.userId);
       } else {
         query = query.eq('name', customerName);
       }
-      
       const { data: existingCust } = await query.maybeSingle();
 
       if (existingCust) {
-        // 既存客ならアップデート（名前は上書きせず、来店情報を更新）
         await supabase
           .from('customers')
           .update({
             phone: customerPhone || undefined,
             email: customerEmail || undefined,
-            line_user_id: lineUser?.userId || undefined, // 🆕 IDを未登録ならここで紐付け
+            line_user_id: lineUser?.userId || undefined,
             total_visits: (existingCust.total_visits || 0) + 1,
             last_arrival_at: startDateTime.toISOString(),
             updated_at: new Date().toISOString()
           })
           .eq('id', existingCust.id);
       } else {
-        // 完全新規客なら登録
         await supabase
           .from('customers')
           .insert([{
@@ -148,14 +169,12 @@ function ConfirmReservation() {
             name: customerName,
             phone: customerPhone,
             email: customerEmail,
-            line_user_id: lineUser?.userId || null, // 🆕 LINE ID も保存
+            line_user_id: lineUser?.userId || null,
             total_visits: 1,
             last_arrival_at: startDateTime.toISOString()
           }]);
       }
 
-      // 🆕 💡 通知用テキストのスマート化ロジック
-      // 人数が1人の時はメニュー名だけ、2名以上の時は「1人目: 〇〇」という形式にします
       const menuLabel = people.length > 1
         ? people.map((p, i) => `${i + 1}人目: ${p.services.map(s => s.name).join(', ')}`).join(' / ')
         : (people[0]?.services?.map(s => s.name).join(', ') || 'メニューなし');
@@ -226,14 +245,13 @@ function ConfirmReservation() {
         </div>
       )}
 
-      {/* 予約内容カード (複数名対応) */}
+      {/* 予約内容カード */}
       <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '15px', marginBottom: '25px', border: '1px solid #e2e8f0' }}>
         <p style={{ margin: '0 0 12px 0' }}>📅 <b>日時：</b> {displayDate} {displayTime} 〜</p>
         <p style={{ margin: '0 0 8px 0' }}>📋 <b>選択メニュー：</b></p>
         <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
           {people && people.map((person, idx) => (
             <div key={idx} style={{ marginBottom: idx < people.length - 1 ? '10px' : 0, paddingBottom: idx < people.length - 1 ? '10px' : 0, borderBottom: idx < people.length - 1 ? '1px dashed #eee' : 'none' }}>
-              {/* 🆕 💡 複数名の時だけ「1人目」などを表示する条件分岐 */}
               {people.length > 1 && (
                 <div style={{ fontWeight: 'bold', color: '#2563eb', marginBottom: '4px' }}>{idx + 1}人目</div>
               )}
@@ -246,13 +264,32 @@ function ConfirmReservation() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div style={{ position: 'relative' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>お客様名 (必須)</label>
-          <input type="text" value={customerName} onChange={(e) => { setCustomerName(e.target.value); setSelectedCustomerId(null); }} placeholder="お名前を入力" style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} />
+          {/* 🆕 handleKeyDown を追加 */}
+          <input 
+            type="text" 
+            value={customerName} 
+            onChange={(e) => { setCustomerName(e.target.value); setSelectedCustomerId(null); }} 
+            onKeyDown={handleKeyDown}
+            placeholder="お名前を入力" 
+            style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} 
+          />
           
-          {/* 🛡️ 修正箇所：isAdminEntry（ねじ込み）の時だけ候補を表示 */}
+          {/* ✅ isAdminEntry の時だけ候補を表示 */}
           {isAdminEntry && suggestedCustomers.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '10px', zIndex: 100, border: '1px solid #eee' }}>
-              {suggestedCustomers.map(c => (
-                <div key={c.id} onClick={() => handleSelectCustomer(c)} style={{ padding: '12px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', fontSize: '0.9rem' }}>
+            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '10px', zIndex: 100, border: '1px solid #eee', overflow: 'hidden' }}>
+              {suggestedCustomers.map((c, index) => (
+                <div 
+                  key={c.id} 
+                  onClick={() => handleSelectCustomer(c)} 
+                  style={{ 
+                    padding: '12px', 
+                    borderBottom: '1px solid #f8fafc', 
+                    cursor: 'pointer', 
+                    fontSize: '0.9rem',
+                    // 🆕 キーボード選択中のハイライト背景
+                    background: index === selectedIndex ? '#eff6ff' : 'transparent'
+                  }}
+                >
                   <b>{c.name} 様</b> <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>({c.phone || '電話なし'})</span>
                 </div>
               ))}
