@@ -21,7 +21,7 @@ function SuperAdmin() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [activeTab, setActiveTab] = useState('list');
 
-  // --- フォームState ---
+  // --- フォームState（ふりがな含む完全版） ---
   const [newShopName, setNewShopName] = useState('');
   const [newShopKana, setNewShopKana] = useState('');
   const [newOwnerName, setNewOwnerName] = useState('');
@@ -163,11 +163,11 @@ function SuperAdmin() {
 
   // --- レンダリングパーツ ---
   const renderShopList = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%', minWidth: 0 }}>
       <div style={panelStyle}>
         <div style={{ position: 'relative', marginBottom: '15px' }}>
           <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', opacity: 0.4 }} />
-          <input type="text" placeholder="検索ワードを入力..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ ...smallInput, paddingLeft: '40px' }} />
+          <input type="text" placeholder="店舗・代表者・電話で検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ ...smallInput, paddingLeft: '40px' }} />
         </div>
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', WebkitOverflowScrolling: 'touch' }}>
           {['すべて', ...categoriesList.map(c => c.name)].map(cat => (
@@ -187,12 +187,12 @@ function SuperAdmin() {
       <h3 style={panelTitle}><PlusSquare size={18} /> 新規店舗の発行</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <input value={newOwnerName} onChange={(e) => setNewOwnerName(e.target.value)} placeholder="代表者名" style={smallInput} />
-          <input value={newOwnerNameKana} onChange={(e) => setNewOwnerNameKana(e.target.value)} placeholder="かな" style={smallInput} />
+          <input value={newOwnerName} onChange={(e) => setNewOwnerName(e.target.value)} placeholder="代表者名" style={{...smallInput, flex:1}} />
+          <input value={newOwnerNameKana} onChange={(e) => setNewOwnerNameKana(e.target.value)} placeholder="かな" style={{...smallInput, flex:1}} />
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <input value={newShopName} onChange={(e) => setNewShopName(e.target.value)} placeholder="店舗名" style={smallInput} />
-          <input value={newShopKana} onChange={(e) => setNewShopKana(e.target.value)} placeholder="かな" style={smallInput} />
+          <input value={newShopName} onChange={(e) => setNewShopName(e.target.value)} placeholder="店舗名" style={{...smallInput, flex:1}} />
+          <input value={newShopKana} onChange={(e) => setNewShopKana(e.target.value)} placeholder="かな" style={{...smallInput, flex:1}} />
         </div>
         <select value={newBusinessType} onChange={(e) => setNewBusinessType(e.target.value)} style={smallInput}>
           <option value="">-- 業種を選択 --</option>
@@ -210,15 +210,15 @@ function SuperAdmin() {
       <div style={panelStyle}>
         <h3 style={panelTitle}><Bell size={18} /> トピック管理</h3>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-          <input value={newNewsDate} onChange={(e) => setNewNewsDate(e.target.value)} placeholder="日付 (2026.01.21)" style={{ ...smallInput, flex: 1 }} />
-          <select value={newNewsCat} onChange={(e) => setNewNewsCat(e.target.value)} style={{ ...smallInput, flex: 1 }}>
-            <option value="お知らせ">お知らせ</option>
+          <input value={newNewsDate} onChange={(e) => setNewNewsDate(e.target.value)} placeholder="2026.01.21" style={{...smallInput, flex:1}} />
+          <select value={newNewsCat} onChange={(e) => setNewNewsCat(e.target.value)} style={{...smallInput, flex:1}}>
+            <option value="伝">伝</option>
             <option value="重要">重要</option>
             <option value="新機能">新機能</option>
           </select>
         </div>
-        <textarea value={newNewsTitle} onChange={(e) => setNewNewsTitle(e.target.value)} placeholder="タイトル内容" style={{ ...smallInput, height: '60px' }} />
-        <button onClick={addNews} style={{ ...secondaryBtn, width: '100%', marginTop: '10px' }}>お知らせ追加</button>
+        <textarea value={newNewsTitle} onChange={(e) => setNewNewsTitle(e.target.value)} placeholder="タイトル内容" style={{...smallInput, height:'60px', marginBottom:'10px'}} />
+        <button onClick={addNews} style={{ ...secondaryBtn, width: '100%' }}>お知らせ追加</button>
         <div style={{ marginTop: '15px', maxHeight: '200px', overflowY: 'auto' }}>
           {newsList.map(n => <div key={n.id} style={newsItemStyle}><span>{n.publish_date} {n.title}</span><Trash2 size={14} color="#ef4444" onClick={() => deleteNews(n.id)} style={{cursor:'pointer'}} /></div>)}
         </div>
@@ -256,13 +256,15 @@ function SuperAdmin() {
             </div>
           </div>
         ) : (
-          // 💻 PC用表示：修正箇所（alignItems: 'start'）
           <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '25px', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               {renderAddShop()}
               {renderPortalSettings()}
             </div>
-            {renderShopList()}
+            {/* 🛡️ PC版で右側が切れないように minWidth: 0 を追加 */}
+            <div style={{ minWidth: 0 }}>
+              {renderShopList()}
+            </div>
           </div>
         )}
       </div>
@@ -270,7 +272,7 @@ function SuperAdmin() {
   );
 }
 
-// 店舗カード
+// 🆕 店舗カード（はみ出し修正済み）
 function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onUpdate, onDelete, onToggleSuspension, onCopy, categories }) {
   const isEditing = editingShopId === shop.id;
   const isSuspended = shop.is_suspended;
@@ -310,7 +312,7 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
           </div>
         </div>
       ) : (
-        <div style={{ width: '100%', overflow: 'hidden' }}>
+        <div style={{ width: '100%', minWidth: 0, overflow: 'hidden' }}>
           <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', fontWeight: 'bold', color: '#1e293b' }}>{shop.business_name}</h4>
           <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '15px' }}>{shop.owner_name} / PW: <strong>{shop.admin_password}</strong></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
