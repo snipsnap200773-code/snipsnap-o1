@@ -19,8 +19,6 @@ function SuperAdmin() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('すべて');
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-
-  // 🆕 スマホ用タブ管理 ('list', 'add', 'config')
   const [activeTab, setActiveTab] = useState('list');
 
   // --- フォームState (省略なし) ---
@@ -43,8 +41,6 @@ function SuperAdmin() {
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editPassword, setEditPassword] = useState('');
-  const [editLineToken, setEditLineToken] = useState('');
-  const [editLineAdminId, setEditLineAdminId] = useState('');
 
   const [newsList, setNewsList] = useState([]);
   const [categoriesList, setCategoriesList] = useState([]);
@@ -52,7 +48,6 @@ function SuperAdmin() {
   const [newNewsCat, setNewNewsCat] = useState('お知らせ');
   const [newNewsTitle, setNewNewsTitle] = useState('');
 
-  // 画面幅監視
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
@@ -103,13 +98,12 @@ function SuperAdmin() {
     suspended: createdShops.filter(s => s.is_suspended).length
   }), [createdShops]);
 
-  // --- 既存ロジック (完全維持) ---
   const createNewShop = async () => {
     if (!newShopName || !newShopKana || !newOwnerName) return alert('必須項目を入力してください');
     const newPass = Math.random().toString(36).slice(-8);
     const { error } = await supabase.from('profiles').insert([{ business_name: newShopName, business_name_kana: newShopKana, owner_name: newOwnerName, owner_name_kana: newOwnerNameKana, business_type: newBusinessType, email_contact: newEmail, phone: newPhone, admin_password: newPass, line_channel_access_token: newLineToken, line_admin_user_id: newLineAdminId, notify_line_enabled: true }]);
     if (!error) {
-      alert(`「${newShopName}」作成完了！ PW: ${newPass}`);
+      alert(`「${newShopName}」作成完了！`);
       setNewShopName(''); fetchCreatedShops(); setActiveTab('list');
     }
   };
@@ -166,15 +160,15 @@ function SuperAdmin() {
     );
   }
 
-  // 🆕 各種コンテンツレンダラー
+  // --- レンダリングパーツ ---
   const renderShopList = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', width: '100%' }}>
       <div style={panelStyle}>
         <div style={{ position: 'relative', marginBottom: '15px' }}>
           <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', opacity: 0.4 }} />
-          <input type="text" placeholder="店舗・代表者・電話で検索" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ ...smallInput, paddingLeft: '40px' }} />
+          <input type="text" placeholder="検索ワードを入力..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{ ...smallInput, paddingLeft: '40px' }} />
         </div>
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }}>
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', WebkitOverflowScrolling: 'touch' }}>
           {['すべて', ...categoriesList.map(c => c.name)].map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)} style={{ padding: '6px 12px', borderRadius: '20px', border: 'none', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', background: activeCategory === cat ? '#1e293b' : '#f1f5f9', color: activeCategory === cat ? '#fff' : '#64748b' }}>{cat}</button>
           ))}
@@ -183,6 +177,7 @@ function SuperAdmin() {
       {filteredShops.map((shop, index) => (
         <ShopCard key={shop.id} shop={shop} index={createdShops.length - createdShops.findIndex(s => s.id === shop.id)} editingShopId={editingShopId} setEditingShopId={setEditingShopId} editState={{ editName, setEditName, editKana, setEditKana, editOwnerName, setEditOwnerName, editOwnerNameKana, setEditOwnerNameKana, editBusinessType, setEditBusinessType, editEmail, setEditEmail, editPhone, setEditPhone, editPassword, setEditPassword }} onUpdate={updateShopInfo} onDelete={deleteShop} onToggleSuspension={toggleSuspension} onCopy={copyToClipboard} categories={categoriesList} />
       ))}
+      {filteredShops.length === 0 && <div style={{textAlign:'center', padding:'40px', color:'#999'}}>該当する店舗はありません</div>}
     </div>
   );
 
@@ -204,41 +199,41 @@ function SuperAdmin() {
   );
 
   const renderPortalSettings = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
       <div style={panelStyle}>
         <h3 style={panelTitle}><Bell size={18} /> トピック管理</h3>
         <input value={newNewsTitle} onChange={(e) => setNewNewsTitle(e.target.value)} placeholder="タイトル内容" style={smallInput} />
         <button onClick={addNews} style={{ ...secondaryBtn, width: '100%', marginTop: '10px' }}>お知らせ追加</button>
         <div style={{ marginTop: '15px' }}>
-          {newsList.map(n => <div key={n.id} style={newsItemStyle}><span>{n.title}</span><Trash2 size={14} onClick={() => deleteNews(n.id)} /></div>)}
+          {newsList.map(n => <div key={n.id} style={newsItemStyle}><span>{n.title}</span><Trash2 size={14} color="#ef4444" onClick={() => deleteNews(n.id)} style={{cursor:'pointer'}} /></div>)}
         </div>
       </div>
       <div style={panelStyle}>
         <h3 style={panelTitle}><ImageIcon size={18} /> カテゴリデザイン</h3>
-        {categoriesList.map(cat => <CategoryRow key={cat.id} cat={cat} onSave={updateCategory} />)}
+        <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
+          {categoriesList.map(cat => <CategoryRow key={cat.id} cat={cat} onSave={updateCategory} />)}
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div style={{ backgroundColor: '#f0f2f5', minHeight: '100vh', paddingBottom: isMobile ? '100px' : '20px' }}>
-      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '15px' }}>
+    <div style={{ backgroundColor: '#f0f2f5', minHeight: '100vh', paddingBottom: isMobile ? '100px' : '20px', boxSizing: 'border-box', overflowX: 'hidden' }}>
+      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: isMobile ? '10px' : '25px' }}>
         
-        {/* 統計エリア */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', overflowX: 'auto' }}>
+        {/* 統計エリア - スマホで横並び、はみ出し禁止 */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '5px' }}>
           <div style={statsCard}>全 {stats.total}</div>
           <div style={{ ...statsCard, color: '#10b981' }}>公開 {stats.active}</div>
           <div style={{ ...statsCard, color: '#ef4444' }}>停止 {stats.suspended}</div>
         </div>
 
         {isMobile ? (
-          // 📱 スマホ用表示
-          <div>
+          <div style={{ width: '100%' }}>
             {activeTab === 'list' && renderShopList()}
             {activeTab === 'add' && renderAddShop()}
             {activeTab === 'config' && renderPortalSettings()}
             
-            {/* ボトムナビゲーション */}
             <div style={bottomNavStyle}>
               <button onClick={() => setActiveTab('list')} style={activeTab === 'list' ? navBtnActive : navBtn}><List size={20} /><span>一覧</span></button>
               <button onClick={() => setActiveTab('add')} style={activeTab === 'add' ? navBtnActive : navBtn}><PlusSquare size={20} /><span>新規</span></button>
@@ -246,9 +241,8 @@ function SuperAdmin() {
             </div>
           </div>
         ) : (
-          // 💻 PC用表示
-          <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '25px', alignItems: 'start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '25px', alignItems: start }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               {renderAddShop()}
               {renderPortalSettings()}
             </div>
@@ -260,24 +254,24 @@ function SuperAdmin() {
   );
 }
 
-// 店舗カード（スマホ対応版）
+// 🆕 店舗カード（はみ出しバグ修正版）
 function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onUpdate, onDelete, onToggleSuspension, onCopy, categories }) {
   const isEditing = editingShopId === shop.id;
   const isSuspended = shop.is_suspended;
 
   return (
-    <div style={{ background: '#fff', padding: '15px', borderRadius: '16px', border: isSuspended ? '2px solid #ef4444' : '1px solid #e2e8f0', position: 'relative' }}>
+    <div style={{ background: '#fff', padding: '15px', borderRadius: '16px', border: isSuspended ? '2px solid #ef4444' : '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
         <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#94a3b8' }}>No.{index}</span>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <Edit2 size={16} color="#64748b" onClick={() => {
+        <div style={{ display: 'flex', gap: '15px' }}>
+          <Edit2 size={16} color="#64748b" style={{cursor:'pointer'}} onClick={() => {
             setEditingShopId(shop.id);
             editState.setEditName(shop.business_name || "");
             editState.setEditOwnerName(shop.owner_name || "");
             editState.setEditBusinessType(shop.business_type || "");
             editState.setEditPassword(shop.admin_password || "");
           }} />
-          <Trash2 size={16} color="#ef4444" onClick={() => onDelete(shop)} />
+          <Trash2 size={16} color="#ef4444" style={{cursor:'pointer'}} onClick={() => onDelete(shop)} />
         </div>
       </div>
 
@@ -286,62 +280,80 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
           <input value={editState.editOwnerName} onChange={(e) => editState.setEditOwnerName(e.target.value)} style={smallInput} placeholder="代表名" />
           <input value={editState.editName} onChange={(e) => editState.setEditName(e.target.value)} style={smallInput} placeholder="店舗名" />
           <input value={editState.editPassword} onChange={(e) => editState.setEditPassword(e.target.value)} style={smallInput} placeholder="PW" />
-          <div style={{ display: 'flex', gap: '5px' }}>
-            <button onClick={() => onUpdate(shop.id)} style={{ ...primaryBtn, background: '#10b981' }}>保存</button>
-            <button onClick={() => setEditingShopId(null)} style={{ ...primaryBtn, background: '#94a3b8' }}>閉じる</button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => onUpdate(shop.id)} style={{ ...primaryBtn, background: '#10b981', flex: 1 }}>保存</button>
+            <button onClick={() => setEditingShopId(null)} style={{ ...primaryBtn, background: '#94a3b8', flex: 1 }}>閉じる</button>
           </div>
         </div>
       ) : (
-        <>
-          <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem' }}>{shop.business_name}</h4>
+        <div style={{ width: '100%', overflow: 'hidden' }}>
+          <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', fontWeight: 'bold', color: '#1e293b' }}>{shop.business_name}</h4>
           <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '15px' }}>{shop.owner_name} / PW: <strong>{shop.admin_password}</strong></div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <UrlBox label="🔑 管理" url={`${window.location.origin}/admin/${shop.id}`} onCopy={onCopy} />
-            <UrlBox label="📅 予約" url={`${window.location.origin}/shop/${shop.id}/reserve`} onCopy={onCopy} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* 🛡️ UrlBox の修正: 最小幅0 を指定して突き抜けを防止 */}
+            <UrlBox label="管理" url={`${window.location.origin}/admin/${shop.id}`} onCopy={onCopy} />
+            <UrlBox label="予約" url={`${window.location.origin}/shop/${shop.id}/reserve`} onCopy={onCopy} />
           </div>
-          <button onClick={() => onToggleSuspension(shop)} style={{ width: '100%', marginTop: '15px', padding: '8px', borderRadius: '8px', border: 'none', fontSize: '0.75rem', fontWeight: 'bold', background: isSuspended ? '#10b981' : '#fee2e2', color: isSuspended ? '#fff' : '#ef4444' }}>
+          <button onClick={() => onToggleSuspension(shop)} style={{ width: '100%', marginTop: '15px', padding: '10px', borderRadius: '10px', border: 'none', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', background: isSuspended ? '#10b981' : '#fee2e2', color: isSuspended ? '#fff' : '#ef4444' }}>
             {isSuspended ? '公開を再開する' : '公開を一時停止する'}
           </button>
-        </>
+        </div>
       )}
     </div>
   );
 }
 
+// 🆕 URLボックス（突き抜け防止版）
 function UrlBox({ label, url, onCopy }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-      <span style={{ fontSize: '0.65rem', fontWeight: 'bold', minWidth: '35px' }}>{label}</span>
-      <input readOnly value={url} style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '0.65rem', color: '#64748b' }} />
-      <Copy size={14} color="#2563eb" onClick={() => onCopy(url)} style={{ cursor: 'pointer' }} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+      <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#1e293b', minWidth: '30px' }}>{label}</span>
+      {/* 🛡️ 文字列が長くても突き抜けないように設定 */}
+      <input 
+        readOnly 
+        value={url} 
+        style={{ 
+          flex: 1, 
+          border: 'none', 
+          background: 'transparent', 
+          fontSize: '0.65rem', 
+          color: '#64748b', 
+          minWidth: 0, 
+          width: '100%', 
+          outline: 'none',
+          textOverflow: 'ellipsis' // はみ出る場合は「...」を表示
+        }} 
+      />
+      <button onClick={() => onCopy(url)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px' }}>
+        <Copy size={16} color="#2563eb" />
+      </button>
     </div>
   );
 }
 
 function CategoryRow({ cat, onSave }) {
-  const [enName, setEnName] = useState(cat.en_name || "");
   const [imgUrl, setImgUrl] = useState(cat.image_url || "");
   return (
-    <div style={{ paddingBottom: '10px', borderBottom: '1px solid #f0f0f0', marginBottom: '10px' }}>
-      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '5px' }}>{cat.name}</div>
-      <div style={{ display: 'flex', gap: '5px' }}>
-        <input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="Image URL" style={{ ...smallInput, flex: 1, fontSize: '0.7rem' }} />
-        <button onClick={() => onSave(cat.id, enName, imgUrl)} style={{ background: '#10b981', border: 'none', borderRadius: '8px', color: '#fff', padding: '5px 10px' }}><Save size={14}/></button>
+    <div style={{ padding: '12px', border: '1px solid #f0f0f0', borderRadius: '12px', background: '#fcfcfc' }}>
+      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '8px', color: '#1e293b' }}>{cat.name}</div>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="Image URL" style={{ ...smallInput, flex: 1, fontSize: '0.75rem', padding: '8px' }} />
+        <button onClick={() => onSave(cat.id, cat.en_name, imgUrl)} style={{ background: '#10b981', border: 'none', borderRadius: '8px', color: '#fff', padding: '8px 12px', cursor:'pointer' }}><Save size={16}/></button>
       </div>
     </div>
   );
 }
 
-// スタイル定数 (省略なし)
-const smallInput = { padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box' };
-const panelStyle = { background: '#fff', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' };
-const panelTitle = { marginTop: 0, fontSize: '0.95rem', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' };
-const primaryBtn = { width: '100%', padding: '12px', background: '#1e293b', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold' };
-const secondaryBtn = { padding: '8px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.8rem' };
-const statsCard = { background: '#fff', padding: '10px 20px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' };
-const newsItemStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', padding: '5px 0', borderBottom: '1px dashed #eee' };
-const bottomNavStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '10px 0', borderTop: '1px solid #e2e8f0', boxShadow: '0 -2px 10px rgba(0,0,0,0.05)', zIndex: 1000 };
-const navBtn = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#94a3b8', cursor: 'pointer' };
+// スタイル定数
+const smallInput = { padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', width: '100%', boxSizing: 'border-box', outline: 'none' };
+const panelStyle = { background: '#fff', padding: '20px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', boxSizing: 'border-box', width: '100%' };
+const panelTitle = { marginTop: 0, fontSize: '1rem', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' };
+const primaryBtn = { width: '100%', padding: '14px', background: '#1e293b', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor:'pointer' };
+const secondaryBtn = { padding: '10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', cursor:'pointer' };
+const statsCard = { background: '#fff', padding: '10px 18px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' };
+const newsItemStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '10px 0', borderBottom: '1px dashed #eee' };
+const bottomNavStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '12px 0', borderTop: '1px solid #e2e8f0', boxShadow: '0 -4px 15px rgba(0,0,0,0.05)', zIndex: 9999 }; // 🛡️ zIndexを最大化
+const navBtn = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#94a3b8', cursor: 'pointer', flex: 1 };
 const navBtnActive = { ...navBtn, color: '#e60012' };
 
 export default SuperAdmin;
