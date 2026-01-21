@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { MapPin } from 'lucide-react'; // 🆕 MapPinアイコンを追加
+import { MapPin } from 'lucide-react'; 
 
 function OnePlayPortal() {
   const [shops, setShops] = useState([]);
@@ -33,12 +33,10 @@ function OnePlayPortal() {
   ];
 
   useEffect(() => {
-    // 🆕 最強のスクロールリセット
     const scrollTimer = setTimeout(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }, 100);
 
-    // 🆕 自動スライダーのタイマー設定（5秒ごとに切り替え）
     const sliderTimer = setInterval(() => {
       setCurrentSlide((prev) => (prev === sliderImages.length - 1 ? 0 : prev + 1));
     }, 5000);
@@ -51,13 +49,10 @@ function OnePlayPortal() {
         .not('business_name', 'is', null);
       
       if (data) {
-        // 1. 【新着店舗用】登録日が新しい順に3件を抽出
         const latest = [...data]
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
           .slice(0, 3);
         setNewShops(latest);
-
-        // 2. 全店舗
         setShops(data);
       }
     };
@@ -140,23 +135,23 @@ function OnePlayPortal() {
 
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
         
-        {/* 3. 最新トピック (NEWS) セクション */}
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '30px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
-          <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* 🆕 3. 最新トピック (NEWS) セクション - 高さを低く調整 */}
+        <div style={{ background: '#fff', borderRadius: '16px', padding: '15px', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
+          <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ color: '#e60012' }}>●</span> 最新トピック
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {topics.map((topic, idx) => (
-              <div key={topic.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 0', borderBottom: idx === topics.length - 1 ? 'none' : '1px solid #f0f0f0', gap: '15px' }}>
-                <span style={{ fontSize: '0.8rem', color: '#999', minWidth: '80px' }}>{topic.date}</span>
-                <span style={{ fontSize: '0.65rem', background: topic.category === '重要' ? '#fee2e2' : '#f1f5f9', color: topic.category === '重要' ? '#ef4444' : '#64748b', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold' }}>{topic.category}</span>
-                <span style={{ fontSize: '0.9rem', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{topic.title}</span>
+              <div key={topic.id} style={{ display: 'flex', alignItems: 'center', padding: '8px 0', borderBottom: idx === topics.length - 1 ? 'none' : '1px solid #f0f0f0', gap: '12px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#999', minWidth: '75px' }}>{topic.date}</span>
+                <span style={{ fontSize: '0.6rem', background: topic.category === '重要' ? '#fee2e2' : '#f1f5f9', color: topic.category === '重要' ? '#ef4444' : '#64748b', padding: '1px 6px', borderRadius: '3px', fontWeight: 'bold' }}>{topic.category}</span>
+                <span style={{ fontSize: '0.85rem', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{topic.title}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* 4. Pick Up Solopreneur セクション（ShopList風の横長カードへ刷新） */}
+        {/* 🆕 4. Pick Up Solopreneur セクション - 角の調整と画像余白の撤廃 */}
         <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', letterSpacing: '1px', color: '#1a1a1a' }}>Pick Up Solopreneur</h3>
@@ -167,14 +162,13 @@ function OnePlayPortal() {
               <div key={shop.id} style={{ 
                 background: '#fff', 
                 border: '1px solid #eee', 
-                borderRadius: '16px', 
+                borderRadius: '8px', // 🛠️ 角の丸みを抑えました
                 overflow: 'hidden', 
                 boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
                 display: 'flex',
                 flexDirection: 'column'
               }}>
-                {/* 🆕 ShopListと同じ構造: カード全体をリンク化 */}
-                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'stretch' }}>
                   <div style={{ 
                     width: '120px', 
                     minWidth: '120px', 
@@ -184,14 +178,15 @@ function OnePlayPortal() {
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     position: 'relative'
+                    // 🛠️ 余白（padding）設定を完全に無くしました
                   }}>
                     {!shop.image_url && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.6rem', color: '#ccc' }}>NO IMAGE</div>}
-                    <div style={{ position: 'absolute', top: '5px', left: '5px', background: 'rgba(230,0,18,0.9)', color: '#fff', fontSize: '0.5rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '3px' }}>PICK UP</div>
+                    <div style={{ position: 'absolute', top: '0', left: '0', background: 'rgba(230,0,18,0.9)', color: '#fff', fontSize: '0.5rem', fontWeight: 'bold', padding: '4px 8px', borderRadius: '0 0 4px 0' }}>PICK UP</div>
                   </div>
-                  <div style={{ padding: '15px', flex: 1 }}>
-                    <div style={{ fontSize: '0.65rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '4px' }}>{shop.business_type}</div>
-                    <h4 style={{ margin: '0 0 5px 0', fontSize: '1.05rem', fontWeight: 'bold' }}>{shop.business_name}</h4>
-                    <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '8px', display: '-webkit-box', WebkitLineClamp: '1', WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
+                  <div style={{ padding: '12px 15px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div style={{ fontSize: '0.6rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '2px' }}>{shop.business_type}</div>
+                    <h4 style={{ margin: '0 0 3px 0', fontSize: '1rem', fontWeight: 'bold' }}>{shop.business_name}</h4>
+                    <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '6px', display: '-webkit-box', WebkitLineClamp: '1', WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
                       {shop.description || '店舗の詳細情報は準備中です。'}
                     </p>
                     <div style={{ fontSize: '0.7rem', color: '#999', display: 'flex', alignItems: 'center', gap: '3px' }}>
