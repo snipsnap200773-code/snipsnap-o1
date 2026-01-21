@@ -65,6 +65,12 @@ function ConfirmReservation() {
 
   useEffect(() => {
     const searchCustomers = async () => {
+      // 🛑 【重要修正】管理者モード（ねじ込み予約）でない場合は、検索ロジックを完全に停止
+      if (!isAdminEntry) {
+        setSuggestedCustomers([]);
+        return;
+      }
+
       if (!customerName || customerName.length < 1 || selectedCustomerId) {
         setSuggestedCustomers([]);
         return;
@@ -79,7 +85,7 @@ function ConfirmReservation() {
     };
     const timer = setTimeout(searchCustomers, 300);
     return () => clearTimeout(timer);
-  }, [customerName, selectedCustomerId]);
+  }, [customerName, selectedCustomerId, isAdminEntry]); // isAdminEntry を依存配列に追加
 
   const handleSelectCustomer = (c) => {
     setCustomerName(c.name);
@@ -241,7 +247,9 @@ function ConfirmReservation() {
         <div style={{ position: 'relative' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>お客様名 (必須)</label>
           <input type="text" value={customerName} onChange={(e) => { setCustomerName(e.target.value); setSelectedCustomerId(null); }} placeholder="お名前を入力" style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} />
-          {suggestedCustomers.length > 0 && (
+          
+          {/* 🛡️ 修正箇所：isAdminEntry（ねじ込み）の時だけ候補を表示 */}
+          {isAdminEntry && suggestedCustomers.length > 0 && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '10px', zIndex: 100, border: '1px solid #eee' }}>
               {suggestedCustomers.map(c => (
                 <div key={c.id} onClick={() => handleSelectCustomer(c)} style={{ padding: '12px', borderBottom: '1px solid #f8fafc', cursor: 'pointer', fontSize: '0.9rem' }}>
