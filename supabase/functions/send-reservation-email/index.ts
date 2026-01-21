@@ -71,6 +71,15 @@ Deno.serve(async (req) => {
     // ==========================================
     if (type === 'remind_all') {
       const nowJST = new Date(new Date().getTime() + (9 * 60 * 60 * 1000));
+      
+      // 🛑 【新規追加】深夜送信防止ロジック（23時〜8時59分は待機）
+      const currentHour = nowJST.getUTCHours(); // +9時間しているのでこれでJSTの時が取れる
+      if (currentHour >= 23 || currentHour < 9) {
+        return new Response(JSON.stringify({ 
+          message: `現在は日本時間 ${currentHour}時 のため、深夜・早朝の送信を控えます。9時以降の実行時に送信されます。` 
+        }), { headers: corsHeaders });
+      }
+
       const tomorrowJST = new Date(nowJST);
       tomorrowJST.setDate(tomorrowJST.getDate() + 1);
       const dateStr = tomorrowJST.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -98,6 +107,7 @@ Deno.serve(async (req) => {
           minute: '2-digit' 
         });
         
+        // 🆕 💡 リマインド送信時も「1名予約なら番号なし」にするスマートロジック
         const isMulti = res.options?.people && res.options.people.length > 1;
         
         const menuDisplayHtml = isMulti 
@@ -108,6 +118,7 @@ Deno.serve(async (req) => {
           ? res.options.people.map((p: any, i: number) => `${i + 1}人目: ${p.services.map((s: any) => s.name).join(', ')}`).join('\n')
           : (res.options?.people?.[0]?.services?.map((s: any) => s.name).join(', ') || res.customer_name);
 
+        // 1. 【標準】リマインドメール送信
         const mailRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
@@ -131,12 +142,14 @@ Deno.serve(async (req) => {
           })
         });
 
+        // 2. 【オプション】リマインドLINE送信
         let lineOk = false;
         if (shop.notify_line_remind_enabled && shop.line_channel_access_token && res.line_user_id) {
           const lineText = `【リマインド】\n明日 ${resTime} よりご予約を承っております。\n\nお名前：${res.customer_name} 様\n店舗：${shop.business_name}\n\n📋 内容：\n${menuDisplayText}\n\nお気をつけてお越しくださいませ！`;
           lineOk = await safePushToLine(res.line_user_id, lineText, shop.line_channel_access_token, "REMIND");
         }
 
+        // 送信済みフラグを更新
         await supabaseAdmin.from('reservations').update({ remind_sent: true }).eq('id', res.id);
         report.push({ id: res.id, email: mailRes.ok, line: lineOk });
       }
@@ -147,7 +160,11 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ==========================================
+    // 🚀 パターンA：店主様への歓迎メール ＆ 三土手さんへの通知送信
+    // ==========================================
     if (type === 'welcome') {
+      // 1. 店主様への歓迎メール送信（ベータ版表記に更新）
       const welcomeRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -229,6 +246,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ==========================================
+    // 🚀 パターンB：通常の予約通知処理（既存ロジック）
+    // ==========================================
     const { data: shopProfile } = await supabaseAdmin
       .from('profiles')
       .select('line_channel_access_token, line_admin_user_id')
