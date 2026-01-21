@@ -43,6 +43,7 @@ function AdminDashboard() {
   const [emailContact, setEmailContact] = useState('');
   const [address, setAddress] = useState(''); 
   const [description, setDescription] = useState(''); 
+  const [introText, setIntroText] = useState(''); // 🆕 店舗紹介（長文）用のStateを追加
   const [notes, setNotes] = useState(''); 
   const [businessHours, setBusinessHours] = useState({});
   const [maxLastSlots, setMaxLastSlots] = useState(2);
@@ -85,7 +86,9 @@ function AdminDashboard() {
     const { data } = await supabase.from('profiles').select('*').eq('id', shopId).single();
     if (data) {
       setShopData(data); setAllowMultiple(data.allow_multiple_services); setPhone(data.phone || '');
-      setEmailContact(data.email_contact || ''); setAddress(data.address || ''); setDescription(data.description || '');
+      setEmailContact(data.email_contact || ''); setAddress(data.address || ''); 
+      setDescription(data.description || '');
+      setIntroText(data.intro_text || ''); // 🆕 データベースから長文を読み込み
       setNotes(data.notes || ''); 
       setBusinessHours(data.business_hours || {}); 
       setRegularHolidays(data.business_hours?.regular_holidays || {});
@@ -153,7 +156,10 @@ function AdminDashboard() {
   const handleFinalSave = async () => {
     const updatedBusinessHours = { ...businessHours, regular_holidays: regularHolidays };
     const { error } = await supabase.from('profiles').update({
-        business_name: businessName, business_name_kana: businessNameKana, phone, email_contact: emailContact, address, description, notes, 
+        business_name: businessName, business_name_kana: businessNameKana, phone, email_contact: emailContact, address, 
+        description, 
+        intro_text: introText, // 🆕 長文テキストを保存
+        notes, 
         business_hours: updatedBusinessHours, allow_multiple_services: allowMultiple, max_last_slots: maxLastSlots,
         slot_interval_min: slotIntervalMin, buffer_preparation_min: bufferPreparationMin, min_lead_time_hours: minLeadTimeHours, auto_fill_logic: autoFillLogic,
         image_url: imageUrl, official_url: officialUrl, line_official_url: lineOfficialUrl, notify_line_enabled: notifyLineEnabled, 
@@ -474,15 +480,21 @@ function AdminDashboard() {
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>業種</label>
               <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}><option value="美容室・理容室">美容室・理容室</option><option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option><option value="エステ・リラク">エステ・リラク</option><option value="整体・接骨院">整体・接骨院</option><option value="飲食店">飲食店</option><option value="その他">その他</option></select>
               
-              {/* 🆕 公式サイトURLの入力欄を追加 */}
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>🌐 公式サイトURL</label>
               <input value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="https://..." />
               
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>メール</label><input type="email" value={emailContact} onChange={(e) => setEmailContact(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗紹介文（ポータルサイト用）</label>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, minHeight: '80px', marginBottom: '15px' }} placeholder="お店のこだわりや特徴を入力してください" />
+              
+              {/* 🆕 サブタイトル（既存のdescriptionを活用） */}
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>サブタイトル（予約画面の見出し）</label>
+              <input value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="例：「イロとカタチ」の専門美容室" />
+
+              {/* 🆕 店舗紹介・詳細アピール文（新設したintroTextを活用） */}
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗紹介・詳細アピール文（長文・詳細ページ用）</label>
+              <textarea value={introText} onChange={(e) => setIntroText(e.target.value)} style={{ ...inputStyle, minHeight: '150px', marginBottom: '15px' }} placeholder="詳細ページに表示されるお店のこだわりや特徴を入力してください" />
+              
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>注意事項（予約画面用）</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} />
             </section>
 
@@ -494,7 +506,6 @@ function AdminDashboard() {
                   <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 新着予約のLINE通知を有効にする</span>
                 </label>
 
-                {/* 🆕 リマインドLINEチェック項目の追加 */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', padding: '10px', background: '#fff', borderRadius: '8px', border: '1px dashed #00b900' }}>
                   <input type="checkbox" checked={notifyLineRemindEnabled} onChange={(e) => setNotifyLineRemindEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} />
                   <div>
