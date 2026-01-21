@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { ChevronLeft, MapPin } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 
 function ShopList() {
   const { categoryId } = useParams(); // URLからカテゴリ名（例：美容室・理容室）を取得
@@ -22,7 +22,7 @@ function ShopList() {
       .from('profiles')
       .select('*')
       .eq('is_suspended', false)
-      .eq('business_type', categoryId) // ここで「振り分け」を行っています
+      .eq('business_type', categoryId)
       .not('business_name', 'is', null)
       .order('business_name_kana', { ascending: true });
 
@@ -68,14 +68,14 @@ function ShopList() {
               <div key={shop.id} style={{ 
                 background: '#fff', 
                 border: '1px solid #eee', 
-                display: 'flex', 
-                borderRadius: '16px', 
+                borderRadius: '8px', 
                 overflow: 'hidden', 
                 boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                flexDirection: 'column'
+                display: 'flex',
+                height: '120px' // カード全体の高さを固定して1:1を実現
               }}>
-                {/* 🆕 修正：カード全体の枠組みをLinkで囲い、ボタンエリアを削除 */}
-                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', width: '100%' }}>
+                  {/* 左側：1:1画像エリア（余白なし） */}
                   <div style={{ 
                     width: '120px', 
                     minWidth: '120px', 
@@ -83,18 +83,30 @@ function ShopList() {
                     background: '#f0f0f0',
                     backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', 
                     backgroundSize: 'cover',
-                    backgroundPosition: 'center'
+                    backgroundPosition: 'center',
+                    flexShrink: 0
                   }}>
                     {!shop.image_url && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.6rem', color: '#ccc' }}>NO IMAGE</div>}
                   </div>
-                  <div style={{ padding: '15px', flex: 1 }}>
-                    <h4 style={{ margin: '0 0 5px 0', fontSize: '1.05rem', fontWeight: 'bold' }}>{shop.business_name}</h4>
-                    <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '10px', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
-                      {shop.description || '店舗の詳細情報は準備中です。'}
+
+                  {/* 右側：情報エリア */}
+                  <div style={{ padding: '12px 15px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {shop.business_name}
+                    </h4>
+                    
+                    {/* サブタイトル内の「/」を改行に変換 */}
+                    <p style={{ fontSize: '0.75rem', color: '#666', margin: 0, lineHeight: '1.4' }}>
+                      {shop.description 
+                        ? shop.description.split('/').map((line, idx) => (
+                            <React.Fragment key={idx}>
+                              {line}
+                              {idx < shop.description.split('/').length - 1 && <br />}
+                            </React.Fragment>
+                          ))
+                        : '店舗の詳細情報は準備中です。'
+                      }
                     </p>
-                    <div style={{ fontSize: '0.7rem', color: '#999', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <MapPin size={12} /> {shop.address || '住所未登録'}
-                    </div>
                   </div>
                 </Link>
               </div>
@@ -103,7 +115,7 @@ function ShopList() {
         )}
       </div>
 
-      <div style={{ padding: '60px 20px', textAlign: 'center', color: '#999', fontSize: '0.7rem' }}>
+      <div style={{ padding: '60px 20px', textAlign: 'center', color: '#cbd5e1', fontSize: '0.7rem' }}>
         © 2026 Solopreneur Portal SoloPre
       </div>
     </div>

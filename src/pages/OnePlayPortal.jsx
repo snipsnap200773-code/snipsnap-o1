@@ -15,17 +15,48 @@ function OnePlayPortal() {
     { id: 3, date: '2026.01.15', category: 'お知らせ', title: 'ソロプレ・ベータ版の店舗登録数が30件を突破！' },
   ];
 
-  // 💡 カテゴリリスト（グリッド用）
+  // 💡 カテゴリリスト（デザイン刷新版）
+  // 業種名に合わせた「雰囲気のある」画像URLを設定しています
   const categoryList = [
-    { id: 'beauty', name: '美容室・理容室', icon: '✂️', color: '#eff6ff' },
-    { id: 'nail', name: 'ネイル・アイラッシュ', icon: '💅', color: '#fdf2f8' },
-    { id: 'esthe', name: 'エステ・リラク', icon: '💆', color: '#f0fdf4' },
-    { id: 'clinic', name: '整体・接骨院', icon: '🏥', color: '#fff7ed' },
-    { id: 'gourmet', name: '飲食店・カフェ', icon: '🍽️', color: '#fff1f2' },
-    { id: 'other', name: 'その他・ライフ', icon: '✨', color: '#f8fafc' },
+    { 
+      id: 'beauty', 
+      name: '美容室・理容室', 
+      enName: 'HAIR & BEAUTY', 
+      img: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=400&q=80' 
+    },
+    { 
+      id: 'nail', 
+      name: 'ネイル・アイラッシュ', 
+      enName: 'NAIL & LASH', 
+      img: 'https://images.unsplash.com/photo-1604654894610-df490998ea7e?auto=format&fit=crop&w=400&q=80' 
+    },
+    { 
+      id: 'esthe', 
+      name: 'エステ・リラク', 
+      enName: 'SPA & RELAX', 
+      img: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?auto=format&fit=crop&w=400&q=80' 
+    },
+    { 
+      id: 'clinic', 
+      name: '整体・接骨院', 
+      enName: 'HEALTH CARE', 
+      img: 'https://images.unsplash.com/photo-1519824145371-296894a0daa9?auto=format&fit=crop&w=400&q=80' 
+    },
+    { 
+      id: 'gourmet', 
+      name: '飲食店・カフェ', 
+      enName: 'FOOD & CAFE', 
+      img: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=400&q=80' 
+    },
+    { 
+      id: 'other', 
+      name: 'その他・ライフ', 
+      enName: 'OTHERS', 
+      img: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=400&q=80' 
+    },
   ];
 
-  // 💡 スライダーに表示する画像と情報の定義
+  // 💡 スライダー画像
   const sliderImages = [
     { id: 1, url: 'https://images.unsplash.com/photo-1600880210836-8f8fe100a35c?auto=format&fit=crop&w=1200&q=80', title: '自分らしく、働く。', desc: 'ソロ起業家を支えるポータルサイト' },
     { id: 2, url: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1200&q=80', title: '次世代の予約管理', desc: 'SnipSnapでビジネスを加速させる' },
@@ -135,7 +166,7 @@ function OnePlayPortal() {
 
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
         
-        {/* 🆕 3. 最新トピック (NEWS) セクション - 高さを低く調整 */}
+        {/* 3. 最新トピック (NEWS) セクション */}
         <div style={{ background: '#fff', borderRadius: '16px', padding: '15px', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
           <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ color: '#e60012' }}>●</span> 最新トピック
@@ -151,7 +182,7 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* 🆕 4. Pick Up Solopreneur セクション - 角の調整と画像余白の撤廃 */}
+        {/* 4. Pick Up Solopreneur セクション */}
         <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', letterSpacing: '1px', color: '#1a1a1a' }}>Pick Up Solopreneur</h3>
@@ -159,39 +190,26 @@ function OnePlayPortal() {
           </div>
           <div style={{ display: 'grid', gap: '15px' }}>
             {newShops.map(shop => (
-              <div key={shop.id} style={{ 
-                background: '#fff', 
-                border: '1px solid #eee', 
-                borderRadius: '8px', // 🛠️ 角の丸みを抑えました
-                overflow: 'hidden', 
-                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                display: 'flex',
-                flexDirection: 'column'
-              }}>
-                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'stretch' }}>
-                  <div style={{ 
-                    width: '120px', 
-                    minWidth: '120px', 
-                    height: '120px',
-                    background: '#f0f0f0',
-                    backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', 
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    position: 'relative'
-                    // 🛠️ 余白（padding）設定を完全に無くしました
-                  }}>
+              <div key={shop.id} style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.03)', display: 'flex', height: '120px' }}>
+                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', width: '100%' }}>
+                  <div style={{ width: '120px', minWidth: '120px', height: '120px', background: '#f0f0f0', backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', flexShrink: 0 }}>
                     {!shop.image_url && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.6rem', color: '#ccc' }}>NO IMAGE</div>}
                     <div style={{ position: 'absolute', top: '0', left: '0', background: 'rgba(230,0,18,0.9)', color: '#fff', fontSize: '0.5rem', fontWeight: 'bold', padding: '4px 8px', borderRadius: '0 0 4px 0' }}>PICK UP</div>
                   </div>
                   <div style={{ padding: '12px 15px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <div style={{ fontSize: '0.6rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '2px' }}>{shop.business_type}</div>
-                    <h4 style={{ margin: '0 0 3px 0', fontSize: '1rem', fontWeight: 'bold' }}>{shop.business_name}</h4>
-                    <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '6px', display: '-webkit-box', WebkitLineClamp: '1', WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
-                      {shop.description || '店舗の詳細情報は準備中です。'}
+                    <h4 style={{ margin: '0 0 3px 0', fontSize: '1rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{shop.business_name}</h4>
+                    <p style={{ fontSize: '0.75rem', color: '#666', margin: 0, lineHeight: '1.4' }}>
+                      {shop.description 
+                        ? shop.description.split('/').map((line, idx) => (
+                            <React.Fragment key={idx}>
+                              {line}
+                              {idx < shop.description.split('/').length - 1 && <br />}
+                            </React.Fragment>
+                          ))
+                        : '店舗の詳細情報は準備中です。'
+                      }
                     </p>
-                    <div style={{ fontSize: '0.7rem', color: '#999', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                      <MapPin size={12} /> {shop.address || '住所未登録'}
-                    </div>
                   </div>
                 </Link>
               </div>
@@ -199,29 +217,39 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* 5. カテゴリグリッドセクション */}
+        {/* 🆕 5. カテゴリグリッドセクション - デザイン大改造版 */}
         <div style={{ marginBottom: '50px' }}>
-          <div style={{ borderLeft: '4px solid #333', paddingLeft: '12px', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>カテゴリーから探す</h3>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#666' }}>目的のサービスをタップしてください</p>
+          <div style={{ borderLeft: '4px solid #1e293b', paddingLeft: '15px', marginBottom: '25px' }}>
+            <h3 style={{ margin: 0, fontSize: '1.3rem', fontWeight: '900', color: '#1e293b' }}>FIND YOUR SERVICE</h3>
+            <p style={{ margin: '5px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold' }}>カテゴリーから探す</p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px' }}>
             {categoryList.map((cat) => (
-              <Link key={cat.id} to={`/category/${cat.name}`} style={{ textDecoration: 'none' }}>
+              <Link key={cat.id} to={`/category/${cat.name}`} style={{ textDecoration: 'none', position: 'relative' }}>
                 <div style={{ 
-                  background: '#fff', 
+                  height: '140px',
                   borderRadius: '16px', 
-                  padding: '20px 10px', 
+                  backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.7)), url(${cat.img})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
                   display: 'flex', 
                   flexDirection: 'column', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                  border: '1px solid #eee',
-                  transition: 'transform 0.1s active',
+                  alignItems: 'flex-start', 
+                  justifyContent: 'flex-end',
+                  padding: '15px',
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
+                  overflow: 'hidden',
+                  transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}>
-                  <span style={{ fontSize: '2.2rem', marginBottom: '10px' }}>{cat.icon}</span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#333', textAlign: 'center' }}>{cat.name}</span>
+                  {/* 背景の薄いブラー効果（高級感の演出） */}
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'grayscale(0.2)' }}></div>
+                  
+                  {/* テキストコンテンツ */}
+                  <div style={{ position: 'relative', zIndex: 1 }}>
+                    <div style={{ color: '#fff', fontSize: '0.55rem', fontWeight: 'bold', letterSpacing: '1px', opacity: 0.8, marginBottom: '2px' }}>{cat.enName}</div>
+                    <div style={{ color: '#fff', fontSize: '0.95rem', fontWeight: '900', letterSpacing: '0.5px' }}>{cat.name}</div>
+                  </div>
                 </div>
               </Link>
             ))}
