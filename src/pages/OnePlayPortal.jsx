@@ -56,7 +56,7 @@ function OnePlayPortal() {
           .slice(0, 3);
         setNewShops(latest);
 
-        // 2. 全店舗（今回はカテゴリ表示がメインなので内部用として維持）
+        // 2. 全店舗
         setShops(data);
       }
     };
@@ -64,7 +64,7 @@ function OnePlayPortal() {
     fetchShops();
     return () => {
       clearTimeout(scrollTimer);
-      clearInterval(sliderTimer); // タイマー解除（メモリリーク防止）
+      clearInterval(sliderTimer); // タイマー解除
     };
   }, []);
 
@@ -119,7 +119,6 @@ function OnePlayPortal() {
             </p>
           </div>
         ))}
-        {/* インジケーター */}
         <div style={{ position: 'absolute', bottom: '20px', width: '100%', display: 'flex', justifyContent: 'center', gap: '10px' }}>
           {sliderImages.map((_, i) => (
             <div
@@ -156,22 +155,34 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* 4. 新着店舗 (NEW OPEN) セクション */}
+        {/* 🆕 4. Pick Up Solopreneur セクション（刷新版） */}
         <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '15px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', letterSpacing: '1px' }}>NEW OPEN</h3>
-            <span style={{ fontSize: '0.7rem', color: '#999' }}>新しく仲間入りしたソロ起業家</span>
+            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', letterSpacing: '1px', color: '#1a1a1a' }}>Pick Up Solopreneur</h3>
+            <span style={{ fontSize: '0.7rem', color: '#999' }}>注目のソロ起業家たち</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '15px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
             {newShops.map(shop => (
               <Link key={shop.id} to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none' }}>
-                <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', position: 'relative' }}>
-                  <div style={{ width: '100%', height: '160px', background: '#eee', backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                    <div style={{ position: 'absolute', top: '10px', left: '10px', background: '#e60012', color: '#fff', fontSize: '0.6rem', fontWeight: 'bold', padding: '3px 8px', borderRadius: '4px' }}>NEW</div>
+                <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  {/* 画像エリア：1:1画像が綺麗に収まるように調整 */}
+                  <div style={{ width: '100%', aspectRatio: '16 / 9', background: '#f8fafc', overflow: 'hidden', position: 'relative' }}>
+                    {shop.image_url ? (
+                      <img src={shop.image_url} alt={shop.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: '0.8rem' }}>NO IMAGE</div>
+                    )}
+                    <div style={{ position: 'absolute', top: '12px', left: '12px', background: 'rgba(230,0,18,0.9)', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', padding: '4px 10px', borderRadius: '4px', backdropFilter: 'blur(4px)' }}>PICK UP</div>
                   </div>
-                  <div style={{ padding: '15px' }}>
-                    <span style={{ fontSize: '0.65rem', color: '#2563eb', fontWeight: 'bold' }}>{shop.business_type}</span>
-                    <h4 style={{ margin: '5px 0 0 0', fontSize: '1rem', color: '#333', fontWeight: 'bold' }}>{shop.business_name}</h4>
+                  {/* 情報エリア */}
+                  <div style={{ padding: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '0.65rem', background: '#eff6ff', color: '#2563eb', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px' }}>{shop.business_type}</span>
+                    </div>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#1a1a1a', fontWeight: 'bold', lineHeight: '1.4' }}>{shop.business_name}</h4>
+                    <p style={{ margin: '10px 0 0 0', fontSize: '0.8rem', color: '#64748b', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.6' }}>
+                      {shop.description || '一歩先ゆくソロ起業家のサービスを体験してみませんか。'}
+                    </p>
                   </div>
                 </div>
               </Link>
@@ -208,7 +219,7 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* 🆕 6. トライアル登録への案内 */}
+        {/* 6. トライアル登録への案内 */}
         <div style={{ marginTop: '20px', padding: '30px 20px', background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', borderRadius: '20px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
           <h4 style={{ color: '#fff', margin: '0 0 10px 0', fontSize: '1.1rem', fontWeight: 'bold' }}>あなたのビジネスも掲載しませんか？</h4>
           <p style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: '1.6', marginBottom: '20px' }}>ソロプレは個人で頑張る起業家を応援します。<br/>今ならベータ版につき、無料で登録可能です。</p>
