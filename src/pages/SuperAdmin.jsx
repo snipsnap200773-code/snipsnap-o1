@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+// 🆕 アイコンを追加
+import { MapPin, Plus, Trash2, Save, Image as ImageIcon, Bell } from 'lucide-react';
 
 function SuperAdmin() {
   // 🆕 管理者ログイン用の追加State
@@ -10,7 +12,7 @@ function SuperAdmin() {
   const MASTER_PASSWORD = import.meta.env.VITE_SUPER_MASTER_PASSWORD; 
   const DELETE_PASSWORD = import.meta.env.VITE_SUPER_DELETE_PASSWORD;
 
-  // --- 既存のState群 ---
+  // --- 既存の店舗管理State群 ---
   const [newShopName, setNewShopName] = useState('');
   const [newShopKana, setNewShopKana] = useState('');
   const [newOwnerName, setNewOwnerName] = useState('');
@@ -34,19 +36,33 @@ function SuperAdmin() {
   const [editLineToken, setEditLineToken] = useState('');
   const [editLineAdminId, setEditLineAdminId] = useState('');
 
-  // ログイン済みの場合のみデータを取得するよう修正
+  // 🆕 ポータルコンテンツ管理用のState
+  const [newsList, setNewsList] = useState([]);
+  const [categoriesList, setCategoriesList] = useState([]);
+  // お知らせ新規作成用
+  const [newNewsDate, setNewNewsDate] = useState('');
+  const [newNewsCat, setNewNewsCat] = useState('お知らせ');
+  const [newNewsTitle, setNewNewsTitle] = useState('');
+
+  // ログイン済みの場合のみデータを取得
   useEffect(() => { 
     if (isAuthorized) {
       fetchCreatedShops(); 
+      fetchPortalContent(); // 🆕 ポータル用データの取得
     }
   }, [isAuthorized]);
+
+  // 🆕 ポータルコンテンツ取得
+  const fetchPortalContent = async () => {
+    const { data: news } = await supabase.from('portal_news').select('*').order('publish_date', { ascending: false });
+    if (news) setNewsList(news);
+    const { data: cats } = await supabase.from('portal_categories').select('*').order('sort_order', { ascending: true });
+    if (cats) setCategoriesList(cats);
+  };
 
   // 🆕 パスワードチェック関数
   const handleLogin = (e) => {
     e.preventDefault();
-    // デバッグ用：もしログインできない場合は F12 キーのコンソールで「正解」が読み込めているか確認できます
-    console.log("MASTER_PASSWORD_STATUS:", MASTER_PASSWORD ? "Loaded" : "Not Found");
-    
     if (inputPass === MASTER_PASSWORD) {
       setIsAuthorized(true);
     } else {
@@ -123,6 +139,36 @@ function SuperAdmin() {
     }
   };
 
+  // 🆕 お知らせ追加
+  const addNews = async () => {
+    if (!newNewsDate || !newNewsTitle) return alert('日付とタイトルを入力してください');
+    const { error } = await supabase.from('portal_news').insert([{ 
+      publish_date: newNewsDate, 
+      category: newNewsCat, 
+      title: newNewsTitle 
+    }]);
+    if (!error) {
+      setNewNewsDate(''); setNewNewsTitle(''); fetchPortalContent();
+    }
+  };
+
+  // 🆕 お知らせ削除
+  const deleteNews = async (id) => {
+    if (window.confirm('このお知らせを削除しますか？')) {
+      await supabase.from('portal_news').delete().eq('id', id);
+      fetchPortalContent();
+    }
+  };
+
+  // 🆕 カテゴリ更新
+  const updateCategory = async (id, enName, imgUrl) => {
+    const { error } = await supabase.from('portal_categories').update({ 
+      en_name: enName, 
+      image_url: imgUrl 
+    }).eq('id', id);
+    if (!error) alert('カテゴリ設定を更新しました');
+  };
+
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     alert('コピーしました！');
@@ -132,7 +178,7 @@ function SuperAdmin() {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f4f7f9' }}>
         <form onSubmit={handleLogin} style={{ background: '#fff', padding: '40px', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', textAlign: 'center', width: '320px' }}>
-          <h2 style={{ color: '#2563eb', marginBottom: '20px', fontSize: '1.4rem', fontWeight: '900' }}>SnipSnap Admin</h2>
+          <h2 style={{ color: '#e60012', marginBottom: '20px', fontSize: '1.4rem', fontWeight: '900' }}>ソロプレ Admin</h2>
           <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '20px' }}>統括管理パスワードを入力してください</p>
           <input 
             type="password" 
@@ -153,7 +199,54 @@ function SuperAdmin() {
   return (
     <div style={{ padding: '15px', fontFamily: 'sans-serif', backgroundColor: '#f4f7f9', minHeight: '100vh', paddingBottom: '100px' }}>
       <div style={{ maxWidth: '650px', margin: '0 auto' }}>
-        <h1 style={{ fontSize: '1.4rem', borderLeft: '6px solid #2563eb', paddingLeft: '15px', marginBottom: '25px', color: '#1e293b' }}>🛠 店舗統括管理</h1>
+        <h1 style={{ fontSize: '1.4rem', borderLeft: '6px solid #e60012', paddingLeft: '15px', marginBottom: '25px', color: '#1e293b' }}>🛠 ソロプレ統括管理</h1>
+
+        {/* --- 🆕 セクション 1: 最新トピック管理 --- */}
+        <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', marginBottom: '30px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+          <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#1e293b', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Bell size={18} color="#e60012" /> 最新トピックの管理
+          </h3>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '15px', flexWrap: 'wrap' }}>
+            <input value={newNewsDate} onChange={(e) => setNewNewsDate(e.target.value)} placeholder="日付 (2026.01.21)" style={{ ...smallInput, flex: 1 }} />
+            <select value={newNewsCat} onChange={(e) => setNewNewsCat(e.target.value)} style={{ ...smallInput, flex: 1 }}>
+              <option value="お知らせ">お知らせ</option>
+              <option value="重要">重要</option>
+              <option value="新機能">新機能</option>
+              <option value="キャンペーン">キャンペーン</option>
+            </select>
+          </div>
+          <textarea value={newNewsTitle} onChange={(e) => setNewNewsTitle(e.target.value)} placeholder="トピックのタイトル内容" style={{ ...smallInput, height: '60px', marginBottom: '10px' }} />
+          <button onClick={addNews} style={{ width: '100%', padding: '12px', background: '#1e293b', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+            <Plus size={18} /> トピックを追加
+          </button>
+          
+          <div style={{ marginTop: '20px', maxHeight: '200px', overflowY: 'auto', borderTop: '1px solid #f0f0f0', paddingTop: '10px' }}>
+            {newsList.map(n => (
+              <div key={n.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px dashed #eee' }}>
+                <div style={{ fontSize: '0.75rem' }}>
+                  <span style={{ color: '#999', marginRight: '8px' }}>{n.publish_date}</span>
+                  <span style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', marginRight: '8px' }}>{n.category}</span>
+                  <span style={{ color: '#333' }}>{n.title}</span>
+                </div>
+                <button onClick={() => deleteNews(n.id)} style={{ border: 'none', background: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={16}/></button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* --- 🆕 セクション 2: カテゴリ画像・英語名管理 --- */}
+        <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', marginBottom: '30px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+          <h3 style={{ marginTop: 0, fontSize: '1rem', color: '#1e293b', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ImageIcon size={18} color="#2563eb" /> カテゴリデザイン管理
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {categoriesList.map(cat => (
+              <CategoryRow key={cat.id} cat={cat} onSave={updateCategory} />
+            ))}
+          </div>
+        </div>
+
+        {/* --- 既存の店舗管理セクション --- */}
         <div style={{ background: '#fff', padding: '15px', borderRadius: '16px', marginBottom: '30px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
           <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: '#64748b', marginBottom: '15px' }}>🆕 新規店舗の発行</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -171,14 +264,15 @@ function SuperAdmin() {
               <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
               <option value="エステ・リラク">エステ・リラク</option>
               <option value="整体・接骨院">整体・接骨院</option>
-              <option value="飲食店">飲食店</option>
-              <option value="その他">その他</option>
+              <option value="飲食店・カフェ">飲食店・カフェ</option>
+              <option value="その他・ライフ">その他・ライフ</option>
             </select>
             <input value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="メールアドレス" style={smallInput} />
             <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="電話番号" style={smallInput} />
-            <button onClick={createNewShop} style={{ padding: '14px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>店舗を発行する</button>
+            <button onClick={createNewShop} style={{ padding: '14px', background: '#e60012', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>店舗を発行する</button>
           </div>
         </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {getSortedShops().map(shop => (
             <div key={shop.id} style={{ background: '#fff', padding: '15px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
@@ -201,8 +295,8 @@ function SuperAdmin() {
                         <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
                         <option value="エステ・リラク">エステ・リラク</option>
                         <option value="整体・接骨院">整体・接骨院</option>
-                        <option value="飲食店">飲食店</option>
-                        <option value="その他">その他</option>
+                        <option value="飲食店・カフェ">飲食店・カフェ</option>
+                        <option value="その他・ライフ">その他・ライフ</option>
                       </select>
                       <input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} style={smallInput} placeholder="メールアドレス" />
                       <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} style={smallInput} placeholder="電話番号" />
@@ -266,9 +360,28 @@ function SuperAdmin() {
   );
 }
 
+// 🆕 カテゴリ編集用の個別コンポーネント（管理を楽にするため）
+function CategoryRow({ cat, onSave }) {
+  const [enName, setEnName] = useState(cat.en_name || "");
+  const [imgUrl, setImgUrl] = useState(cat.image_url || "");
+
+  return (
+    <div style={{ border: '1px solid #f0f0f0', padding: '12px', borderRadius: '10px', background: '#fcfcfc' }}>
+      <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '8px', color: '#1e293b' }}>{cat.name}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <input value={enName} onChange={(e) => setEnName(e.target.value)} placeholder="英語名 (例: HAIR & BEAUTY)" style={{ ...smallInput, padding: '6px 10px', fontSize: '0.75rem' }} />
+        <div style={{ display: 'flex', gap: '5px' }}>
+          <input value={imgUrl} onChange={(e) => setImgUrl(e.target.value)} placeholder="背景画像URL (Unsplash等)" style={{ ...smallInput, padding: '6px 10px', fontSize: '0.75rem', flex: 1 }} />
+          <button onClick={() => onSave(cat.id, enName, imgUrl)} style={{ ...openBtnStyle, background: '#10b981', padding: '6px 12px' }}><Save size={14} /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const smallInput = { padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' };
 const actionBtnStyle = { background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#475569', fontSize: '0.65rem', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer' };
 const iconBtnStyle = { padding: '8px', fontSize: '0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer' };
-const openBtnStyle = { padding: '8px 12px', fontSize: '0.7rem', borderRadius: '6px', background: '#2563eb', color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center' };
+const openBtnStyle = { padding: '8px 12px', fontSize: '0.7rem', borderRadius: '6px', background: '#2563eb', color: '#fff', textDecoration: 'none', display: 'flex', alignItems: 'center', cursor: 'pointer', border: 'none' };
 
 export default SuperAdmin;
