@@ -14,6 +14,7 @@ function OnePlayPortal() {
     { id: 3, date: '2026.01.15', category: 'お知らせ', title: 'ソロプレ・ベータ版の店舗登録数が30件を突破！' },
   ];
 
+  // 💡 スライダーに表示する画像と情報の定義
   const sliderImages = [
     { id: 1, url: 'https://images.unsplash.com/photo-1600880210836-8f8fe100a35c?auto=format&fit=crop&w=1200&q=80', title: '自分らしく、働く。', desc: 'ソロ起業家を支えるポータルサイト' },
     { id: 2, url: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1200&q=80', title: '次世代の予約管理', desc: 'SnipSnapでビジネスを加速させる' },
@@ -21,10 +22,12 @@ function OnePlayPortal() {
   ];
 
   useEffect(() => {
+    // 🆕 最強のスクロールリセット
     const scrollTimer = setTimeout(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     }, 100);
 
+    // 🆕 自動スライダーのタイマー設定（5秒ごとに切り替え）
     const sliderTimer = setInterval(() => {
       setCurrentSlide((prev) => (prev === sliderImages.length - 1 ? 0 : prev + 1));
     }, 5000);
@@ -37,13 +40,13 @@ function OnePlayPortal() {
         .not('business_name', 'is', null);
       
       if (data) {
-        // 1. 【新着店舗用】純粋に登録日が新しい順に3件
+        // 1. 【新着店舗用】登録日が新しい順に3件を抽出
         const latest = [...data]
           .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
           .slice(0, 3);
         setNewShops(latest);
 
-        // 2. 【店舗一覧用】SnipSnapトップ + あいうえお順
+        // 2. 【店舗一覧用】「美容室SnipSnap」をトップに、それ以外をあいうえお順にする並び替え
         const sortedShops = [...data].sort((a, b) => {
           if (a.business_name === '美容室SnipSnap') return -1;
           if (b.business_name === '美容室SnipSnap') return 1;
@@ -56,14 +59,14 @@ function OnePlayPortal() {
     fetchShops();
     return () => {
       clearTimeout(scrollTimer);
-      clearInterval(sliderTimer);
+      clearInterval(sliderTimer); // タイマー解除（メモリリーク防止）
     };
   }, []);
 
   return (
     <div style={{ backgroundColor: '#f4f7f9', minHeight: '100vh', fontFamily: '"Hiragino Sans", "Meiryo", sans-serif', color: '#333', width: '100%' }}>
       
-      {/* --- 1. ヘッダーエリア --- */}
+      {/* 1. ヘッダーエリア */}
       <div style={{ background: '#fff', padding: '15px 20px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -71,7 +74,8 @@ function OnePlayPortal() {
             <div style={{ height: '20px', width: '1px', background: '#ccc', margin: '0 12px' }}></div>
             <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'bold' }}>Solopreneur Portal</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {/* ETC風のハンバーガーメニュー */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', cursor: 'pointer' }}>
             <div style={{ width: '22px', height: '2px', background: '#333' }}></div>
             <div style={{ width: '22px', height: '2px', background: '#333' }}></div>
             <div style={{ width: '22px', height: '2px', background: '#333' }}></div>
@@ -79,24 +83,61 @@ function OnePlayPortal() {
         </div>
       </div>
 
-      {/* --- 2. 自動カルーセルスライダー --- */}
+      {/* 2. 自動カルーセルスライダー */}
       <div style={{ width: '100%', position: 'relative', height: '320px', overflow: 'hidden', background: '#000' }}>
         {sliderImages.map((slide, index) => (
-          <div key={slide.id} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundImage: `linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.5)), url(${slide.url})`, backgroundSize: 'cover', backgroundPosition: 'center', opacity: index === currentSlide ? 1 : 0, transition: 'opacity 1.5s ease-in-out', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#fff', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '2rem', fontWeight: '900', margin: '0 0 10px 0', textShadow: '0 2px 15px rgba(0,0,0,0.6)', transform: index === currentSlide ? 'translateY(0)' : 'translateY(20px)', transition: '0.8s ease-out' }}>{slide.title}</h2>
-            <p style={{ fontSize: '1rem', margin: 0, textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>{slide.desc}</p>
+          <div
+            key={slide.id}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundImage: `linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.5)), url(${slide.url})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              opacity: index === currentSlide ? 1 : 0,
+              transition: 'opacity 1.5s ease-in-out',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              color: '#fff',
+              textAlign: 'center'
+            }}
+          >
+            <h2 style={{ fontSize: '2rem', fontWeight: '900', margin: '0 0 10px 0', textShadow: '0 2px 15px rgba(0,0,0,0.6)', transform: index === currentSlide ? 'translateY(0)' : 'translateY(20px)', transition: '0.8s ease-out' }}>
+              {slide.title}
+            </h2>
+            <p style={{ fontSize: '1rem', margin: 0, textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}>
+              {slide.desc}
+            </p>
           </div>
         ))}
+        {/* インジケーター */}
         <div style={{ position: 'absolute', bottom: '20px', width: '100%', display: 'flex', justifyContent: 'center', gap: '10px' }}>
           {sliderImages.map((_, i) => (
-            <div key={i} onClick={() => setCurrentSlide(i)} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i === currentSlide ? '#fff' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: '0.3s' }}></div>
+            <div
+              key={i}
+              onClick={() => setCurrentSlide(i)}
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: i === currentSlide ? '#fff' : 'rgba(255,255,255,0.4)',
+                cursor: 'pointer',
+                transition: '0.3s'
+              }}
+            ></div>
           ))}
         </div>
       </div>
 
+      {/* 3. メインコンテンツエリア */}
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
         
-        {/* --- 3. 最新トピック (NEWS) --- */}
+        {/* 最新トピック (NEWS) セクション */}
         <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '30px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
           <h3 style={{ margin: '0 0 15px 0', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ color: '#e60012' }}>●</span> 最新トピック
@@ -112,7 +153,7 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* --- 4. 新着店舗 (NEW OPEN) --- */}
+        {/* 新着店舗 (NEW OPEN) セクション */}
         <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', letterSpacing: '1px' }}>NEW OPEN</h3>
@@ -135,26 +176,67 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* --- 5. 掲載店舗一覧 (MAIN LIST) --- */}
+        {/* 掲載店舗一覧 */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>🏪 掲載店舗一覧</h3>
-            <span style={{ fontSize: '0.85rem', color: '#666' }}><b>{shops.length}</b> 件の店舗</span>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ background: '#333', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem' }}>SHOP</span>
+              掲載中の店舗
+            </h3>
+            <span style={{ fontSize: '0.9rem', color: '#666' }}>
+              合計 <b>{shops.length}</b> 件
+            </span>
           </div>
           
-          <div style={{ display: 'grid', gap: '15px' }}>
+          <div style={{ display: 'grid', gap: '20px' }}>
             {shops.map(shop => (
-              <div key={shop.id} style={{ background: '#fff', border: '1px solid #eee', display: 'flex', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                <div style={{ width: '110px', minWidth: '110px', background: '#f0f0f0', backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
-                <div style={{ padding: '15px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <h4 style={{ margin: '0 0 5px 0', fontSize: '1.1rem', color: '#1a1a1a' }}>{shop.business_name}</h4>
-                  <div style={{ fontSize: '0.75rem', color: '#666', lineHeight: '1.4', marginBottom: '8px', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{shop.description || '詳細情報は準備中です。'}</div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1, textDecoration: 'none' }}>
-                      <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '8px 0', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold' }}>予約</div>
-                    </Link>
-                    <div style={{ flex: 1, background: '#f1f5f9', color: '#475569', textAlign: 'center', padding: '8px 0', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold' }}>詳細</div>
+              <div key={shop.id} style={{ 
+                background: '#fff', 
+                border: '1px solid #eee', 
+                display: 'flex', 
+                overflow: 'hidden',
+                borderRadius: '16px',
+                flexDirection: 'column',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                transition: 'transform 0.2s',
+                cursor: 'pointer'
+              }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #f8f8f8' }}>
+                  <div style={{ 
+                    width: '140px', 
+                    minWidth: '140px', 
+                    height: '140px',
+                    background: '#f0f0f0',
+                    backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', 
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.7rem',
+                    color: '#ccc'
+                  }}>
+                    {!shop.image_url && 'NO IMAGE'}
                   </div>
+
+                  <div style={{ padding: '20px', flex: 1 }}>
+                    <h3 style={{ margin: '0 0 10px 0', fontSize: '1.25rem', color: '#1a1a1a', fontWeight: 'bold' }}>
+                      {shop.business_name}
+                    </h3>
+                    <div style={{ fontSize: '0.85rem', color: '#666', lineHeight: '1.6', marginBottom: '12px' }}>
+                      {shop.description || '店舗の詳細情報は準備中です。'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#999', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      📍 {shop.address || '住所未登録'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', padding: '15px', gap: '10px', background: '#fff' }}>
+                  <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1.2, textDecoration: 'none' }}>
+                    <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '12px 0', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(37,99,235,0.2)' }}>✉️ 予約手続きへ</div>
+                  </Link>
+                  <div style={{ flex: 1, background: '#f1f5f9', color: '#475569', textAlign: 'center', padding: '12px 0', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', border: '1px solid #e2e8f0' }}>🌐 詳細・地図</div>
                 </div>
               </div>
             ))}
@@ -162,9 +244,11 @@ function OnePlayPortal() {
         </div>
       </div>
 
-      {/* --- 6. フッター --- */}
+      {/* 6. フッター */}
       <div style={{ padding: '60px 20px', textAlign: 'center', background: '#fff', marginTop: '40px', borderTop: '1px solid #eee' }}>
-        <Link to="/" style={{ color: '#666', textDecoration: 'none', fontSize: '0.8rem', fontWeight: 'bold' }}>← 本番のソロプレへ戻る</Link>
+        <Link to="/" style={{ color: '#666', textDecoration: 'none', fontSize: '0.8rem', fontWeight: 'bold' }}>
+           ← 本番のソロプレへ戻る
+        </Link>
         <p style={{ margin: '20px 0 0 0', fontSize: '0.7rem', color: '#bbb' }}>© 2026 Solopreneur Portal SoloPre</p>
       </div>
     </div>
