@@ -71,14 +71,26 @@ function ShopDetail() {
 
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
         
-        {/* 基本情報 */}
+        {/* 基本情報カード */}
         <div style={{ background: '#fff', borderRadius: '24px', padding: '25px', marginTop: '-40px', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', position: 'relative' }}>
           <div style={{ background: '#2563eb', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '4px 12px', borderRadius: '20px', display: 'inline-block', marginBottom: '10px' }}>
             {shop.business_type}
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '900', margin: '0 0 15px 0', color: '#1a1a1a' }}>{shop.business_name}</h2>
+          
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '900', margin: '0 0 5px 0', color: '#1a1a1a' }}>
+            {shop.business_name}
+          </h2>
+
+          {/* 🆕 サブタイトル（旧：店舗紹介文）を見出しとして表示 */}
+          {shop.description && (
+            <div style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '15px' }}>
+              {shop.description}
+            </div>
+          )}
+
+          {/* 🆕 店舗紹介・詳細アピール文（長文）をメイン文章として表示 */}
           <p style={{ fontSize: '0.95rem', color: '#4b5563', lineHeight: '1.8', whiteSpace: 'pre-wrap', marginBottom: '20px' }}>
-            {shop.description || '店舗の詳細情報は準備中です。'}
+            {shop.intro_text || '店舗の詳細情報は準備中です。'}
           </p>
 
           {/* 📞 住所・連絡先 */}
