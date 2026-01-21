@@ -21,7 +21,7 @@ function SuperAdmin() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [activeTab, setActiveTab] = useState('list');
 
-  // --- フォームState (省略なし) ---
+  // --- フォームState ---
   const [newShopName, setNewShopName] = useState('');
   const [newShopKana, setNewShopKana] = useState('');
   const [newOwnerName, setNewOwnerName] = useState('');
@@ -103,8 +103,8 @@ function SuperAdmin() {
     const newPass = Math.random().toString(36).slice(-8);
     const { error } = await supabase.from('profiles').insert([{ business_name: newShopName, business_name_kana: newShopKana, owner_name: newOwnerName, owner_name_kana: newOwnerNameKana, business_type: newBusinessType, email_contact: newEmail, phone: newPhone, admin_password: newPass, line_channel_access_token: newLineToken, line_admin_user_id: newLineAdminId, notify_line_enabled: true }]);
     if (!error) {
-      alert(`「${newShopName}」作成完了！`);
-      setNewShopName(''); fetchCreatedShops(); setActiveTab('list');
+      alert(`「${newShopName}」作成完了！ PW: ${newPass}`);
+      setNewShopName(''); setNewShopKana(''); setNewOwnerName(''); setNewOwnerNameKana(''); fetchCreatedShops(); setActiveTab('list');
     }
   };
 
@@ -127,6 +127,7 @@ function SuperAdmin() {
   };
 
   const addNews = async () => {
+    if (!newNewsDate || !newNewsTitle) return alert('日付とタイトルを入力してください');
     const { error } = await supabase.from('portal_news').insert([{ publish_date: newNewsDate, category: newNewsCat, title: newNewsTitle }]);
     if (!error) { setNewNewsDate(''); setNewNewsTitle(''); fetchPortalContent(); }
   };
@@ -185,8 +186,14 @@ function SuperAdmin() {
     <div style={panelStyle}>
       <h3 style={panelTitle}><PlusSquare size={18} /> 新規店舗の発行</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <input value={newOwnerName} onChange={(e) => setNewOwnerName(e.target.value)} placeholder="代表者名" style={smallInput} />
-        <input value={newShopName} onChange={(e) => setNewShopName(e.target.value)} placeholder="店舗名" style={smallInput} />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input value={newOwnerName} onChange={(e) => setNewOwnerName(e.target.value)} placeholder="代表者名" style={smallInput} />
+          <input value={newOwnerNameKana} onChange={(e) => setNewOwnerNameKana(e.target.value)} placeholder="かな" style={smallInput} />
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input value={newShopName} onChange={(e) => setNewShopName(e.target.value)} placeholder="店舗名" style={smallInput} />
+          <input value={newShopKana} onChange={(e) => setNewShopKana(e.target.value)} placeholder="かな" style={smallInput} />
+        </div>
         <select value={newBusinessType} onChange={(e) => setNewBusinessType(e.target.value)} style={smallInput}>
           <option value="">-- 業種を選択 --</option>
           {categoriesList.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -202,10 +209,18 @@ function SuperAdmin() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
       <div style={panelStyle}>
         <h3 style={panelTitle}><Bell size={18} /> トピック管理</h3>
-        <input value={newNewsTitle} onChange={(e) => setNewNewsTitle(e.target.value)} placeholder="タイトル内容" style={smallInput} />
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+          <input value={newNewsDate} onChange={(e) => setNewNewsDate(e.target.value)} placeholder="日付 (2026.01.21)" style={{ ...smallInput, flex: 1 }} />
+          <select value={newNewsCat} onChange={(e) => setNewNewsCat(e.target.value)} style={{ ...smallInput, flex: 1 }}>
+            <option value="お知らせ">お知らせ</option>
+            <option value="重要">重要</option>
+            <option value="新機能">新機能</option>
+          </select>
+        </div>
+        <textarea value={newNewsTitle} onChange={(e) => setNewNewsTitle(e.target.value)} placeholder="タイトル内容" style={{ ...smallInput, height: '60px' }} />
         <button onClick={addNews} style={{ ...secondaryBtn, width: '100%', marginTop: '10px' }}>お知らせ追加</button>
-        <div style={{ marginTop: '15px' }}>
-          {newsList.map(n => <div key={n.id} style={newsItemStyle}><span>{n.title}</span><Trash2 size={14} color="#ef4444" onClick={() => deleteNews(n.id)} style={{cursor:'pointer'}} /></div>)}
+        <div style={{ marginTop: '15px', maxHeight: '200px', overflowY: 'auto' }}>
+          {newsList.map(n => <div key={n.id} style={newsItemStyle}><span>{n.publish_date} {n.title}</span><Trash2 size={14} color="#ef4444" onClick={() => deleteNews(n.id)} style={{cursor:'pointer'}} /></div>)}
         </div>
       </div>
       <div style={panelStyle}>
@@ -221,7 +236,7 @@ function SuperAdmin() {
     <div style={{ backgroundColor: '#f0f2f5', minHeight: '100vh', paddingBottom: isMobile ? '100px' : '20px', boxSizing: 'border-box', overflowX: 'hidden' }}>
       <div style={{ maxWidth: '1000px', margin: '0 auto', padding: isMobile ? '10px' : '25px' }}>
         
-        {/* 統計エリア - スマホで横並び、はみ出し禁止 */}
+        {/* 統計エリア */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '5px' }}>
           <div style={statsCard}>全 {stats.total}</div>
           <div style={{ ...statsCard, color: '#10b981' }}>公開 {stats.active}</div>
@@ -241,7 +256,8 @@ function SuperAdmin() {
             </div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '25px', alignItems: start }}>
+          // 💻 PC用表示：修正箇所（alignItems: 'start'）
+          <div style={{ display: 'grid', gridTemplateColumns: '350px 1fr', gap: '25px', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
               {renderAddShop()}
               {renderPortalSettings()}
@@ -254,7 +270,7 @@ function SuperAdmin() {
   );
 }
 
-// 🆕 店舗カード（はみ出しバグ修正版）
+// 店舗カード
 function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onUpdate, onDelete, onToggleSuspension, onCopy, categories }) {
   const isEditing = editingShopId === shop.id;
   const isSuspended = shop.is_suspended;
@@ -267,7 +283,9 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
           <Edit2 size={16} color="#64748b" style={{cursor:'pointer'}} onClick={() => {
             setEditingShopId(shop.id);
             editState.setEditName(shop.business_name || "");
+            editState.setEditKana(shop.business_name_kana || "");
             editState.setEditOwnerName(shop.owner_name || "");
+            editState.setEditOwnerNameKana(shop.owner_name_kana || "");
             editState.setEditBusinessType(shop.business_type || "");
             editState.setEditPassword(shop.admin_password || "");
           }} />
@@ -277,8 +295,14 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
 
       {isEditing ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <input value={editState.editOwnerName} onChange={(e) => editState.setEditOwnerName(e.target.value)} style={smallInput} placeholder="代表名" />
-          <input value={editState.editName} onChange={(e) => editState.setEditName(e.target.value)} style={smallInput} placeholder="店舗名" />
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <input value={editState.editOwnerName} onChange={(e) => editState.setEditOwnerName(e.target.value)} style={smallInput} placeholder="代表名" />
+            <input value={editState.editOwnerNameKana} onChange={(e) => editState.setEditOwnerNameKana(e.target.value)} style={smallInput} placeholder="かな" />
+          </div>
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <input value={editState.editName} onChange={(e) => editState.setEditName(e.target.value)} style={smallInput} placeholder="店舗名" />
+            <input value={editState.editKana} onChange={(e) => editState.setEditKana(e.target.value)} style={smallInput} placeholder="かな" />
+          </div>
           <input value={editState.editPassword} onChange={(e) => editState.setEditPassword(e.target.value)} style={smallInput} placeholder="PW" />
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => onUpdate(shop.id)} style={{ ...primaryBtn, background: '#10b981', flex: 1 }}>保存</button>
@@ -290,7 +314,6 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
           <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', fontWeight: 'bold', color: '#1e293b' }}>{shop.business_name}</h4>
           <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '15px' }}>{shop.owner_name} / PW: <strong>{shop.admin_password}</strong></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {/* 🛡️ UrlBox の修正: 最小幅0 を指定して突き抜けを防止 */}
             <UrlBox label="管理" url={`${window.location.origin}/admin/${shop.id}`} onCopy={onCopy} />
             <UrlBox label="予約" url={`${window.location.origin}/shop/${shop.id}/reserve`} onCopy={onCopy} />
           </div>
@@ -303,27 +326,11 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
   );
 }
 
-// 🆕 URLボックス（突き抜け防止版）
 function UrlBox({ label, url, onCopy }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
       <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#1e293b', minWidth: '30px' }}>{label}</span>
-      {/* 🛡️ 文字列が長くても突き抜けないように設定 */}
-      <input 
-        readOnly 
-        value={url} 
-        style={{ 
-          flex: 1, 
-          border: 'none', 
-          background: 'transparent', 
-          fontSize: '0.65rem', 
-          color: '#64748b', 
-          minWidth: 0, 
-          width: '100%', 
-          outline: 'none',
-          textOverflow: 'ellipsis' // はみ出る場合は「...」を表示
-        }} 
-      />
+      <input readOnly value={url} style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '0.65rem', color: '#64748b', minWidth: 0, width: '100%', outline: 'none', textOverflow: 'ellipsis' }} />
       <button onClick={() => onCopy(url)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px' }}>
         <Copy size={16} color="#2563eb" />
       </button>
@@ -352,7 +359,7 @@ const primaryBtn = { width: '100%', padding: '14px', background: '#1e293b', colo
 const secondaryBtn = { padding: '10px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', cursor:'pointer' };
 const statsCard = { background: '#fff', padding: '10px 18px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' };
 const newsItemStyle = { display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', padding: '10px 0', borderBottom: '1px dashed #eee' };
-const bottomNavStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '12px 0', borderTop: '1px solid #e2e8f0', boxShadow: '0 -4px 15px rgba(0,0,0,0.05)', zIndex: 9999 }; // 🛡️ zIndexを最大化
+const bottomNavStyle = { position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', display: 'flex', justifyContent: 'space-around', padding: '12px 0', borderTop: '1px solid #e2e8f0', boxShadow: '0 -4px 15px rgba(0,0,0,0.05)', zIndex: 9999 };
 const navBtn = { background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: '#94a3b8', cursor: 'pointer', flex: 1 };
 const navBtnActive = { ...navBtn, color: '#e60012' };
 
