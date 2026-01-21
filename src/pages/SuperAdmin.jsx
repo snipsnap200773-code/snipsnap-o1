@@ -213,6 +213,7 @@ function SuperAdmin() {
           <input value={newNewsDate} onChange={(e) => setNewNewsDate(e.target.value)} placeholder="2026.01.21" style={{...smallInput, flex:1}} />
           <select value={newNewsCat} onChange={(e) => setNewNewsCat(e.target.value)} style={{...smallInput, flex:1}}>
             <option value="伝">伝</option>
+            <option value="お知らせ"></option>
             <option value="重要">重要</option>
             <option value="新機能">新機能</option>
           </select>
