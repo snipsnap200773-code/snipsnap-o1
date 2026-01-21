@@ -91,7 +91,7 @@ function TrialRegistration() {
       <div style={{ maxWidth: '500px', margin: '0 auto', background: '#fff', padding: '30px', borderRadius: '20px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
         
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1 style={{ color: '#2563eb', fontSize: '1.8rem', fontWeight: '900', margin: '0 0 10px 0' }}>SnipSnap</h1>
+          <h1 style={{ color: '#2563eb', fontSize: '1.8rem', fontWeight: '900', margin: '0 0 10px 0' }}>ソロプレ(Solopreneur Portal)</h1>
           <p style={{ color: '#64748b', fontSize: '0.9rem', fontWeight: 'bold' }}>🚀 ベータ版申し込み</p>
         </div>
 
