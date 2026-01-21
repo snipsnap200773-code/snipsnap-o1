@@ -115,7 +115,7 @@ function OnePlayPortal() { // コンポーネント名だけOnePlayPortalに合�
 
       <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999', fontSize: '0.7rem' }}>
         <Link to="/" style={{ color: '#999', textDecoration: 'none' }}>
-           ← 本番のSnipSnapへ戻る
+           ← 本番のソロプレへ戻る
         </Link>
       </div>
     </div>

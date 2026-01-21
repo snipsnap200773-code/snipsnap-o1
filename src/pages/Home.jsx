@@ -37,7 +37,7 @@ function Home() {
       
       <div style={{ background: '#fff', padding: '15px 20px', borderBottom: '2px solid #e60012', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', alignItems: 'center' }}>
-          <h1 style={{ color: '#e60012', fontSize: '1.6rem', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>SnipSnap</h1>
+          <h1 style={{ color: '#e60012', fontSize: '1.6rem', fontWeight: '900', margin: 0, letterSpacing: '-1px' }}>ソロプレ（Solopreneur）</h1>
           <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: '10px', marginTop: '5px' }}>予約ポータルサイト</span>
         </div>
       </div>
@@ -131,7 +131,7 @@ function Home() {
         }}>
           <h2 style={{ fontSize: '1.4rem', marginBottom: '10px', fontWeight: '900' }}>🚀 店舗オーナー様へ</h2>
           <p style={{ fontSize: '0.85rem', opacity: 0.9, marginBottom: '25px', lineHeight: '1.6' }}>
-            SnipSnapで、あなたの店舗専用の予約システムを作りませんか？<br />
+            ソロプレで、あなたの店舗専用の予約システムを作りませんか？<br />
             今ならベータ版を無料で全機能お試しいただけます。
           </p>
           <Link to="/trial-registration" style={{ 
@@ -157,7 +157,7 @@ function Home() {
       <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999', fontSize: '0.7rem' }}>
         {/* 🆕 隠しリンク：開発中のOnePlayポータルへ */}
         <Link to="/oneplay-portal" style={{ color: '#999', textDecoration: 'none' }}>
-          © 2026 SnipSnap 予約ポータル
+          © 2026 ソロプレ 予約ポータル
         </Link>
       </div>
     </div>
