@@ -263,7 +263,7 @@ function SuperAdmin() {
               <option value="美容室・理容室">美容室・理容室</option>
               <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
               <option value="エステ・リラク">エステ・リラク</option>
-              <option value="整体・接骨院">整体・接骨院</option>
+              <option value="整体・接骨院・針灸">整体・接骨院・針灸</option>
               <option value="飲食店・カフェ">飲食店・カフェ</option>
               <option value="その他・ライフ">その他・ライフ</option>
             </select>
@@ -294,7 +294,7 @@ function SuperAdmin() {
                         <option value="美容室・理容室">美容室・理容室</option>
                         <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
                         <option value="エステ・リラク">エステ・リラク</option>
-                        <option value="整体・接骨院">整体・接骨院</option>
+                        <option value="整体・接骨院・針灸">整体・接骨院・針灸</option>
                         <option value="飲食店・カフェ">飲食店・カフェ</option>
                         <option value="その他・ライフ">その他・ライフ</option>
                       </select>
