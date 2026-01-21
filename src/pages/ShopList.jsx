@@ -35,9 +35,9 @@ function ShopList() {
   return (
     <div style={{ backgroundColor: '#f4f7f9', minHeight: '100vh', fontFamily: '"Hiragino Sans", "Meiryo", sans-serif', color: '#333' }}>
       
-      {/* 1. ヘッダー */}
+      {/* 1. ヘッダー - 🆕 戻り先をトップページに変更 */}
       <div style={{ background: '#fff', padding: '15px 20px', borderBottom: '1px solid #eee', position: 'sticky', top: 0, zIndex: 100, display: 'flex', alignItems: 'center' }}>
-        <button onClick={() => navigate('/oneplay-portal')} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '5px' }}>
+        <button onClick={() => navigate('/')} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '5px' }}>
           <ChevronLeft size={24} color="#333" />
         </button>
         <div style={{ marginLeft: '10px' }}>
@@ -60,7 +60,8 @@ function ShopList() {
         ) : shops.length === 0 ? (
           <div style={{ padding: '80px 20px', textAlign: 'center', background: '#fff', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
             <p style={{ color: '#999', fontSize: '0.9rem' }}>ごめんなさい！<br />現在、このカテゴリに掲載店舗はありません。</p>
-            <Link to="/oneplay-portal" style={{ display: 'inline-block', marginTop: '20px', color: '#2563eb', fontWeight: 'bold', textDecoration: 'none', fontSize: '0.85rem' }}>← 他のカテゴリを探す</Link>
+            {/* 🆕 リンク先をトップページに変更 */}
+            <Link to="/" style={{ display: 'inline-block', marginTop: '20px', color: '#2563eb', fontWeight: 'bold', textDecoration: 'none', fontSize: '0.85rem' }}>← 他のカテゴリを探す</Link>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '15px' }}>
@@ -72,7 +73,7 @@ function ShopList() {
                 overflow: 'hidden', 
                 boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
                 display: 'flex',
-                height: '120px' // カード全体の高さを固定して1:1を実現
+                height: '120px' 
               }}>
                 <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', width: '100%' }}>
                   {/* 左側：1:1画像エリア（余白なし） */}

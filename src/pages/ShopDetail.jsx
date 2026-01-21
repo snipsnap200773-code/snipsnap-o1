@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { MapPin, Phone, MessageCircle, ExternalLink, Mail, ChevronLeft, Info, Home } from 'lucide-react';
+import { MapPin, Phone, MessageCircle, ExternalLink, Mail, ChevronLeft, Info, Home as HomeIcon } from 'lucide-react';
 
 function ShopDetail() {
   const { shopId } = useParams();
@@ -34,7 +34,7 @@ function ShopDetail() {
     return <div style={{ textAlign: 'center', padding: '50px' }}>店舗が見つかりませんでした。</div>;
   }
 
-  // Googleマップ埋め込み用のURL作成
+  // 🆕 Googleマップ埋め込み用のURLを最新形式に修正
   const googleMapEmbedUrl = shop.address 
     ? `https://www.google.com/maps?q=${encodeURIComponent(shop.address)}&output=embed`
     : null;
@@ -57,7 +57,6 @@ function ShopDetail() {
     flex: 1
   };
 
-  // 右下浮遊ボタンのスタイル
   const floatingButtonStyle = {
     position: 'fixed',
     bottom: '30px',
@@ -78,7 +77,7 @@ function ShopDetail() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f4f7f9', minHeight: '100vh', paddingBottom: '60px', fontFamily: '"Hiragino Sans", "Meiryo", sans-serif' }}>
+    <div style={{ backgroundColor: '#f4f7f9', minHeight: '100vh', paddingBottom: '100px', fontFamily: '"Hiragino Sans", "Meiryo", sans-serif' }}>
       
       {/* ヘッダー */}
       <div style={{ background: '#fff', padding: '15px 20px', display: 'flex', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
@@ -97,7 +96,7 @@ function ShopDetail() {
 
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
         
-        {/* 基本情報カード (重なり解消のためマージンを調整) */}
+        {/* 基本情報カード */}
         <div style={{ background: '#fff', borderRadius: '24px', padding: '25px', marginTop: '10px', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', position: 'relative' }}>
           <div style={{ background: '#2563eb', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '4px 12px', borderRadius: '20px', display: 'inline-block', marginBottom: '10px' }}>
             {shop.business_type}
@@ -154,12 +153,10 @@ function ShopDetail() {
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
           
-          {/* メール予約 (アンダーバーから移動) */}
           <Link to={`/shop/${shop.id}/reserve`} style={{ ...actionButtonStyle, background: '#2563eb', color: '#fff' }}>
             <Mail size={24} color="#fff" />メール予約
           </Link>
 
-          {/* LINE */}
           {shop.line_official_url ? (
             <a href={shop.line_official_url} target="_blank" rel="noreferrer" style={{ ...actionButtonStyle, background: '#06c755', color: '#fff' }}>
               <MessageCircle size={24} color="#fff" />LINE予約
@@ -170,7 +167,6 @@ function ShopDetail() {
             </div>
           )}
 
-          {/* 公式サイト */}
           {shop.official_url ? (
             <a href={shop.official_url} target="_blank" rel="noreferrer" style={{ ...actionButtonStyle, background: '#475569', color: '#fff' }}>
               <ExternalLink size={24} color="#fff" />公式サイト
@@ -195,7 +191,7 @@ function ShopDetail() {
 
       {/* 浮遊ボタン（右下に常に配置） */}
       <Link to="/" style={floatingButtonStyle}>
-        <Home size={18} />
+        <HomeIcon size={18} />
         ポータルサイトへ
       </Link>
 
