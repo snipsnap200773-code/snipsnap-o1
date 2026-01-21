@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { MapPin } from 'lucide-react'; // 🆕 MapPinアイコンを追加
 
 function OnePlayPortal() {
   const [shops, setShops] = useState([]);
@@ -64,7 +65,7 @@ function OnePlayPortal() {
     fetchShops();
     return () => {
       clearTimeout(scrollTimer);
-      clearInterval(sliderTimer); // タイマー解除
+      clearInterval(sliderTimer);
     };
   }, []);
 
@@ -155,37 +156,50 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* 🆕 4. Pick Up Solopreneur セクション（刷新版） */}
+        {/* 4. Pick Up Solopreneur セクション（ShopList風の横長カードへ刷新） */}
         <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '900', letterSpacing: '1px', color: '#1a1a1a' }}>Pick Up Solopreneur</h3>
             <span style={{ fontSize: '0.7rem', color: '#999' }}>注目のソロ起業家たち</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+          <div style={{ display: 'grid', gap: '15px' }}>
             {newShops.map(shop => (
-              <Link key={shop.id} to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none' }}>
-                <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', height: '100%' }}>
-                  {/* 画像エリア：1:1画像が綺麗に収まるように調整 */}
-                  <div style={{ width: '100%', aspectRatio: '16 / 9', background: '#f8fafc', overflow: 'hidden', position: 'relative' }}>
-                    {shop.image_url ? (
-                      <img src={shop.image_url} alt={shop.business_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontSize: '0.8rem' }}>NO IMAGE</div>
-                    )}
-                    <div style={{ position: 'absolute', top: '12px', left: '12px', background: 'rgba(230,0,18,0.9)', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', padding: '4px 10px', borderRadius: '4px', backdropFilter: 'blur(4px)' }}>PICK UP</div>
+              <div key={shop.id} style={{ 
+                background: '#fff', 
+                border: '1px solid #eee', 
+                borderRadius: '16px', 
+                overflow: 'hidden', 
+                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                {/* 🆕 ShopListと同じ構造: カード全体をリンク化 */}
+                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+                  <div style={{ 
+                    width: '120px', 
+                    minWidth: '120px', 
+                    height: '120px',
+                    background: '#f0f0f0',
+                    backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', 
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    position: 'relative'
+                  }}>
+                    {!shop.image_url && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.6rem', color: '#ccc' }}>NO IMAGE</div>}
+                    <div style={{ position: 'absolute', top: '5px', left: '5px', background: 'rgba(230,0,18,0.9)', color: '#fff', fontSize: '0.5rem', fontWeight: 'bold', padding: '2px 6px', borderRadius: '3px' }}>PICK UP</div>
                   </div>
-                  {/* 情報エリア */}
-                  <div style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '0.65rem', background: '#eff6ff', color: '#2563eb', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px' }}>{shop.business_type}</span>
-                    </div>
-                    <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#1a1a1a', fontWeight: 'bold', lineHeight: '1.4' }}>{shop.business_name}</h4>
-                    <p style={{ margin: '10px 0 0 0', fontSize: '0.8rem', color: '#64748b', display: '-webkit-box', WebkitLineClamp: '2', WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.6' }}>
-                      {shop.description || '一歩先ゆくソロ起業家のサービスを体験してみませんか。'}
+                  <div style={{ padding: '15px', flex: 1 }}>
+                    <div style={{ fontSize: '0.65rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '4px' }}>{shop.business_type}</div>
+                    <h4 style={{ margin: '0 0 5px 0', fontSize: '1.05rem', fontWeight: 'bold' }}>{shop.business_name}</h4>
+                    <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '8px', display: '-webkit-box', WebkitLineClamp: '1', WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
+                      {shop.description || '店舗の詳細情報は準備中です。'}
                     </p>
+                    <div style={{ fontSize: '0.7rem', color: '#999', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <MapPin size={12} /> {shop.address || '住所未登録'}
+                    </div>
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </div>
             ))}
           </div>
         </div>
