@@ -270,8 +270,9 @@ function ReservationForm() {
       </div>
 
       <div>
+        {/* 🛡️ 修正箇所：1人目の時は「メニューを選択」、2人目以降は「n人目の〜」を表示 */}
         <h3 style={{ fontSize: '1rem', borderLeft: '4px solid #2563eb', paddingLeft: '10px', marginBottom: '20px' }}>
-          {people.length + 1}人目のメニューを選択
+          {people.length === 0 ? "メニューを選択" : `${people.length + 1}人目のメニューを選択`}
         </h3>
         
         {categories.map((cat, idx) => {
