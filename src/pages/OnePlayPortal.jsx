@@ -56,13 +56,8 @@ function OnePlayPortal() {
           .slice(0, 3);
         setNewShops(latest);
 
-        // 2. 【店舗一覧用】「美容室SnipSnap」をトップに、それ以外をあいうえお順にする並び替え
-        const sortedShops = [...data].sort((a, b) => {
-          if (a.business_name === '美容室SnipSnap') return -1;
-          if (b.business_name === '美容室SnipSnap') return 1;
-          return (a.business_name_kana || "").localeCompare(b.business_name_kana || "", 'ja');
-        });
-        setShops(sortedShops);
+        // 2. 全店舗（今回はカテゴリ表示がメインなので内部用として維持）
+        setShops(data);
       }
     };
 
@@ -124,6 +119,7 @@ function OnePlayPortal() {
             </p>
           </div>
         ))}
+        {/* インジケーター */}
         <div style={{ position: 'absolute', bottom: '20px', width: '100%', display: 'flex', justifyContent: 'center', gap: '10px' }}>
           {sliderImages.map((_, i) => (
             <div
@@ -183,7 +179,7 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* 🆕 5. カテゴリグリッドセクション */}
+        {/* 5. カテゴリグリッドセクション */}
         <div style={{ marginBottom: '50px' }}>
           <div style={{ borderLeft: '4px solid #333', paddingLeft: '12px', marginBottom: '20px' }}>
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 'bold' }}>カテゴリーから探す</h3>
@@ -212,78 +208,21 @@ function OnePlayPortal() {
           </div>
         </div>
 
-        {/* 6. 掲載店舗一覧 (全件) */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ background: '#333', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem' }}>SHOP</span>
-              掲載中の店舗
-            </h3>
-            <span style={{ fontSize: '0.9rem', color: '#666' }}>
-              合計 <b>{shops.length}</b> 件
-            </span>
-          </div>
-          
-          <div style={{ display: 'grid', gap: '20px' }}>
-            {shops.map(shop => (
-              <div key={shop.id} style={{ 
-                background: '#fff', 
-                border: '1px solid #eee', 
-                display: 'flex', 
-                overflow: 'hidden',
-                borderRadius: '16px',
-                flexDirection: 'column',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                transition: 'transform 0.2s',
-                cursor: 'default'
-              }}>
-                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', display: 'flex', borderBottom: '1px solid #f8f8f8', color: 'inherit' }}>
-                  <div style={{ 
-                    width: '140px', 
-                    minWidth: '140px', 
-                    height: '140px',
-                    background: '#f0f0f0',
-                    backgroundImage: shop.image_url ? `url(${shop.image_url})` : 'none', 
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.7rem',
-                    color: '#ccc'
-                  }}>
-                    {!shop.image_url && 'NO IMAGE'}
-                  </div>
-
-                  <div style={{ padding: '20px', flex: 1 }}>
-                    <h3 style={{ margin: '0 0 10px 0', fontSize: '1.25rem', color: '#1a1a1a', fontWeight: 'bold' }}>
-                      {shop.business_name}
-                    </h3>
-                    <div style={{ fontSize: '0.85rem', color: '#666', lineHeight: '1.6', marginBottom: '12px' }}>
-                      {shop.description || '店舗の詳細情報は準備中です。'}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#999', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      📍 {shop.address || '住所未登録'}
-                    </div>
-                  </div>
-                </Link>
-
-                <div style={{ display: 'flex', padding: '15px', gap: '10px', background: '#fff' }}>
-                  <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1.2, textDecoration: 'none' }}>
-                    <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '12px 0', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(37,99,235,0.2)' }}>✉️ 予約手続きへ</div>
-                  </Link>
-                  <Link to={`/shop/${shop.id}/detail`} style={{ flex: 1, textDecoration: 'none' }}>
-                    <div style={{ background: '#f1f5f9', color: '#475569', textAlign: 'center', padding: '12px 0', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', border: '1px solid #e2e8f0' }}>🌐 詳細・地図</div>
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* 🆕 6. トライアル登録への案内 */}
+        <div style={{ marginTop: '20px', padding: '30px 20px', background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', borderRadius: '20px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+          <h4 style={{ color: '#fff', margin: '0 0 10px 0', fontSize: '1.1rem', fontWeight: 'bold' }}>あなたのビジネスも掲載しませんか？</h4>
+          <p style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: '1.6', marginBottom: '20px' }}>ソロプレは個人で頑張る起業家を応援します。<br/>今ならベータ版につき、無料で登録可能です。</p>
+          <Link to="/trial-registration" style={{ textDecoration: 'none' }}>
+            <div style={{ background: '#e60012', color: '#fff', padding: '12px 30px', borderRadius: '30px', fontSize: '0.9rem', fontWeight: 'bold', display: 'inline-block', boxShadow: '0 4px 15px rgba(230,0,18,0.3)' }}>
+              ベータ版はこちら 🚀
+            </div>
+          </Link>
         </div>
+
       </div>
 
       {/* 7. フッター */}
-      <div style={{ padding: '60px 20px', textAlign: 'center', background: '#fff', marginTop: '40px', borderTop: '1px solid #eee' }}>
+      <div style={{ padding: '60px 20px', textAlign: 'center', background: '#fff', marginTop: '60px', borderTop: '1px solid #eee' }}>
         <Link to="/" style={{ color: '#666', textDecoration: 'none', fontSize: '0.8rem', fontWeight: 'bold' }}>
            ← 本番のソロプレへ戻る
         </Link>

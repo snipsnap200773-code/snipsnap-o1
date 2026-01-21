@@ -74,8 +74,8 @@ function ShopList() {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
                 flexDirection: 'column'
               }}>
-                {/* 上半分：詳細へのリンク */}
-                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex' }}>
+                {/* 🆕 修正：カード全体の枠組みをLinkで囲い、ボタンエリアを削除 */}
+                <Link to={`/shop/${shop.id}/detail`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
                   <div style={{ 
                     width: '120px', 
                     minWidth: '120px', 
@@ -97,16 +97,6 @@ function ShopList() {
                     </div>
                   </div>
                 </Link>
-
-                {/* 下半分：アクションボタン */}
-                <div style={{ display: 'flex', padding: '10px 15px', gap: '10px', background: '#fafafa', borderTop: '1px solid #f0f0f0' }}>
-                  <Link to={`/shop/${shop.id}/reserve`} style={{ flex: 1.2, textDecoration: 'none' }}>
-                    <div style={{ background: '#2563eb', color: '#fff', textAlign: 'center', padding: '10px 0', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold' }}>予約手続き</div>
-                  </Link>
-                  <Link to={`/shop/${shop.id}/detail`} style={{ flex: 1, textDecoration: 'none' }}>
-                    <div style={{ background: '#fff', color: '#475569', textAlign: 'center', padding: '10px 0', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', border: '1px solid #ddd' }}>詳細を見る</div>
-                  </Link>
-                </div>
               </div>
             ))}
           </div>
