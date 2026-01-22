@@ -133,10 +133,46 @@ function Home() {
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {topics.map((topic, idx) => (
-                <div key={topic.id} style={{ display: 'flex', alignItems: 'center', padding: '8px 0', borderBottom: idx === topics.length - 1 ? 'none' : '1px solid #f0f0f0', gap: '12px' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#999', minWidth: '75px' }}>{topic.publish_date}</span>
-                  <span style={{ fontSize: '0.6rem', background: topic.category === '重要' ? '#fee2e2' : '#f1f5f9', color: topic.category === '重要' ? '#ef4444' : '#64748b', padding: '1px 6px', borderRadius: '3px', fontWeight: 'bold' }}>{topic.category}</span>
-                  <span style={{ fontSize: '0.85rem', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}>{topic.title}</span>
+                <div key={topic.id} style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start', // 💡 長文時にタグと日付を上揃えにする
+                  padding: '10px 0', 
+                  borderBottom: idx === topics.length - 1 ? 'none' : '1px solid #f0f0f0', 
+                  gap: '12px' 
+                }}>
+                  {/* 日付：幅を固定 */}
+                  <span style={{ fontSize: '0.75rem', color: '#999', minWidth: '75px', flexShrink: 0, paddingTop: '2px' }}>
+                    {topic.publish_date}
+                  </span>
+                  
+                  {/* カテゴリタグ：絶対に改行させない */}
+                  <span style={{ 
+                    fontSize: '0.6rem', 
+                    background: topic.category === '重要' ? '#fee2e2' : '#f1f5f9', 
+                    color: topic.category === '重要' ? '#ef4444' : '#64748b', 
+                    padding: '2px 8px', 
+                    borderRadius: '4px', 
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap', // 💡 改行禁止
+                    flexShrink: 0,        // 💡 幅の圧縮禁止
+                    minWidth: '50px',     // 💡 最低幅を確保
+                    textAlign: 'center'
+                  }}>
+                    {topic.category}
+                  </span>
+
+                  {/* タイトル：途中で切らずに折り返す */}
+                  <span style={{ 
+                    fontSize: '0.85rem', 
+                    color: '#333', 
+                    cursor: 'pointer',
+                    flex: 1,              // 💡 残りの幅を使い切る
+                    lineHeight: '1.5',     // 💡 行間を広げて読みやすく
+                    whiteSpace: 'normal',  // 💡 自動改行を許可
+                    wordBreak: 'break-all' // 💡 英数字が続いても枠内で折る
+                  }}>
+                    {topic.title}
+                  </span>
                 </div>
               ))}
             </div>
