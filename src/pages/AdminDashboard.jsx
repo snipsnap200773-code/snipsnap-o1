@@ -25,7 +25,7 @@ function AdminDashboard() {
   const [categories, setCategories] = useState([]);
   const [allowMultiple, setAllowMultiple] = useState(false);
   
-  // 🆕 カテゴリ設定用のStateを拡張
+  // カテゴリ設定用のState
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newUrlKey, setNewUrlKey] = useState(''); // URL識別キー
   const [newCustomShopName, setNewCustomShopName] = useState(''); // 専用屋号
@@ -206,7 +206,6 @@ function AdminDashboard() {
     fetchMenuDetails();
   };
 
-  // ✅ 修正版：カテゴリ登録・編集ロジック（新しい2つの項目を追加）
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
     const payload = { 
@@ -217,7 +216,6 @@ function AdminDashboard() {
     if (editingCategoryId) await supabase.from('service_categories').update(payload).eq('id', editingCategoryId);
     else await supabase.from('service_categories').insert([{ ...payload, shop_id: shopId, sort_order: categories.length }]);
     
-    // リセット
     setEditingCategoryId(null); 
     setNewCategoryName(''); 
     setNewUrlKey('');
@@ -268,7 +266,6 @@ function AdminDashboard() {
     );
   }
 
-  // ✅ テーマカラーの取得（デフォルト青）
   const themeColor = shopData?.theme_color || '#2563eb';
 
   const cardStyle = { marginBottom: '20px', background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', boxSizing: 'border-box', width: '100%', overflow: 'hidden' };
@@ -293,7 +290,6 @@ function AdminDashboard() {
         {activeTab === 'menu' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             
-            {/* 🎨 テーマカラー設定セクション */}
             <section style={{ ...cardStyle, border: '1px solid #10b981', background: '#f0fdf4' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: '#059669' }}>🎨 お店のテーマカラー</h3>
               <p style={{ fontSize: '0.75rem', color: '#15803d', marginBottom: '12px' }}>
@@ -324,7 +320,6 @@ function AdminDashboard() {
               </label>
             </section>
 
-            {/* ✅ カテゴリ設定（マルチ入り口・屋号対応版） */}
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📂 カテゴリ設定</h3>
               <form onSubmit={handleCategorySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
@@ -358,7 +353,6 @@ function AdminDashboard() {
                       <div style={{ display: 'flex', gap: '5px' }}>
                         <button onClick={() => moveItem('category', categories, c.id, 'up')} disabled={idx === 0}>▲</button>
                         <button onClick={() => moveItem('category', categories, c.id, 'down')} disabled={idx === categories.length - 1}>▼</button>
-                        {/* ✅ 編集ボタン：既存の全データをStateにセット */}
                         <button onClick={() => {
                           setEditingCategoryId(c.id); 
                           setNewCategoryName(c.name);
@@ -517,9 +511,25 @@ function AdminDashboard() {
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ ...cardStyle, padding: '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {/* 🆕 1. 予約管理画面を最上部に追加 */}
+                <UrlBox label="📈 予約管理画面" url={`${window.location.origin}/admin/${shopId}/reservations`} color="#ef4444" copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}/reservations`)} />
+                
                 <UrlBox label={`🔑 店舗主用設定 (PW: ${shopData?.admin_password})`} url={`${window.location.origin}/admin/${shopId}`} color={themeColor} copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} />
                 <UrlBox label="💬 LINEリッチメニュー用URL" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
-                <UrlBox label="📅 お客様用予約" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
+                
+                {/* ✅ ラベルを変更 (ノーマル) */}
+                <UrlBox label="📅 お客様用予約 (ノーマル)" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
+
+                {/* 🆕 2. 識別キー(url_key)が設定されているカテゴリの専用URLを動的に生成 */}
+                {categories.filter(c => c.url_key).map(c => (
+                  <UrlBox 
+                    key={c.id}
+                    label={`🔮 専用予約：${c.custom_shop_name || c.name}`} 
+                    url={`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`} 
+                    color="#7c3aed" 
+                    copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`)} 
+                  />
+                ))}
               </div>
             </section>
 
