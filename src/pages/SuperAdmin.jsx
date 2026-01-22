@@ -109,7 +109,16 @@ function SuperAdmin() {
   };
 
   const updateShopInfo = async (id) => {
-    const { error } = await supabase.from('profiles').update({ business_name: editName, business_name_kana: editKana, owner_name: editOwnerName, owner_name_kana: editOwnerNameKana, business_type: editBusinessType, email_contact: editEmail, phone: editPhone, admin_password: editPassword }).eq('id', id);
+    const { error } = await supabase.from('profiles').update({ 
+      business_name: editName, 
+      business_name_kana: editKana, 
+      owner_name: editOwnerName, 
+      owner_name_kana: editOwnerNameKana, 
+      business_type: editBusinessType, 
+      email_contact: editEmail, 
+      phone: editPhone, 
+      admin_password: editPassword 
+    }).eq('id', id);
     if (!error) { setEditingShopId(null); fetchCreatedShops(); alert('更新完了'); }
   };
 
@@ -273,7 +282,7 @@ function SuperAdmin() {
   );
 }
 
-// 🆕 店舗カード（はみ出し修正済み）
+// 🆕 店舗カード（編集項目の強化版）
 function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onUpdate, onDelete, onToggleSuspension, onCopy, categories }) {
   const isEditing = editingShopId === shop.id;
   const isSuspended = shop.is_suspended;
@@ -290,6 +299,8 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
             editState.setEditOwnerName(shop.owner_name || "");
             editState.setEditOwnerNameKana(shop.owner_name_kana || "");
             editState.setEditBusinessType(shop.business_type || "");
+            editState.setEditEmail(shop.email_contact || "");
+            editState.setEditPhone(shop.phone || "");
             editState.setEditPassword(shop.admin_password || "");
           }} />
           <Trash2 size={16} color="#ef4444" style={{cursor:'pointer'}} onClick={() => onDelete(shop)} />
@@ -306,7 +317,15 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
             <input value={editState.editName} onChange={(e) => editState.setEditName(e.target.value)} style={smallInput} placeholder="店舗名" />
             <input value={editState.editKana} onChange={(e) => editState.setEditKana(e.target.value)} style={smallInput} placeholder="かな" />
           </div>
+          {/* 🆕 編集項目に「業種」「メール」「電話」を追加 */}
+          <select value={editState.editBusinessType} onChange={(e) => editState.setEditBusinessType(e.target.value)} style={smallInput}>
+            <option value="">-- 業種を選択 --</option>
+            {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select>
+          <input value={editState.editEmail} onChange={(e) => editState.setEditEmail(e.target.value)} style={smallInput} placeholder="メールアドレス" />
+          <input value={editState.editPhone} onChange={(e) => editState.setEditPhone(e.target.value)} style={smallInput} placeholder="電話番号" />
           <input value={editState.editPassword} onChange={(e) => editState.setEditPassword(e.target.value)} style={smallInput} placeholder="PW" />
+          
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={() => onUpdate(shop.id)} style={{ ...primaryBtn, background: '#10b981', flex: 1 }}>保存</button>
             <button onClick={() => setEditingShopId(null)} style={{ ...primaryBtn, background: '#94a3b8', flex: 1 }}>閉じる</button>
@@ -315,7 +334,8 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
       ) : (
         <div style={{ width: '100%', minWidth: 0, overflow: 'hidden' }}>
           <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', fontWeight: 'bold', color: '#1e293b' }}>{shop.business_name}</h4>
-          <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '15px' }}>{shop.owner_name} / PW: <strong>{shop.admin_password}</strong></div>
+          <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '5px' }}>{shop.owner_name} / PW: <strong>{shop.admin_password}</strong></div>
+          <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '15px' }}>業種: {shop.business_type || "未設定"}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <UrlBox label="管理" url={`${window.location.origin}/admin/${shop.id}`} onCopy={onCopy} />
             <UrlBox label="予約" url={`${window.location.origin}/shop/${shop.id}/reserve`} onCopy={onCopy} />
