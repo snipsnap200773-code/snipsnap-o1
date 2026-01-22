@@ -24,7 +24,12 @@ function AdminDashboard() {
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
   const [allowMultiple, setAllowMultiple] = useState(false);
+  
+  // 🆕 カテゴリ設定用のStateを拡張
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newUrlKey, setNewUrlKey] = useState(''); // URL識別キー
+  const [newCustomShopName, setNewCustomShopName] = useState(''); // 専用屋号
+
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [newServiceName, setNewServiceName] = useState('');
   const [newServiceSlots, setNewServiceSlots] = useState(1); 
@@ -201,11 +206,23 @@ function AdminDashboard() {
     fetchMenuDetails();
   };
 
+  // ✅ 修正版：カテゴリ登録・編集ロジック（新しい2つの項目を追加）
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
-    if (editingCategoryId) await supabase.from('service_categories').update({ name: newCategoryName }).eq('id', editingCategoryId);
-    else await supabase.from('service_categories').insert([{ shop_id: shopId, name: newCategoryName, sort_order: categories.length }]);
-    setEditingCategoryId(null); setNewCategoryName(''); fetchMenuDetails();
+    const payload = { 
+      name: newCategoryName, 
+      url_key: newUrlKey, 
+      custom_shop_name: newCustomShopName 
+    };
+    if (editingCategoryId) await supabase.from('service_categories').update(payload).eq('id', editingCategoryId);
+    else await supabase.from('service_categories').insert([{ ...payload, shop_id: shopId, sort_order: categories.length }]);
+    
+    // リセット
+    setEditingCategoryId(null); 
+    setNewCategoryName(''); 
+    setNewUrlKey('');
+    setNewCustomShopName('');
+    fetchMenuDetails();
   };
 
   const handleServiceSubmit = async (e) => {
@@ -261,7 +278,6 @@ function AdminDashboard() {
     <div style={{ fontFamily: 'sans-serif', maxWidth: '700px', margin: '0 auto', paddingBottom: '120px', boxSizing: 'border-box', width: '100%' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', borderBottom: '1px solid #eee', padding: '10px' }}>
         <div style={{ display: 'flex', gap: '5px' }}>
-          {/* ✅ タブ切り替えボタンのカラー連動 */}
           {['menu', 'hours', 'info', 'security'].map(tab => ( 
             <button key={tab} onClick={() => changeTab(tab)} style={{ flex: 1, padding: '12px 5px', border: 'none', borderRadius: '8px', background: activeTab === tab ? themeColor : '#f1f5f9', color: activeTab === tab ? '#fff' : '#475569', fontWeight: 'bold', fontSize: '0.85rem' }}>
               {tab === 'menu' ? 'メニュー' : tab === 'hours' ? '営業時間' : tab === 'info' ? '店舗情報' : '🔒 安全'}
@@ -300,7 +316,6 @@ function AdminDashboard() {
               </div>
             </section>
 
-            {/* ✅ 予約ルール枠のカラー連動 */}
             <section style={{ ...cardStyle, border: `1px solid ${themeColor}` }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: themeColor }}>🛡️ 予約ルール</h3>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -309,27 +324,51 @@ function AdminDashboard() {
               </label>
             </section>
 
+            {/* ✅ カテゴリ設定（マルチ入り口・屋号対応版） */}
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📂 カテゴリ設定</h3>
-              <form onSubmit={handleCategorySubmit} style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
-                <input placeholder="カテゴリ名" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} style={{ ...inputStyle, flex: 1 }} required />
-                {/* ✅ 確定ボタンのカラー連動 */}
-                <button type="submit" style={{ padding: '10px', background: themeColor, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>確定</button>
+              <form onSubmit={handleCategorySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                <input placeholder="カテゴリ名（例：美容室）" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} style={inputStyle} required />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input placeholder="URL識別キー（例：hair）" value={newUrlKey} onChange={(e) => setNewUrlKey(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                  <input placeholder="専用屋号（例：ソロプレ美容室）" value={newCustomShopName} onChange={(e) => setNewCustomShopName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" style={{ flex: 2, padding: '12px', background: themeColor, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+                    {editingCategoryId ? 'カテゴリを更新' : 'カテゴリを新規登録'}
+                  </button>
+                  {editingCategoryId && (
+                    <button type="button" onClick={() => { setEditingCategoryId(null); setNewCategoryName(''); setNewUrlKey(''); setNewCustomShopName(''); }} style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>取消</button>
+                  )}
+                </div>
               </form>
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {categories.map((c, idx) => (
                   <div key={c.id} style={{ background: '#f8fafc', padding: '10px', borderRadius: '12px', border: '1px solid #e5e7eb', boxSizing: 'border-box' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 'bold' }}>{c.name}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 'bold' }}>{c.name}</span>
+                        {(c.url_key || c.custom_shop_name) && (
+                          <div style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '2px' }}>
+                            🔑 {c.url_key || '-'} / 🏠 {c.custom_shop_name || '-'}
+                          </div>
+                        )}
+                      </div>
                       <div style={{ display: 'flex', gap: '5px' }}>
                         <button onClick={() => moveItem('category', categories, c.id, 'up')} disabled={idx === 0}>▲</button>
                         <button onClick={() => moveItem('category', categories, c.id, 'down')} disabled={idx === categories.length - 1}>▼</button>
-                        <button onClick={() => {setEditingCategoryId(c.id); setNewCategoryName(c.name);}}>✎</button>
+                        {/* ✅ 編集ボタン：既存の全データをStateにセット */}
+                        <button onClick={() => {
+                          setEditingCategoryId(c.id); 
+                          setNewCategoryName(c.name);
+                          setNewUrlKey(c.url_key || '');
+                          setNewCustomShopName(c.custom_shop_name || '');
+                        }}>✎</button>
                         <button onClick={() => deleteCategory(c.id)}>×</button>
                       </div>
                     </div>
                     <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {/* ✅ 複数選択ボタンのカラー連動 */}
                       <button onClick={async () => { await supabase.from('service_categories').update({ allow_multiple_in_category: !c.allow_multiple_in_category }).eq('id', c.id); fetchMenuDetails(); }} style={{ fontSize: '0.7rem', padding: '4px 8px', background: c.allow_multiple_in_category ? themeColor : '#fff', color: c.allow_multiple_in_category ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '15px' }}>{c.allow_multiple_in_category ? '複数選択可' : '1つのみ選択'}</button>
                       <button onClick={() => setEditingDisableCatId(editingDisableCatId === c.id ? null : c.id)} style={{ fontSize: '0.7rem', padding: '4px 8px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '15px' }}>🔗 連動設定</button>
                     </div>
@@ -367,11 +406,9 @@ function AdminDashboard() {
                 <div style={{ marginBottom: '15px' }}>
                   <label style={{ fontSize: '0.85rem', display: 'block', marginBottom: '8px' }}>必要コマ数: <span style={{ color: themeColor }}>{newServiceSlots}コマ ({newServiceSlots * slotIntervalMin}分)</span></label>
                   <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                    {/* ✅ コマ数選択ボタンのカラー連動 */}
                     {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => <button key={n} type="button" onClick={() => setNewServiceSlots(n)} style={{ width: '40px', height: '40px', borderRadius: '8px', border: '1px solid', borderColor: newServiceSlots === n ? themeColor : '#ccc', background: newServiceSlots === n ? themeColor : 'white', color: newServiceSlots === n ? 'white' : '#333', fontWeight: 'bold' }}>{n}</button>)}
                   </div>
                 </div>
-                {/* ✅ メニュー保存ボタンのカラー連動 */}
                 <button type="submit" style={{ width: '100%', padding: '15px', background: editingServiceId ? '#f97316' : themeColor, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>メニューを保存</button>
               </form>
             </section>
@@ -387,7 +424,6 @@ function AdminDashboard() {
                         <div style={{ fontSize: '0.8rem', color: themeColor }}>{s.slots * slotIntervalMin}分 ({s.slots}コマ)</div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        {/* ✅ 枝ボタンのカラー連動 */}
                         <button onClick={() => setActiveServiceForOptions(activeServiceForOptions?.id === s.id ? null : s)} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold', color: activeServiceForOptions?.id === s.id ? themeColor : '#333' }}>枝</button>
                         <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'up')} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>▲</button>
                         <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>▼</button>
@@ -403,7 +439,6 @@ function AdminDashboard() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>追加コマ:</label>
                             <input type="number" value={optSlots} onChange={(e) => setOptSlots(parseInt(e.target.value))} style={{ width: '80px', ...inputStyle }} />
-                            {/* ✅ 枝追加ボタンのカラー連動 */}
                             <button type="submit" style={{ flex: 1, padding: '12px', background: themeColor, color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>＋ 枝追加</button>
                           </div>
                         </form>
@@ -435,7 +470,6 @@ function AdminDashboard() {
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>1コマの単位</label>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {/* ✅ 単位ボタンのカラー連動 */}
                   {[15, 30].map(min => (<button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? themeColor : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '8px', fontWeight: 'bold' }}>{min}分</button>))}
                 </div>
               </div>
@@ -502,7 +536,6 @@ function AdminDashboard() {
                 
                 <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
                   <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }} />
-                  {/* ✅ 画像変更ボタンのカラー連動 */}
                   <button type="button" style={{ width: '100%', padding: '12px', background: '#fff', border: `1px solid ${themeColor}`, color: themeColor, borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem' }}>
                     📸 写真を撮る / 変更する
                   </button>
@@ -526,7 +559,6 @@ function AdminDashboard() {
               
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>サブタイトル（予約画面の見出し）</label>
               <input value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} placeholder="例：「イロとカタチ」/の専門美容室" />
-              {/* ✅ 改行プレビューのカラー連動 */}
               <div style={{ marginBottom: '20px', padding: '12px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                 <p style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 'bold', marginBottom: '6px' }}>[ 表示プレビュー ]</p>
                 <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: themeColor, lineHeight: '1.5' }}>
@@ -573,7 +605,6 @@ function AdminDashboard() {
               <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '20px' }}>パスワードを変更すると、開発者（三土手）であっても、データベースからあなたのパスワードを読み取ることが物理的に不可能になります。</p>
               {!isChangingPassword ? (<button onClick={() => setIsChangingPassword(true)} style={{ width: '100%', padding: '15px', background: '#fff', border: `1px solid ${themeColor}`, color: themeColor, borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>パスワードを変更する</button>) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}><label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>新しいパスワード (8文字以上)</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={inputStyle} placeholder="新しいパスワードを入力" /><div style={{ display: 'flex', gap: '10px' }}>
-                  {/* ✅ パスワード保存ボタンのカラー連動 */}
                   <button onClick={handleUpdatePassword} style={{ flex: 1, padding: '15px', background: themeColor, color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>安全に保存</button>
                   <button onClick={() => setIsChangingPassword(false)} style={{ flex: 1, padding: '15px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>キャンセル</button>
                 </div></div>
@@ -584,7 +615,6 @@ function AdminDashboard() {
       </div>
 
       <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 1000 }}>
-        {/* ✅ 最重要：設定保存ボタンのカラー連動 */}
         <button onClick={handleFinalSave} style={{ padding: '18px 35px', background: themeColor, color: '#fff', border: 'none', borderRadius: '40px', fontWeight: 'bold', boxShadow: `0 8px 30px ${themeColor}66`, fontSize: '1rem', cursor: 'pointer' }}>設定を保存する 💾</button>
       </div>
     </div>

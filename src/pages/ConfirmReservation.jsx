@@ -8,8 +8,18 @@ function ConfirmReservation() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 前の画面から引き継いだデータ
-  const { people, totalSlotsNeeded, date, time, adminDate, adminTime, lineUser } = location.state || {};
+  // ✅ 前の画面から引き継いだデータ（customShopName を追加）
+  const { 
+    people, 
+    totalSlotsNeeded, 
+    date, 
+    time, 
+    adminDate, 
+    adminTime, 
+    lineUser, 
+    customShopName // 🆕 入り口別の専用屋号
+  } = location.state || {};
+  
   const isAdminEntry = !!adminDate; 
 
   const [shop, setShop] = useState(null);
@@ -193,18 +203,30 @@ function ConfirmReservation() {
           res_type: 'normal',
           line_user_id: lineUser?.userId || null,
           cancel_token: cancelToken,
-          options: { people: people }
+          options: { 
+            people: people,
+            // 🆕 予約データにも「入り口別の屋号」を記録しておく（後で確認しやすくするため）
+            applied_shop_name: customShopName || shop.business_name 
+          }
         }
       ]);
 
       if (dbError) throw dbError;
 
       if (!isAdminEntry) {
+        // ✅ 【重要】メール送信時の店名を customShopName で上書き
         await supabaseAnon.functions.invoke('send-reservation-email', {
           body: {
-            shopId, customerEmail, customerName, shopName: shop.business_name,
-            shopEmail: shop.email_contact, startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
-            services: menuLabel, cancelUrl, lineUserId: lineUser?.userId || null,
+            shopId, 
+            customerEmail, 
+            customerName, 
+            // 🆕 ここで専用屋号を優先的に使用
+            shopName: customShopName || shop.business_name,
+            shopEmail: shop.email_contact, 
+            startTime: `${targetDate.replace(/-/g, '/')} ${targetTime}`,
+            services: menuLabel, 
+            cancelUrl, 
+            lineUserId: lineUser?.userId || null,
             notifyLineEnabled: shop.notify_line_enabled
           }
         });
@@ -227,7 +249,7 @@ function ConfirmReservation() {
 
   if (!shop) return null;
 
-  // ✅ テーマカラーの取得（デフォルト青）
+  // ✅ テーマカラーの取得
   const themeColor = shop?.theme_color || '#2563eb';
 
   const displayDate = (adminDate || date).replace(/-/g, '/');
@@ -237,7 +259,6 @@ function ConfirmReservation() {
     <div style={{ padding: '20px', maxWidth: '500px', margin: '0 auto', fontFamily: 'sans-serif', color: '#333' }}>
       <button onClick={() => navigate(-1)} style={{ marginBottom: '20px', border: 'none', background: 'none', color: '#666', cursor: 'pointer', fontWeight: 'bold' }}>← 戻る</button>
       
-      {/* ✅ 見出しのボーダーカラー連動 */}
       <h2 style={{ borderLeft: isAdminEntry ? '4px solid #e11d48' : `4px solid ${themeColor}`, paddingLeft: '10px', fontSize: '1.2rem', marginBottom: '25px' }}>
         {isAdminEntry ? '⚡ 店舗ねじ込み予約（入力短縮）' : '予約内容の確認'}
       </h2>
@@ -251,13 +272,17 @@ function ConfirmReservation() {
 
       {/* 予約内容カード */}
       <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '15px', marginBottom: '25px', border: '1px solid #e2e8f0' }}>
+        {/* 🆕 屋号の表示（専用屋号があればそれを表示、なければ元の店名） */}
+        <p style={{ margin: '0 0 12px 0', fontSize: '1.1rem', fontWeight: 'bold', color: themeColor }}>
+          🏨 {customShopName || shop.business_name}
+        </p>
+        
         <p style={{ margin: '0 0 12px 0' }}>📅 <b>日時：</b> {displayDate} {displayTime} 〜</p>
         <p style={{ margin: '0 0 8px 0' }}>📋 <b>選択メニュー：</b></p>
         <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
           {people && people.map((person, idx) => (
             <div key={idx} style={{ marginBottom: idx < people.length - 1 ? '10px' : 0, paddingBottom: idx < people.length - 1 ? '10px' : 0, borderBottom: idx < people.length - 1 ? '1px dashed #eee' : 'none' }}>
               {people.length > 1 && (
-                // ✅ 複数名表示のカラー連動
                 <div style={{ fontWeight: 'bold', color: themeColor, marginBottom: '4px' }}>{idx + 1}人目</div>
               )}
               {person.services.map(s => <div key={s.id}>・{s.name}</div>)}
@@ -289,7 +314,6 @@ function ConfirmReservation() {
                     borderBottom: '1px solid #f8fafc', 
                     cursor: 'pointer', 
                     fontSize: '0.9rem',
-                    // ✅ サジェスト選択のハイライトカラー連動（薄い色に）
                     background: index === selectedIndex ? `${themeColor}15` : 'transparent'
                   }}
                 >
@@ -313,7 +337,6 @@ function ConfirmReservation() {
           </>
         )}
 
-        {/* ✅ メインボタンのカラー連動 */}
         <button 
           onClick={handleReserve} 
           disabled={isSubmitting} 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-// 🆕 修正：通知専用の supabaseAnon もインポートに追加
+// ✅ 修正：通知専用の supabaseAnon もインポートに追加
 import { supabase, supabaseAnon } from '../supabaseClient';
 // 💡 重要：LINEログイン（LIFF）を操作するためのSDK
 import liff from '@line/liff';
@@ -15,10 +15,13 @@ function ReservationForm() {
   const adminDate = location.state?.adminDate;
   const adminTime = location.state?.adminTime;
 
-  // 💡 移植：LINE経由（URLに ?source=line があるか、またはLINEアプリ内か）を判定
+  // 💡 LINE経由判定
   const queryParams = new URLSearchParams(location.search);
   const isLineSource = queryParams.get('source') === 'line';
   const isLineApp = /Line/i.test(navigator.userAgent);
+
+  // 🆕 【重要】入り口識別キー（?type=xxx）を取得
+  const entryType = queryParams.get('type');
 
   // 基本データState
   const [shop, setShop] = useState(null);
@@ -26,10 +29,10 @@ function ReservationForm() {
   const [services, setServices] = useState([]);
   const [options, setOptions] = useState([]);
 
-  // --- 🆕 複数名予約用のState ---
-  const [people, setPeople] = useState([]); // 確定した人のリスト: [{services, options, slots}]
-  const [selectedServices, setSelectedServices] = useState([]); // 現在編集中の人のメニュー
-  const [selectedOptions, setSelectedOptions] = useState({}); // 現在編集中の人の枝メニュー
+  // --- 複数名予約用のState ---
+  const [people, setPeople] = useState([]); 
+  const [selectedServices, setSelectedServices] = useState([]); 
+  const [selectedOptions, setSelectedOptions] = useState({}); 
   
   const [loading, setLoading] = useState(true);
   const [lineUser, setLineUser] = useState(null);
@@ -65,8 +68,22 @@ function ReservationForm() {
     if (shopRes.data) {
       setShop(shopRes.data);
       if (!shopRes.data.is_suspended) {
-        const catRes = await supabase.from('service_categories').select('*').eq('shop_id', shopId).order('sort_order');
-        if (catRes.data) setCategories(catRes.data);
+        // ✅ カテゴリ取得の修正
+        let catQuery = supabase.from('service_categories').select('*').eq('shop_id', shopId).order('sort_order');
+        
+        const catRes = await catQuery;
+        
+        if (catRes.data) {
+          // 🆕 【入り口識別ロジック】
+          // URLに ?type=xxx がある場合は、url_key が一致するものだけを表示
+          // typeがない場合は、すべてのカテゴリを表示（既存動作を維持）
+          const filteredCats = entryType 
+            ? catRes.data.filter(c => c.url_key === entryType)
+            : catRes.data;
+          
+          setCategories(filteredCats);
+        }
+
         const servRes = await supabase.from('services').select('*').eq('shop_id', shopId).order('sort_order');
         if (servRes.data) setServices(servRes.data);
         const optRes = await supabase.from('service_options').select('*');
@@ -76,19 +93,14 @@ function ReservationForm() {
     setLoading(false);
   };
 
-  // --- 🆕 複数名対応の計算ロジック ---
-
-  // 今編集中の人の必要コマ数
+  // --- 複数名対応の計算ロジック ---
   const currentPersonSlots = selectedServices.reduce((sum, s) => sum + s.slots, 0) + 
     Object.values(selectedOptions).reduce((sum, opt) => sum + (opt.additional_slots || 0), 0);
 
-  // すでに確定した人たちの合計コマ数
   const pastPeopleSlots = people.reduce((sum, p) => sum + p.slots, 0);
 
-  // 全員分の合計必要コマ数
   const totalSlotsNeeded = pastPeopleSlots + currentPersonSlots;
 
-  // 必須条件チェック (現在編集中の一人分に対して)
   const checkRequiredMet = () => {
     return selectedServices.every(s => {
       const cat = categories.find(c => c.name === s.category);
@@ -104,11 +116,8 @@ function ReservationForm() {
   const isTotalTimeOk = totalSlotsNeeded > 0;
   const isRequiredMet = checkRequiredMet();
 
-  // --- 🆕 複数名予約用のアクション ---
-
-  // 「追加でもう一人」を押した時
   const handleAddPerson = () => {
-    if (people.length >= 3) return; // 最大4名まで
+    if (people.length >= 3) return; 
     
     setPeople([...people, { 
       services: selectedServices, 
@@ -118,19 +127,15 @@ function ReservationForm() {
 
     setSelectedServices([]);
     setSelectedOptions({});
-
-    // 🆕 画面を一番上までスクロール
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 追加した人を削除する場合
   const removePerson = (index) => {
     const newPeople = [...people];
     newPeople.splice(index, 1);
     setPeople(newPeople);
   };
 
-  // UI制御：無効化されたカテゴリ
   const disabledCategoryNames = selectedServices.reduce((acc, s) => {
     const cat = categories.find(c => c.name === s.category);
     if (cat?.disable_categories) return [...acc, ...cat.disable_categories.split(',').map(n => n.trim())];
@@ -202,10 +207,18 @@ function ReservationForm() {
 
   const handleNextStep = () => {
     window.scrollTo(0,0);
+
+    // 🆕 【重要】選択されたメニューのカテゴリから「専用屋号」を探す
+    // 複数カテゴリある場合は、最初のカテゴリの屋号を優先（三土手さんの設計に合わせます）
+    const firstSelectedCat = categories.find(c => c.name === selectedServices[0]?.category);
+    const customShopName = firstSelectedCat?.custom_shop_name || null;
+
     const commonState = { 
       people: [...people, { services: selectedServices, options: selectedOptions, slots: currentPersonSlots }],
       totalSlotsNeeded,
-      lineUser 
+      lineUser,
+      // 🆕 後の画面に専用屋号を引き継ぐ
+      customShopName 
     };
 
     if (isAdminMode) {
@@ -234,7 +247,6 @@ function ReservationForm() {
   if (shop?.is_suspended) return <div style={{ padding: '60px 20px', textAlign: 'center' }}><h2>現在、予約受付を停止しています</h2></div>;
   if (!shop) return <div style={{ textAlign: 'center', padding: '50px' }}>店舗が見つかりません</div>;
 
-  // ✅ テーマカラーの取得（設定がない場合はデフォルトの青）
   const themeColor = shop?.theme_color || '#2563eb';
 
   return (
@@ -270,7 +282,6 @@ function ReservationForm() {
           </div>
         )}
         
-        {/* ✅ 【修正箇所】サブタイトル（description）の「/」による改行対応 */}
         {shop.description && (
           <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6' }}>
             {shop.description.split('/').map((line, idx) => (
@@ -284,8 +295,6 @@ function ReservationForm() {
       </div>
 
       <div>
-        {/* 🛡️ 1人目の時は「メニューを選択」、2人目以降は「n人目の〜」を表示 */}
-        {/* ✅ ボーダーの色をテーマカラーに連動 */}
         <h3 style={{ fontSize: '1rem', borderLeft: `4px solid ${themeColor}`, paddingLeft: '10px', marginBottom: '20px' }}>
           {people.length === 0 ? "メニューを選択" : `${people.length + 1}人目のメニューを選択`}
         </h3>
@@ -311,7 +320,6 @@ function ReservationForm() {
                          style={{ border: isSelected ? `2px solid ${themeColor}` : '1px solid #ddd', borderRadius: '12px', background: 'white' }}>
                       <button disabled={isDisabled} onClick={() => toggleService(service, idx)} style={{ width: '100%', padding: '15px', border: 'none', background: 'none', textAlign: 'left' }}>
                         <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          {/* ✅ チェックボックスの背景色をテーマカラーに連動 */}
                           <div style={{ 
                             width: '18px', height: '18px', border: `2px solid ${themeColor}`, 
                             borderRadius: cat.allow_multiple_in_category ? '4px' : '50%', 
@@ -358,8 +366,6 @@ function ReservationForm() {
           );
         })}
 
-        {/* 🆕 縦書きの「追加でもう一人」札 */}
-        {/* ✅ 背景色をテーマカラーに連動 */}
         {selectedServices.length > 0 && people.length < 3 && allOptionsSelected && isRequiredMet && (
           <button 
             onClick={handleAddPerson}
@@ -380,7 +386,6 @@ function ReservationForm() {
           @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
         `}</style>
 
-        {/* 下部固定アンダーバー */}
         {(selectedServices.length > 0 || people.length > 0) && (
           <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(10px)', padding: '15px 20px', borderTop: '1px solid #e2e8f0', textAlign: 'center', zIndex: 1000, boxShadow: '0 -4px 12px rgba(0,0,0,0.05)' }}>
             <button 
