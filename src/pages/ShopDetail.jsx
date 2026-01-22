@@ -118,7 +118,7 @@ function ShopDetail() {
             </div>
           )}
 
-          <p style={{ fontSize: '0.95rem', color: '#4b5563', lineHeight: '1.8', whiteSpace: 'pre-wrap', marginBottom: '20px' }}>
+          <p style={{ fontSize: '0.95rem', color: '#4b5563', lineHeight: '1.5', whiteSpace: 'pre-wrap', marginBottom: '20px' }}>
             {shop.intro_text || '店舗の詳細情報は準備中です。'}
           </p>
 
