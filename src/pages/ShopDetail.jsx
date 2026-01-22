@@ -34,6 +34,9 @@ function ShopDetail() {
     return <div style={{ textAlign: 'center', padding: '50px' }}>店舗が見つかりませんでした。</div>;
   }
 
+  // ✅ テーマカラーを抽出（デフォルト青）
+  const themeColor = shop?.theme_color || '#2563eb';
+
   // ✅ Googleマップ埋め込み用のURL形式
   const googleMapEmbedUrl = shop.address 
     ? `https://www.google.com/maps?q=${encodeURIComponent(shop.address)}&output=embed`
@@ -98,7 +101,8 @@ function ShopDetail() {
         
         {/* 基本情報カード */}
         <div style={{ background: '#fff', borderRadius: '24px', padding: '25px', marginTop: '10px', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', position: 'relative' }}>
-          <div style={{ background: '#2563eb', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '4px 12px', borderRadius: '20px', display: 'inline-block', marginBottom: '10px' }}>
+          {/* ✅ 業種ラベルのカラー連動 */}
+          <div style={{ background: themeColor, color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', padding: '4px 12px', borderRadius: '20px', display: 'inline-block', marginBottom: '10px' }}>
             {shop.business_type}
           </div>
           
@@ -106,9 +110,9 @@ function ShopDetail() {
             {shop.business_name}
           </h2>
 
-          {/* ✅ 修正箇所：サブタイトル（description）の「/」による改行対応 */}
+          {/* ✅ サブタイトル（description）の「/」による改行 ＆ カラー連動 */}
           {shop.description && (
-            <div style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '15px', lineHeight: '1.4' }}>
+            <div style={{ fontSize: '0.9rem', color: themeColor, fontWeight: 'bold', marginBottom: '15px', lineHeight: '1.4' }}>
               {shop.description.split('/').map((line, idx) => (
                 <React.Fragment key={idx}>
                   {line}
@@ -118,6 +122,7 @@ function ShopDetail() {
             </div>
           )}
 
+          {/* ✅ 店舗紹介の行間調整（1.5）を維持 */}
           <p style={{ fontSize: '0.95rem', color: '#4b5563', lineHeight: '1.5', whiteSpace: 'pre-wrap', marginBottom: '20px' }}>
             {shop.intro_text || '店舗の詳細情報は準備中です。'}
           </p>
@@ -125,13 +130,13 @@ function ShopDetail() {
           {/* 📞 住所・連絡先 */}
           <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', fontSize: '0.85rem', color: '#666' }}>
-              <MapPin size={18} color="#2563eb" style={{ flexShrink: 0 }} />
+              <MapPin size={18} color={themeColor} style={{ flexShrink: 0 }} />
               <span>{shop.address || '住所未登録'}</span>
             </div>
             
             {shop.phone && (
-              <a href={`tel:${shop.phone}`} style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.85rem', color: '#2563eb', textDecoration: 'none', fontWeight: 'bold' }}>
-                <Phone size={18} color="#2563eb" style={{ flexShrink: 0 }} />
+              <a href={`tel:${shop.phone}`} style={{ display: 'flex', gap: '10px', alignItems: 'center', fontSize: '0.85rem', color: themeColor, textDecoration: 'none', fontWeight: 'bold' }}>
+                <Phone size={18} color={themeColor} style={{ flexShrink: 0 }} />
                 <span>{shop.phone} (タップで発信)</span>
               </a>
             )}
@@ -155,11 +160,12 @@ function ShopDetail() {
 
         {/* アクションパネル */}
         <h3 style={{ fontSize: '1rem', fontWeight: 'bold', margin: '30px 0 15px 10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Info size={18} color="#2563eb" /> お問い合わせ・ご予約
+          <Info size={18} color={themeColor} /> お問い合わせ・ご予約
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
           
-          <Link to={`/shop/${shop.id}/reserve`} style={{ ...actionButtonStyle, background: '#2563eb', color: '#fff' }}>
+          {/* ✅ メール予約ボタンのカラー連動 */}
+          <Link to={`/shop/${shop.id}/reserve`} style={{ ...actionButtonStyle, background: themeColor, color: '#fff' }}>
             <Mail size={24} color="#fff" />メール予約
           </Link>
 
