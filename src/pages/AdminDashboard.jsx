@@ -25,10 +25,11 @@ function AdminDashboard() {
   const [categories, setCategories] = useState([]);
   const [allowMultiple, setAllowMultiple] = useState(false);
   
-  // カテゴリ設定用のState
+  // ✅ カテゴリ設定用のStateを拡張（識別キー・専用屋号・専用サブタイトル）
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newUrlKey, setNewUrlKey] = useState(''); // URL識別キー
-  const [newCustomShopName, setNewCustomShopName] = useState(''); // 専用屋号
+  const [newUrlKey, setNewUrlKey] = useState(''); 
+  const [newCustomShopName, setNewCustomShopName] = useState(''); 
+  const [newCustomDescription, setNewCustomDescription] = useState(''); // 🆕 追加
 
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [newServiceName, setNewServiceName] = useState('');
@@ -206,12 +207,14 @@ function AdminDashboard() {
     fetchMenuDetails();
   };
 
+  // ✅ 修正版：カテゴリ登録・編集ロジック（専用サブタイトルを追加）
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
     const payload = { 
       name: newCategoryName, 
       url_key: newUrlKey, 
-      custom_shop_name: newCustomShopName 
+      custom_shop_name: newCustomShopName,
+      custom_description: newCustomDescription // 🆕 カラム追加分
     };
     if (editingCategoryId) await supabase.from('service_categories').update(payload).eq('id', editingCategoryId);
     else await supabase.from('service_categories').insert([{ ...payload, shop_id: shopId, sort_order: categories.length }]);
@@ -220,6 +223,7 @@ function AdminDashboard() {
     setNewCategoryName(''); 
     setNewUrlKey('');
     setNewCustomShopName('');
+    setNewCustomDescription(''); 
     fetchMenuDetails();
   };
 
@@ -266,6 +270,7 @@ function AdminDashboard() {
     );
   }
 
+  // ✅ テーマカラーの取得（デフォルト青）
   const themeColor = shopData?.theme_color || '#2563eb';
 
   const cardStyle = { marginBottom: '20px', background: '#fff', padding: '15px', borderRadius: '12px', border: '1px solid #ddd', boxSizing: 'border-box', width: '100%', overflow: 'hidden' };
@@ -275,6 +280,7 @@ function AdminDashboard() {
     <div style={{ fontFamily: 'sans-serif', maxWidth: '700px', margin: '0 auto', paddingBottom: '120px', boxSizing: 'border-box', width: '100%' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', borderBottom: '1px solid #eee', padding: '10px' }}>
         <div style={{ display: 'flex', gap: '5px' }}>
+          {/* ✅ タブ切り替えボタンのカラー連動 */}
           {['menu', 'hours', 'info', 'security'].map(tab => ( 
             <button key={tab} onClick={() => changeTab(tab)} style={{ flex: 1, padding: '12px 5px', border: 'none', borderRadius: '8px', background: activeTab === tab ? themeColor : '#f1f5f9', color: activeTab === tab ? '#fff' : '#475569', fontWeight: 'bold', fontSize: '0.85rem' }}>
               {tab === 'menu' ? 'メニュー' : tab === 'hours' ? '営業時間' : tab === 'info' ? '店舗情報' : '🔒 安全'}
@@ -290,6 +296,7 @@ function AdminDashboard() {
         {activeTab === 'menu' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             
+            {/* 🎨 テーマカラー設定セクション */}
             <section style={{ ...cardStyle, border: '1px solid #10b981', background: '#f0fdf4' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: '#059669' }}>🎨 お店のテーマカラー</h3>
               <p style={{ fontSize: '0.75rem', color: '#15803d', marginBottom: '12px' }}>
@@ -312,6 +319,7 @@ function AdminDashboard() {
               </div>
             </section>
 
+            {/* ✅ 予約ルール枠のカラー連動 */}
             <section style={{ ...cardStyle, border: `1px solid ${themeColor}` }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: themeColor }}>🛡️ 予約ルール</h3>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -320,20 +328,29 @@ function AdminDashboard() {
               </label>
             </section>
 
+            {/* ✅ カテゴリ設定（マルチ入り口・専用説明文対応版） */}
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📂 カテゴリ設定</h3>
               <form onSubmit={handleCategorySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
                 <input placeholder="カテゴリ名（例：美容室）" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} style={inputStyle} required />
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input placeholder="URL識別キー（例：hair）" value={newUrlKey} onChange={(e) => setNewUrlKey(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                  <input placeholder="識別キー（例：hair）" value={newUrlKey} onChange={(e) => setNewUrlKey(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
                   <input placeholder="専用屋号（例：ソロプレ美容室）" value={newCustomShopName} onChange={(e) => setNewCustomShopName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
                 </div>
+                {/* 🆕 専用サブタイトル入力欄 */}
+                <input 
+                  placeholder="専用サブタイトル（例：運命を変える鑑定を提供）" 
+                  value={newCustomDescription} 
+                  onChange={(e) => setNewCustomDescription(e.target.value)} 
+                  style={inputStyle} 
+                />
+                
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button type="submit" style={{ flex: 2, padding: '12px', background: themeColor, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
                     {editingCategoryId ? 'カテゴリを更新' : 'カテゴリを新規登録'}
                   </button>
                   {editingCategoryId && (
-                    <button type="button" onClick={() => { setEditingCategoryId(null); setNewCategoryName(''); setNewUrlKey(''); setNewCustomShopName(''); }} style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>取消</button>
+                    <button type="button" onClick={() => { setEditingCategoryId(null); setNewCategoryName(''); setNewUrlKey(''); setNewCustomShopName(''); setNewCustomDescription(''); }} style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>取消</button>
                   )}
                 </div>
               </form>
@@ -349,19 +366,28 @@ function AdminDashboard() {
                             🔑 {c.url_key || '-'} / 🏠 {c.custom_shop_name || '-'}
                           </div>
                         )}
+                        {/* 🆕 リスト表示にサブタイトルを追加 */}
+                        {c.custom_description && (
+                          <div style={{ fontSize: '0.6rem', color: themeColor, marginTop: '2px' }}>
+                            📝 {c.custom_description}
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'flex', gap: '5px' }}>
                         <button onClick={() => moveItem('category', categories, c.id, 'up')} disabled={idx === 0}>▲</button>
                         <button onClick={() => moveItem('category', categories, c.id, 'down')} disabled={idx === categories.length - 1}>▼</button>
+                        {/* ✅ 編集ボタン：専用サブタイトルもStateにセット */}
                         <button onClick={() => {
                           setEditingCategoryId(c.id); 
                           setNewCategoryName(c.name);
                           setNewUrlKey(c.url_key || '');
                           setNewCustomShopName(c.custom_shop_name || '');
+                          setNewCustomDescription(c.custom_description || '');
                         }}>✎</button>
                         <button onClick={() => deleteCategory(c.id)}>×</button>
                       </div>
                     </div>
+                    {/* ✅ 三土手さんの重要ロジック：カテゴリごとの連動・必須設定（省略せず維持） */}
                     <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       <button onClick={async () => { await supabase.from('service_categories').update({ allow_multiple_in_category: !c.allow_multiple_in_category }).eq('id', c.id); fetchMenuDetails(); }} style={{ fontSize: '0.7rem', padding: '4px 8px', background: c.allow_multiple_in_category ? themeColor : '#fff', color: c.allow_multiple_in_category ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '15px' }}>{c.allow_multiple_in_category ? '複数選択可' : '1つのみ選択'}</button>
                       <button onClick={() => setEditingDisableCatId(editingDisableCatId === c.id ? null : c.id)} style={{ fontSize: '0.7rem', padding: '4px 8px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '15px' }}>🔗 連動設定</button>
@@ -389,6 +415,7 @@ function AdminDashboard() {
               </div>
             </section>
             
+            {/* ✅ メニュー登録・編集セクション（省略せず維持） */}
             <section ref={menuFormRef} style={{ ...cardStyle, background: '#f8fafc' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📝 メニュー登録・編集</h3>
               <form onSubmit={handleServiceSubmit}>
@@ -407,6 +434,7 @@ function AdminDashboard() {
               </form>
             </section>
 
+            {/* ✅ カテゴリ別サービス一覧（省略せず維持） */}
             {categories.map((cat) => (
               <div key={cat.id} style={{ marginBottom: '25px', width: '100%', boxSizing: 'border-box' }}>
                 <h4 style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: '10px', borderLeft: '4px solid #cbd5e1', paddingLeft: '8px' }}>{cat.name}</h4>
@@ -425,6 +453,7 @@ function AdminDashboard() {
                         <button onClick={() => deleteService(s.id)} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>×</button>
                       </div>                     
                     </div>
+                    {/* ✅ 枝メニュー（オプション）の展開（省略せず維持） */}
                     {activeServiceForOptions?.id === s.id && (
                       <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
                         <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -456,7 +485,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- ⏰ 営業時間・定休日タブ --- */}
+        {/* --- ⏰ 営業時間・定休日タブ（省略せず維持） --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: `2px solid ${themeColor}` }}>
@@ -511,7 +540,7 @@ function AdminDashboard() {
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ ...cardStyle, padding: '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {/* 🆕 1. 予約管理画面を最上部に追加 */}
+                {/* ✅ 1. 予約管理画面を最上部に追加 */}
                 <UrlBox label="📈 予約管理画面" url={`${window.location.origin}/admin/${shopId}/reservations`} color="#ef4444" copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}/reservations`)} />
                 
                 <UrlBox label={`🔑 店舗主用設定 (PW: ${shopData?.admin_password})`} url={`${window.location.origin}/admin/${shopId}`} color={themeColor} copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} />
@@ -520,7 +549,7 @@ function AdminDashboard() {
                 {/* ✅ ラベルを変更 (ノーマル) */}
                 <UrlBox label="📅 お客様用予約 (ノーマル)" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
 
-                {/* 🆕 2. 識別キー(url_key)が設定されているカテゴリの専用URLを動的に生成 */}
+                {/* ✅ 2. 識別キーが設定されているカテゴリの専用URLを動的に生成 */}
                 {categories.filter(c => c.url_key).map(c => (
                   <UrlBox 
                     key={c.id}
@@ -613,7 +642,7 @@ function AdminDashboard() {
             <section style={{ ...cardStyle, border: `2px solid ${themeColor}` }}>
               <h3 style={{ marginTop: 0, color: themeColor }}>🔐 セキュリティ設定</h3>
               <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '20px' }}>パスワードを変更すると、開発者（三土手）であっても、データベースからあなたのパスワードを読み取ることが物理的に不可能になります。</p>
-              {!isChangingPassword ? (<button onClick={() => setIsChangingPassword(true)} style={{ width: '100%', padding: '15px', background: '#fff', border: `1px solid ${themeColor}`, color: themeColor, borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>パスワードを変更する</button>) : (
+              {!isChangingPassword ? (<button onClick={() => setIsChangingPassword(true)} style={{ width: '100%', padding: '15px', border: `1px solid ${themeColor}`, color: themeColor, borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>パスワードを変更する</button>) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}><label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>新しいパスワード (8文字以上)</label><input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={inputStyle} placeholder="新しいパスワードを入力" /><div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={handleUpdatePassword} style={{ flex: 1, padding: '15px', background: themeColor, color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>安全に保存</button>
                   <button onClick={() => setIsChangingPassword(false)} style={{ flex: 1, padding: '15px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontWeight: 'bold' }}>キャンセル</button>
