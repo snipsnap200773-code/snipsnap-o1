@@ -273,8 +273,42 @@ function AdminDashboard() {
         {message && <div style={{ position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)', width: '90%', padding: '15px', background: '#dcfce7', color: '#166534', borderRadius: '8px', zIndex: 1001, textAlign: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>{message}</div>}
 
         {/* --- 🛠️ メニュータブ --- */}
-        {activeTab === 'menu' && (
+          {activeTab === 'menu' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
+            
+            {/* 🆕 お店のテーマカラー設定 */}
+            <section style={{ ...cardStyle, border: '1px solid #10b981', background: '#f0fdf4' }}>
+              <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: '#059669' }}>🎨 お店のテーマカラー</h3>
+              <p style={{ fontSize: '0.75rem', color: '#15803d', marginBottom: '12px' }}>
+                予約ボタンやチェックボックスの色をお店の雰囲気に合わせましょう。
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <div style={{ position: 'relative', width: '50px', height: '50px' }}>
+                  <input 
+                    type="color" 
+                    value={shopData?.theme_color || '#2563eb'} 
+                    onChange={(e) => setShopData({ ...shopData, theme_color: e.target.value })} 
+                    style={{ 
+                      position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+                      border: 'none', padding: 0, background: 'none', cursor: 'pointer' 
+                    }} 
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#1e293b' }}>
+                    現在の選択色：<span style={{ color: shopData?.theme_color || '#2563eb' }}>{shopData?.theme_color || '#2563eb'}</span>
+                  </div>
+                  {/* プレビューボタン */}
+                  <div style={{ 
+                    marginTop: '5px', padding: '6px 12px', background: shopData?.theme_color || '#2563eb', 
+                    color: '#fff', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold', display: 'inline-block' 
+                  }}>
+                    ボタンのプレビュー
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section style={{ ...cardStyle, border: '1px solid #2563eb' }}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem', color: '#2563eb' }}>🛡️ 予約ルール</h3>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
