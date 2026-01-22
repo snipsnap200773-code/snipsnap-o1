@@ -341,11 +341,13 @@ function AdminDashboard() {
                 </div>
                 {/* 🆕 専用サブタイトル入力欄 */}
                 <input 
-                  placeholder="専用サブタイトル（例：運命を変える鑑定を提供）" 
-                  value={newCustomDescription} 
-                  onChange={(e) => setNewCustomDescription(e.target.value)} 
-                  style={inputStyle} 
-                <input 
+  placeholder="専用サブタイトル（例：運命を変える鑑定を提供）" 
+  value={newCustomDescription} 
+  onChange={(e) => setNewCustomDescription(e.target.value)} 
+  style={inputStyle} 
+/> {/* 👈 ここに「 /> 」を足してください */}
+
+<input 
   placeholder="別ブランド公式サイトURL（https://...）" 
   value={newCustomOfficialUrl} 
   onChange={(e) => setNewCustomOfficialUrl(e.target.value)} 
