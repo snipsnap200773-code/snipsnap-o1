@@ -1,17 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { MapPin, Phone, MessageCircle, ExternalLink, Mail, ChevronLeft, Info, Home as HomeIcon } from 'lucide-react';
+import { MapPin, Phone, MessageCircle, ExternalLink, Mail, ChevronLeft, Info, Home as HomeIcon, Sparkles } from 'lucide-react';
 
 function ShopDetail() {
   const { shopId } = useParams();
   const navigate = useNavigate();
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // 🆕 特別カテゴリ（識別キー付き）を管理するState
+  const [specialCategories, setSpecialCategories] = useState([]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
     const fetchShopDetail = async () => {
+      setLoading(true);
+      // 1. 店舗プロフィールの取得
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -20,6 +25,17 @@ function ShopDetail() {
 
       if (!error && data) {
         setShop(data);
+        
+        // 🆕 2. 識別キー（url_key）が設定されているカテゴリを動的に取得
+        const { data: cats } = await supabase
+          .from('service_categories')
+          .select('*')
+          .eq('shop_id', shopId)
+          .neq('url_key', '')      // 空文字を除外
+          .not('url_key', 'is', null) // nullを除外
+          .order('sort_order', { ascending: true });
+
+        setSpecialCategories(cats || []);
       }
       setLoading(false);
     };
@@ -39,7 +55,7 @@ function ShopDetail() {
 
   // ✅ Googleマップ埋め込み用のURL形式
   const googleMapEmbedUrl = shop.address 
-    ? `https://www.google.com/maps?q=${encodeURIComponent(shop.address)}&output=embed`
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(shop.address)}&output=embed`
     : null;
 
   const actionButtonStyle = {
@@ -126,6 +142,39 @@ function ShopDetail() {
           <p style={{ fontSize: '0.95rem', color: '#4b5563', lineHeight: '1.5', whiteSpace: 'pre-wrap', marginBottom: '20px' }}>
             {shop.intro_text || '店舗の詳細情報は準備中です。'}
           </p>
+
+          {/* --- 🆕 専用サービス（別ブランド）への誘導バナーエリア --- */}
+          {specialCategories.length > 0 && (
+            <div style={{ margin: '25px 0', padding: '20px', background: '#f8fafc', borderRadius: '20px', border: `1px dashed ${themeColor}` }}>
+              <h3 style={{ fontSize: '0.85rem', color: themeColor, marginBottom: '15px', textAlign: 'center', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <Sparkles size={16} /> 併設メニューのご案内
+              </h3>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {specialCategories.map(cat => (
+                  <div 
+                    key={cat.id} 
+                    onClick={() => navigate(`/shop/${shopId}/reserve?type=${cat.url_key}`)}
+                    style={{ 
+                      background: '#fff', padding: '15px', borderRadius: '15px', cursor: 'pointer',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0'
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1a1a1a' }}>
+                      {cat.custom_shop_name || cat.name}
+                    </div>
+                    {cat.custom_description && (
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', lineHeight: '1.4' }}>
+                        {cat.custom_description.split('/')[0]} {/* サブタイトルの1行目だけチラ見せ */}
+                      </div>
+                    )}
+                    <div style={{ marginTop: '10px', fontSize: '0.7rem', color: themeColor, fontWeight: 'bold', textAlign: 'right' }}>
+                      専用予約ページを開く →
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 📞 住所・連絡先 */}
           <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
