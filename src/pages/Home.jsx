@@ -127,7 +127,7 @@ function Home() {
         
         {/* 3. 最新トピック */}
         {topics.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '15px', marginBottom: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '15px', marginBottom: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.04)' }}>
             <h3 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ color: '#e60012' }}>●</span> 最新トピック
             </h3>
@@ -138,10 +138,10 @@ function Home() {
                   alignItems: 'flex-start', // 💡 長文時にタグと日付を上揃えにする
                   padding: '10px 0', 
                   borderBottom: idx === topics.length - 1 ? 'none' : '1px solid #f0f0f0', 
-                  gap: '12px' 
+                  gap: '6px' 
                 }}>
                   {/* 日付：幅を固定 */}
-                  <span style={{ fontSize: '0.75rem', color: '#999', minWidth: '75px', flexShrink: 0, paddingTop: '2px' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#999', minWidth: '68px', flexShrink: 0, paddingTop: '2px' }}>
                     {topic.publish_date}
                   </span>
                   
