@@ -42,6 +42,7 @@ function AdminDashboard() {
   const [optName, setOptName] = useState('');           
   const [optSlots, setOptSlots] = useState(0);
   const [editingDisableCatId, setEditingDisableCatId] = useState(null);
+  const [newCustomOfficialUrl, setNewCustomOfficialUrl] = useState('');
 
   // --- 4. 営業時間・店舗情報用State ---
   const [phone, setPhone] = useState('');
@@ -215,6 +216,7 @@ function AdminDashboard() {
       url_key: newUrlKey, 
       custom_shop_name: newCustomShopName,
       custom_description: newCustomDescription // 🆕 カラム追加分
+      custom_official_url: newCustomOfficialUrl // 🆕 ここを追加
     };
     if (editingCategoryId) await supabase.from('service_categories').update(payload).eq('id', editingCategoryId);
     else await supabase.from('service_categories').insert([{ ...payload, shop_id: shopId, sort_order: categories.length }]);
@@ -343,7 +345,12 @@ function AdminDashboard() {
                   value={newCustomDescription} 
                   onChange={(e) => setNewCustomDescription(e.target.value)} 
                   style={inputStyle} 
-                />
+                <input 
+  placeholder="別ブランド公式サイトURL（https://...）" 
+  value={newCustomOfficialUrl} 
+  onChange={(e) => setNewCustomOfficialUrl(e.target.value)} 
+  style={inputStyle} 
+/>
                 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button type="submit" style={{ flex: 2, padding: '12px', background: themeColor, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
@@ -383,6 +390,7 @@ function AdminDashboard() {
                           setNewUrlKey(c.url_key || '');
                           setNewCustomShopName(c.custom_shop_name || '');
                           setNewCustomDescription(c.custom_description || '');
+                          setNewCustomOfficialUrl(c.custom_official_url || '');
                         }}>✎</button>
                         <button onClick={() => deleteCategory(c.id)}>×</button>
                       </div>
