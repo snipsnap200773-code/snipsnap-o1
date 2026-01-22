@@ -122,7 +122,6 @@ function TimeSelection() {
 
     if (isBooked) return { status: 'booked', label: '×' };
 
-    // 🆕 修正版：優先順位付き・前後ピンポイント隙間ブロック
     if (shop.auto_fill_logic) {
       const dayRes = existingReservations.filter(r => r.start_time.startsWith(dateStr));
       if (dayRes.length > 0) {
@@ -130,7 +129,6 @@ function TimeSelection() {
         const gapBlockCandidates = [];
 
         dayRes.forEach(r => {
-          // 【特等席】予約直後の枠（後ろ1マス目）を特定
           const resEnd = new Date(r.end_time).getTime();
           const earliestPossible = resEnd + (buffer * 60 * 1000);
           const perfectPostSlot = timeSlots.find(s => {
@@ -140,19 +138,16 @@ function TimeSelection() {
           });
           
           if (perfectPostSlot) {
-            specialSlots.push(perfectPostSlot); // 優先的に空ける枠
-            // 【後ろ側ブロック】特等席のさらに１つ後ろ（２マス目）を候補に
+            specialSlots.push(perfectPostSlot); 
             const idx = timeSlots.indexOf(perfectPostSlot);
             if (idx + 1 < timeSlots.length) gapBlockCandidates.push(timeSlots[idx + 1]);
           }
           
-          // 【前側ブロック】開始時間の３マス前を候補に
           const resStartStr = new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
           const startIdx = timeSlots.indexOf(resStartStr);
           if (startIdx >= 3) gapBlockCandidates.push(timeSlots[startIdx - 3]);
         });
 
-        // 判定：候補の中でも、他の予約の「特等席」になっている枠はブロックしない
         if (gapBlockCandidates.includes(timeStr) && !specialSlots.includes(timeStr)) {
           return { status: 'gap', label: '✕' }; 
         }
@@ -164,13 +159,17 @@ function TimeSelection() {
 
   if (loading) return <div style={{textAlign:'center', padding:'100px'}}>読み込み中...</div>;
 
+  // ✅ テーマカラーを抽出（デフォルト青）
+  const themeColor = shop?.theme_color || '#2563eb';
+
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif', color: '#333', paddingBottom: '120px' }}>
       <div style={{ padding: '15px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#fff', zIndex: 100 }}>
         <button onClick={() => navigate(-1)} style={{ border: 'none', background: 'none', color: '#666', fontWeight: 'bold' }}>← 戻る</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>日時選択</div>
-          <div style={{ fontSize: '0.7rem', color: '#2563eb' }}>所要時間: {totalSlotsNeeded * (shop?.slot_interval_min || 15)}分</div>
+          {/* ✅ 所要時間のカラー連動 */}
+          <div style={{ fontSize: '0.7rem', color: themeColor }}>所要時間: {totalSlotsNeeded * (shop?.slot_interval_min || 15)}分</div>
         </div>
         <div style={{ width: '40px' }}></div>
       </div>
@@ -207,7 +206,21 @@ function TimeSelection() {
                   const dateStr = date.toLocaleDateString('sv-SE');
                   const isSelected = selectedDateTime.date === dateStr && selectedDateTime.time === time;
                   return (
-                    <td key={date.toString()} onClick={() => res.status === 'available' && setSelectedDateTime({ date: dateStr, time })} style={{ textAlign: 'center', borderRight: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', cursor: res.status === 'available' ? 'pointer' : 'default', background: isSelected ? '#2563eb' : (['none', 'closed', 'rest', 'past', 'booked', 'gap'].includes(res.status) ? '#f1f5f9' : '#fff'), color: isSelected ? '#fff' : (res.status === 'available' ? '#2563eb' : '#cbd5e1'), height: '42px' }}>
+                    <td 
+                      key={date.toString()} 
+                      onClick={() => res.status === 'available' && setSelectedDateTime({ date: dateStr, time })} 
+                      style={{ 
+                        textAlign: 'center', 
+                        borderRight: '1px solid #e2e8f0', 
+                        borderBottom: '1px solid #e2e8f0', 
+                        cursor: res.status === 'available' ? 'pointer' : 'default', 
+                        // ✅ 背景色：選択時はテーマカラー、不可時は薄いグレー
+                        background: isSelected ? themeColor : (['none', 'closed', 'rest', 'past', 'booked', 'gap'].includes(res.status) ? '#f1f5f9' : '#fff'), 
+                        // ✅ 文字色：選択時は白、可能時はテーマカラー
+                        color: isSelected ? '#fff' : (res.status === 'available' ? themeColor : '#cbd5e1'), 
+                        height: '42px' 
+                      }}
+                    >
                       <div style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{res.label || (res.status === 'available' ? '◎' : '')}</div>
                     </td>
                   );
@@ -221,7 +234,8 @@ function TimeSelection() {
       {selectedDateTime.time && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', padding: '20px', borderTop: '1px solid #e2e8f0', textAlign: 'center', zIndex: 1000, boxShadow: '0 -4px 12px rgba(0,0,0,0.1)' }}>
           <div style={{ marginBottom: '10px', fontSize: '0.9rem' }}>選択：<b>{selectedDateTime.date.replace(/-/g, '/')} {selectedDateTime.time}</b></div>
-          <button style={{ width: '100%', maxWidth: '400px', padding: '16px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold' }} onClick={() => navigate(`/shop/${shopId}/confirm`, { state: { ...location.state, ...selectedDateTime } })}>予約内容の確認へ進む</button>
+          {/* ✅ 下部ボタンのカラー連動 */}
+          <button style={{ width: '100%', maxWidth: '400px', padding: '16px', background: themeColor, color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold' }} onClick={() => navigate(`/shop/${shopId}/confirm`, { state: { ...location.state, ...selectedDateTime } })}>予約内容の確認へ進む</button>
         </div>
       )}
     </div>

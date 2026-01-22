@@ -227,6 +227,9 @@ function ConfirmReservation() {
 
   if (!shop) return null;
 
+  // ✅ テーマカラーの取得（デフォルト青）
+  const themeColor = shop?.theme_color || '#2563eb';
+
   const displayDate = (adminDate || date).replace(/-/g, '/');
   const displayTime = adminTime || time;
 
@@ -234,7 +237,8 @@ function ConfirmReservation() {
     <div style={{ padding: '20px', maxWidth: '500px', margin: '0 auto', fontFamily: 'sans-serif', color: '#333' }}>
       <button onClick={() => navigate(-1)} style={{ marginBottom: '20px', border: 'none', background: 'none', color: '#666', cursor: 'pointer', fontWeight: 'bold' }}>← 戻る</button>
       
-      <h2 style={{ borderLeft: isAdminEntry ? '4px solid #e11d48' : '4px solid #2563eb', paddingLeft: '10px', fontSize: '1.2rem', marginBottom: '25px' }}>
+      {/* ✅ 見出しのボーダーカラー連動 */}
+      <h2 style={{ borderLeft: isAdminEntry ? '4px solid #e11d48' : `4px solid ${themeColor}`, paddingLeft: '10px', fontSize: '1.2rem', marginBottom: '25px' }}>
         {isAdminEntry ? '⚡ 店舗ねじ込み予約（入力短縮）' : '予約内容の確認'}
       </h2>
 
@@ -253,7 +257,8 @@ function ConfirmReservation() {
           {people && people.map((person, idx) => (
             <div key={idx} style={{ marginBottom: idx < people.length - 1 ? '10px' : 0, paddingBottom: idx < people.length - 1 ? '10px' : 0, borderBottom: idx < people.length - 1 ? '1px dashed #eee' : 'none' }}>
               {people.length > 1 && (
-                <div style={{ fontWeight: 'bold', color: '#2563eb', marginBottom: '4px' }}>{idx + 1}人目</div>
+                // ✅ 複数名表示のカラー連動
+                <div style={{ fontWeight: 'bold', color: themeColor, marginBottom: '4px' }}>{idx + 1}人目</div>
               )}
               {person.services.map(s => <div key={s.id}>・{s.name}</div>)}
             </div>
@@ -264,7 +269,6 @@ function ConfirmReservation() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div style={{ position: 'relative' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>お客様名 (必須)</label>
-          {/* 🆕 handleKeyDown を追加 */}
           <input 
             type="text" 
             value={customerName} 
@@ -274,7 +278,6 @@ function ConfirmReservation() {
             style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #ddd', boxSizing: 'border-box', fontSize: '1rem' }} 
           />
           
-          {/* ✅ isAdminEntry の時だけ候補を表示 */}
           {isAdminEntry && suggestedCustomers.length > 0 && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', borderRadius: '10px', zIndex: 100, border: '1px solid #eee', overflow: 'hidden' }}>
               {suggestedCustomers.map((c, index) => (
@@ -286,8 +289,8 @@ function ConfirmReservation() {
                     borderBottom: '1px solid #f8fafc', 
                     cursor: 'pointer', 
                     fontSize: '0.9rem',
-                    // 🆕 キーボード選択中のハイライト背景
-                    background: index === selectedIndex ? '#eff6ff' : 'transparent'
+                    // ✅ サジェスト選択のハイライトカラー連動（薄い色に）
+                    background: index === selectedIndex ? `${themeColor}15` : 'transparent'
                   }}
                 >
                   <b>{c.name} 様</b> <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>({c.phone || '電話なし'})</span>
@@ -310,7 +313,16 @@ function ConfirmReservation() {
           </>
         )}
 
-        <button onClick={handleReserve} disabled={isSubmitting} style={{ marginTop: '10px', padding: '18px', background: isSubmitting ? '#94a3b8' : (isAdminEntry ? '#e11d48' : '#2563eb'), color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer' }}>
+        {/* ✅ メインボタンのカラー連動 */}
+        <button 
+          onClick={handleReserve} 
+          disabled={isSubmitting} 
+          style={{ 
+            marginTop: '10px', padding: '18px', 
+            background: isSubmitting ? '#94a3b8' : (isAdminEntry ? '#e11d48' : themeColor), 
+            color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer' 
+          }}
+        >
           {isSubmitting ? '処理中...' : (isAdminEntry ? '🚀 ねじ込んで名簿登録' : '予約を確定する')}
         </button>
       </div>
