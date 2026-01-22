@@ -266,11 +266,22 @@ function ReservationForm() {
             ⚠️ 管理者モード：{adminDate} {adminTime} の予約を作成中
           </div>
         )}
-        {shop.description && <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6' }}>{shop.description}</p>}
+        
+        {/* ✅ 【修正箇所】サブタイトル（description）の「/」による改行対応 */}
+        {shop.description && (
+          <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6' }}>
+            {shop.description.split('/').map((line, idx) => (
+              <React.Fragment key={idx}>
+                {line}
+                {idx < shop.description.split('/').length - 1 && <br />}
+              </React.Fragment>
+            ))}
+          </p>
+        )}
       </div>
 
       <div>
-        {/* 🛡️ 修正箇所：1人目の時は「メニューを選択」、2人目以降は「n人目の〜」を表示 */}
+        {/* 🛡️ 1人目の時は「メニューを選択」、2人目以降は「n人目の〜」を表示 */}
         <h3 style={{ fontSize: '1rem', borderLeft: '4px solid #2563eb', paddingLeft: '10px', marginBottom: '20px' }}>
           {people.length === 0 ? "メニューを選択" : `${people.length + 1}人目のメニューを選択`}
         </h3>

@@ -34,7 +34,7 @@ function ShopDetail() {
     return <div style={{ textAlign: 'center', padding: '50px' }}>店舗が見つかりませんでした。</div>;
   }
 
-  // 🆕 Googleマップ埋め込み用のURLを最新形式に修正
+  // ✅ Googleマップ埋め込み用のURL形式
   const googleMapEmbedUrl = shop.address 
     ? `https://www.google.com/maps?q=${encodeURIComponent(shop.address)}&output=embed`
     : null;
@@ -106,9 +106,15 @@ function ShopDetail() {
             {shop.business_name}
           </h2>
 
+          {/* ✅ 修正箇所：サブタイトル（description）の「/」による改行対応 */}
           {shop.description && (
-            <div style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '15px' }}>
-              {shop.description}
+            <div style={{ fontSize: '0.9rem', color: '#2563eb', fontWeight: 'bold', marginBottom: '15px', lineHeight: '1.4' }}>
+              {shop.description.split('/').map((line, idx) => (
+                <React.Fragment key={idx}>
+                  {line}
+                  {idx < shop.description.split('/').length - 1 && <br />}
+                </React.Fragment>
+              ))}
             </div>
           )}
 
@@ -189,7 +195,7 @@ function ShopDetail() {
         )}
       </div>
 
-      {/* 浮遊ボタン（右下に常に配置） */}
+      {/* 浮遊ボタン */}
       <Link to="/" style={floatingButtonStyle}>
         <HomeIcon size={18} />
         ポータルサイトへ
