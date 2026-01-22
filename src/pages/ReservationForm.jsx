@@ -74,15 +74,13 @@ function ReservationForm() {
         const catRes = await catQuery;
         
         if (catRes.data) {
-          // 🆕 【入り口識別ロジック】
-          // URLに ?type=xxx がある場合は、url_key が一致するものだけを表示
-          // typeがない場合は、すべてのカテゴリを表示（既存動作を維持）
-          const filteredCats = entryType 
-            ? catRes.data.filter(c => c.url_key === entryType)
-            : catRes.data;
-          
-          setCategories(filteredCats);
-        }
+  // 🆕 【入り口識別ロジック：厳格版】
+  const filteredCats = entryType 
+    ? catRes.data.filter(c => c.url_key === entryType) // URL指定があるなら、完全に一致するものだけ出す
+    : catRes.data.filter(c => !c.url_key);            // URL指定がないなら、url_keyが空のもの（一般メニュー）だけ出す
+  
+  setCategories(filteredCats);
+}
 
         const servRes = await supabase.from('services').select('*').eq('shop_id', shopId).order('sort_order');
         if (servRes.data) setServices(servRes.data);
