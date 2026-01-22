@@ -234,6 +234,9 @@ function ReservationForm() {
   if (shop?.is_suspended) return <div style={{ padding: '60px 20px', textAlign: 'center' }}><h2>現在、予約受付を停止しています</h2></div>;
   if (!shop) return <div style={{ textAlign: 'center', padding: '50px' }}>店舗が見つかりません</div>;
 
+  // ✅ テーマカラーの取得（設定がない場合はデフォルトの青）
+  const themeColor = shop?.theme_color || '#2563eb';
+
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif', maxWidth: '500px', margin: '0 auto', color: '#333', paddingBottom: '160px' }}>
       
@@ -254,7 +257,7 @@ function ReservationForm() {
             <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 'bold', marginBottom: '8px' }}>現在の予約内容：</p>
             {people.map((p, idx) => (
               <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', padding: '4px 0', borderBottom: idx < people.length - 1 ? '1px dashed #eee' : 'none' }}>
-                <span>{idx + 1}人目：{p.services.map(s => s.name).join(', ')}</span>
+                <span style={{ color: themeColor, fontWeight: 'bold' }}>{idx + 1}人目：{p.services.map(s => s.name).join(', ')}</span>
                 <button onClick={() => removePerson(idx)} style={{ border: 'none', background: 'none', color: '#ef4444', fontSize: '0.9rem', cursor: 'pointer' }}>×</button>
               </div>
             ))}
@@ -282,7 +285,8 @@ function ReservationForm() {
 
       <div>
         {/* 🛡️ 1人目の時は「メニューを選択」、2人目以降は「n人目の〜」を表示 */}
-        <h3 style={{ fontSize: '1rem', borderLeft: '4px solid #2563eb', paddingLeft: '10px', marginBottom: '20px' }}>
+        {/* ✅ ボーダーの色をテーマカラーに連動 */}
+        <h3 style={{ fontSize: '1rem', borderLeft: `4px solid ${themeColor}`, paddingLeft: '10px', marginBottom: '20px' }}>
           {people.length === 0 ? "メニューを選択" : `${people.length + 1}人目のメニューを選択`}
         </h3>
         
@@ -303,10 +307,17 @@ function ReservationForm() {
                   const isSelected = selectedServices.find(s => s.id === service.id);
                   const groupedOpts = getGroupedOptions(service.id);
                   return (
-                    <div key={service.id} ref={el => serviceRefs.current[service.id] = el} style={{ border: isSelected ? '2px solid #2563eb' : '1px solid #ddd', borderRadius: '12px', background: 'white' }}>
+                    <div key={service.id} ref={el => serviceRefs.current[service.id] = el} 
+                         style={{ border: isSelected ? `2px solid ${themeColor}` : '1px solid #ddd', borderRadius: '12px', background: 'white' }}>
                       <button disabled={isDisabled} onClick={() => toggleService(service, idx)} style={{ width: '100%', padding: '15px', border: 'none', background: 'none', textAlign: 'left' }}>
                         <div style={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ width: '18px', height: '18px', border: '2px solid #2563eb', borderRadius: cat.allow_multiple_in_category ? '4px' : '50%', background: isSelected ? '#2563eb' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>{isSelected && '✓'}</div>
+                          {/* ✅ チェックボックスの背景色をテーマカラーに連動 */}
+                          <div style={{ 
+                            width: '18px', height: '18px', border: `2px solid ${themeColor}`, 
+                            borderRadius: cat.allow_multiple_in_category ? '4px' : '50%', 
+                            background: isSelected ? themeColor : 'transparent', 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' 
+                          }}>{isSelected && '✓'}</div>
                           <span>{service.name}</span>
                         </div>
                       </button>
@@ -316,9 +327,24 @@ function ReservationForm() {
                             <div key={gn} style={{ marginTop: '10px' }}>
                               <p style={{ fontSize: '0.7rem', color: '#475569' }}>└ {gn}</p>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                                {groupedOpts[gn].map(opt => (
-                                  <button key={opt.id} onClick={() => handleOptionSelect(service.id, gn, opt, idx)} style={{ padding: '10px 5px', borderRadius: '8px', border: '1px solid', borderColor: selectedOptions[`${service.id}-${gn}`]?.id === opt.id ? '#2563eb' : '#cbd5e1', background: selectedOptions[`${service.id}-${gn}`]?.id === opt.id ? '#2563eb' : 'white', color: selectedOptions[`${service.id}-${gn}`]?.id === opt.id ? 'white' : '#475569', fontSize: '0.8rem' }}>{opt.option_name}</button>
-                                ))}
+                                {groupedOpts[gn].map(opt => {
+                                  const isOptSelected = selectedOptions[`${service.id}-${gn}`]?.id === opt.id;
+                                  return (
+                                    <button 
+                                      key={opt.id} 
+                                      onClick={() => handleOptionSelect(service.id, gn, opt, idx)} 
+                                      style={{ 
+                                        padding: '10px 5px', borderRadius: '8px', border: '1px solid', 
+                                        borderColor: isOptSelected ? themeColor : '#cbd5e1', 
+                                        background: isOptSelected ? themeColor : 'white', 
+                                        color: isOptSelected ? 'white' : '#475569', 
+                                        fontSize: '0.8rem' 
+                                      }}
+                                    >
+                                      {opt.option_name}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
                           ))}
@@ -333,13 +359,14 @@ function ReservationForm() {
         })}
 
         {/* 🆕 縦書きの「追加でもう一人」札 */}
+        {/* ✅ 背景色をテーマカラーに連動 */}
         {selectedServices.length > 0 && people.length < 3 && allOptionsSelected && isRequiredMet && (
           <button 
             onClick={handleAddPerson}
             style={{ 
               position: 'fixed', bottom: '100px', right: '15px', zIndex: 999, 
               writingMode: 'vertical-rl',
-              background: '#f97316', color: 'white', padding: '15px 8px', 
+              background: themeColor, color: 'white', padding: '15px 8px', 
               borderRadius: '8px 0 0 8px', border: 'none', fontWeight: 'bold', 
               fontSize: '0.85rem', boxShadow: '-4px 4px 12px rgba(0,0,0,0.1)', 
               cursor: 'pointer', animation: 'slideIn 0.3s ease-out'
@@ -361,7 +388,7 @@ function ReservationForm() {
               onClick={handleNextStep} 
               style={{ 
                 width: '100%', maxWidth: '400px', padding: '16px', 
-                background: (!allOptionsSelected || !isRequiredMet || !isTotalTimeOk) ? '#cbd5e1' : '#2563eb', 
+                background: (!allOptionsSelected || !isRequiredMet || !isTotalTimeOk) ? '#cbd5e1' : themeColor, 
                 color: 'white', border: 'none', borderRadius: '14px', fontWeight: 'bold', fontSize: '1rem'
               }}
             >
