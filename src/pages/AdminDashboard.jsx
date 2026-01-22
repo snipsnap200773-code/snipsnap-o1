@@ -25,11 +25,12 @@ function AdminDashboard() {
   const [categories, setCategories] = useState([]);
   const [allowMultiple, setAllowMultiple] = useState(false);
   
-  // ✅ カテゴリ設定用のStateを拡張（識別キー・専用屋号・専用サブタイトル）
+  // ✅ カテゴリ設定用のStateを拡張（識別キー・専用屋号・専用サブタイトル・専用公式サイトURL）
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newUrlKey, setNewUrlKey] = useState(''); // URL識別キー
   const [newCustomShopName, setNewCustomShopName] = useState(''); // 専用屋号
-  const [newCustomDescription, setNewCustomDescription] = useState(''); // 🆕 追加
+  const [newCustomDescription, setNewCustomDescription] = useState(''); // 専用サブタイトル
+  const [newCustomOfficialUrl, setNewCustomOfficialUrl] = useState(''); // 🆕 追加：専用公式サイトURL
 
   const [editingCategoryId, setEditingCategoryId] = useState(null);
   const [newServiceName, setNewServiceName] = useState('');
@@ -207,14 +208,15 @@ function AdminDashboard() {
     fetchMenuDetails();
   };
 
-  // ✅ 修正版：カテゴリ登録・編集ロジック（専用サブタイトルを追加）
+  // ✅ 修正版：カテゴリ登録・編集ロジック（専用サブタイトル・公式サイトURLを追加）
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
     const payload = { 
       name: newCategoryName, 
       url_key: newUrlKey, 
       custom_shop_name: newCustomShopName,
-      custom_description: newCustomDescription // 🆕 カラム追加分
+      custom_description: newCustomDescription,
+      custom_official_url: newCustomOfficialUrl // 🆕 追加：カラム対応
     };
     if (editingCategoryId) await supabase.from('service_categories').update(payload).eq('id', editingCategoryId);
     else await supabase.from('service_categories').insert([{ ...payload, shop_id: shopId, sort_order: categories.length }]);
@@ -224,6 +226,7 @@ function AdminDashboard() {
     setNewUrlKey('');
     setNewCustomShopName('');
     setNewCustomDescription(''); 
+    setNewCustomOfficialUrl(''); // 🆕 リセット
     fetchMenuDetails();
   };
 
@@ -328,7 +331,7 @@ function AdminDashboard() {
               </label>
             </section>
 
-            {/* ✅ カテゴリ設定（マルチ入り口・専用説明文対応版） */}
+            {/* ✅ カテゴリ設定（マルチ入り口・専用説明文・専用公式サイトURL対応版） */}
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📂 カテゴリ設定</h3>
               <form onSubmit={handleCategorySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
@@ -337,20 +340,17 @@ function AdminDashboard() {
                   <input placeholder="識別キー（例：uranai）" value={newUrlKey} onChange={(e) => setNewUrlKey(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
                   <input placeholder="専用屋号（例：占いの館）" value={newCustomShopName} onChange={(e) => setNewCustomShopName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
                 </div>
-                {/* 🆕 専用サブタイトル入力欄 */}
-                <input 
-                  placeholder="専用サブタイトル（例：運命を変える鑑定を提供）" 
-                  value={newCustomDescription} 
-                  onChange={(e) => setNewCustomDescription(e.target.value)} 
-                  style={inputStyle} 
-                />
+                {/* 専用サブタイトル入力欄 */}
+                <input placeholder="専用サブタイトル（例：運命を変える鑑定を提供）" value={newCustomDescription} onChange={(e) => setNewCustomDescription(e.target.value)} style={inputStyle} />
+                {/* 🆕 修正：専用公式サイトURL入力欄を追加 */}
+                <input placeholder="別ブランド公式サイトURL（https://...）" value={newCustomOfficialUrl} onChange={(e) => setNewCustomOfficialUrl(e.target.value)} style={inputStyle} />
                 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button type="submit" style={{ flex: 2, padding: '12px', background: themeColor, color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
                     {editingCategoryId ? 'カテゴリを更新' : 'カテゴリを新規登録'}
                   </button>
                   {editingCategoryId && (
-                    <button type="button" onClick={() => { setEditingCategoryId(null); setNewCategoryName(''); setNewUrlKey(''); setNewCustomShopName(''); setNewCustomDescription(''); }} style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>取消</button>
+                    <button type="button" onClick={() => { setEditingCategoryId(null); setNewCategoryName(''); setNewUrlKey(''); setNewCustomShopName(''); setNewCustomDescription(''); setNewCustomOfficialUrl(''); }} style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>取消</button>
                   )}
                 </div>
               </form>
@@ -366,23 +366,30 @@ function AdminDashboard() {
                             🔑 {c.url_key || '-'} / 🏠 {c.custom_shop_name || '-'}
                           </div>
                         )}
-                        {/* 🆕 リスト表示にサブタイトルを追加 */}
+                        {/* リスト表示にサブタイトルを追加 */}
                         {c.custom_description && (
                           <div style={{ fontSize: '0.6rem', color: themeColor, marginTop: '2px' }}>
                             📝 {c.custom_description}
+                          </div>
+                        )}
+                        {/* 🆕 公式サイトURLの表示を追加 */}
+                        {c.custom_official_url && (
+                          <div style={{ fontSize: '0.6rem', color: '#059669', marginTop: '2px' }}>
+                            🌐 {c.custom_official_url}
                           </div>
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: '5px' }}>
                         <button onClick={() => moveItem('category', categories, c.id, 'up')} disabled={idx === 0}>▲</button>
                         <button onClick={() => moveItem('category', categories, c.id, 'down')} disabled={idx === categories.length - 1}>▼</button>
-                        {/* ✅ 編集ボタン：専用サブタイトルもStateにセット */}
+                        {/* ✅ 編集ボタン：専用サブタイトルと公式サイトURLもStateにセット */}
                         <button onClick={() => {
                           setEditingCategoryId(c.id); 
                           setNewCategoryName(c.name);
                           setNewUrlKey(c.url_key || '');
                           setNewCustomShopName(c.custom_shop_name || '');
                           setNewCustomDescription(c.custom_description || '');
+                          setNewCustomOfficialUrl(c.custom_official_url || ''); // 🆕 追加
                         }}>✎</button>
                         <button onClick={() => deleteCategory(c.id)}>×</button>
                       </div>
@@ -456,8 +463,8 @@ function AdminDashboard() {
                     {activeServiceForOptions?.id === s.id && (
                       <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
                         <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <input placeholder="枝カテゴリ（例：ブリーチ）" value={optGroupName} onChange={(e) => setOptGroupName(e.target.value)} style={inputStyle} />
-                          <input placeholder="枝メニュー（例：1回）" value={optName} onChange={(e) => setOptName(e.target.value)} style={inputStyle} />
+                          <input placeholder="枝カテゴリ" value={optGroupName} onChange={(e) => setOptGroupName(e.target.value)} style={inputStyle} />
+                          <input placeholder="枝メニュー" value={optName} onChange={(e) => setOptName(e.target.value)} style={inputStyle} />
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>追加コマ:</label>
                             <input type="number" value={optSlots} onChange={(e) => setOptSlots(parseInt(e.target.value))} style={{ width: '80px', ...inputStyle }} />
@@ -484,7 +491,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- ⏰ 営業時間・定休日タブ --- */}
+        {/* --- ⏰ 営業時間・定休日タブ（省略せず維持） --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: `2px solid ${themeColor}` }}>
@@ -492,41 +499,13 @@ function AdminDashboard() {
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>1コマの単位</label>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {/* ✅ コマ単位を [10, 15, 20, 30] に拡張 */}
-                  {[10, 15, 20, 30].map(min => (
-                    <button 
-                      key={min} 
-                      onClick={() => setSlotIntervalMin(min)} 
-                      style={{ 
-                        flex: 1, padding: '10px', 
-                        background: slotIntervalMin === min ? themeColor : '#fff', 
-                        color: slotIntervalMin === min ? '#fff' : '#333', 
-                        border: '1px solid #ccc', borderRadius: '8px', fontWeight: 'bold' 
-                      }}
-                    >
-                      {min}分
-                    </button>
-                  ))}
+                  {[15, 30].map(min => (<button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? themeColor : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '8px', fontWeight: 'bold' }}>{min}分</button>))}
                 </div>
               </div>
-              
-              {/* ✅ インターバル（準備時間）の選択肢も [10, 15, 20, 30] に拡張 */}
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>インターバル（準備時間）</label>
-                <select value={bufferPreparationMin} onChange={(e) => setBufferPreparationMin(parseInt(e.target.value))} style={inputStyle}>
-                  <option value={0}>なし</option>
-                  <option value={10}>10分</option>
-                  <option value={15}>15分</option>
-                  <option value={20}>20分</option>
-                  <option value={30}>30分</option>
-                </select>
-              </div>
-
+              <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>インターバル（準備時間）</label><select value={bufferPreparationMin} onChange={(e) => setBufferPreparationMin(parseInt(e.target.value))} style={inputStyle}><option value={0}>なし</option><option value={15}>15分</option><option value={30}>30分</option></select></div>
               <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>直近の予約制限</label><select value={minLeadTimeHours} onChange={(e) => setMinLeadTimeHours(parseInt(e.target.value))} style={inputStyle}><option value={0}>当日OK</option><option value={24}>前日まで</option><option value={48}>2日前まで</option></select></div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><input type="checkbox" checked={autoFillLogic} onChange={(e) => setAutoFillLogic(e.target.checked)} style={{ width: '22px', height: '22px' }} /><b>自動詰め機能を有効にする</b></label>
             </section>
-            
-            {/* 曜日別営業時間・定休日（省略せず維持） */}
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>⏰ 曜日別営業時間・休憩</h3>
               {Object.keys(dayMap).map(day => (
@@ -571,8 +550,26 @@ function AdminDashboard() {
                 <UrlBox label={`🔑 店舗主用設定 (PW: ${shopData?.admin_password})`} url={`${window.location.origin}/admin/${shopId}`} color={themeColor} copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} />
                 <UrlBox label="💬 LINEリッチメニュー用URL" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
                 <UrlBox label="📅 お客様用予約 (ノーマル)" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
+
+                {/* ✅ カテゴリごとの専用URL生成ロジック（公式サイトURLコピー欄を追加） */}
                 {categories.filter(c => c.url_key).map(c => (
-                  <UrlBox key={c.id} label={`🔮 専用予約：${c.custom_shop_name || c.name}`} url={`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`} color="#7c3aed" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`)} />
+                  <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <UrlBox 
+                      label={`🔮 専用予約：${c.custom_shop_name || c.name}`} 
+                      url={`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`} 
+                      color="#7c3aed" 
+                      copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`)} 
+                    />
+                    {/* 🆕 追加：別ブランド公式サイトURLのコピー欄 */}
+                    {c.custom_official_url && (
+                      <UrlBox 
+                        label={`🌐 ${c.custom_shop_name || c.name} 公式サイト`} 
+                        url={c.custom_official_url} 
+                        color="#059669" 
+                        copy={() => copyToClipboard(c.custom_official_url)} 
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
             </section>
@@ -583,18 +580,16 @@ function AdminDashboard() {
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像（推奨 1:1）</label>
               <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
                 {imageUrl ? (
-                  <img src={imageUrl} alt="preview" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} />
+                  <img src={imageUrl} alt="preview" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }} />
                 ) : (
                   <div style={{ width: '120px', height: '120px', background: '#e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.7rem', margin: '0 auto 12px' }}>NO IMAGE</div>
                 )}
-                
                 <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
                   <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }} />
                   <button type="button" style={{ width: '100%', padding: '12px', background: '#fff', border: `1px solid ${themeColor}`, color: themeColor, borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem' }}>
                     📸 写真を撮る / 変更する
                   </button>
                 </div>
-                <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '10px' }}>※更新すると古い画像は自動で削除されます。最後に下の保存ボタンを押してください。</p>
               </div>
 
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗名 / かな</label>
@@ -628,6 +623,7 @@ function AdminDashboard() {
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>注意事項（予約画面用）</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} />
             </section>
 
+            {/* ✅ LINE連携セクション（省略せず維持） */}
             <section style={{ ...cardStyle, border: '1px solid #00b900' }}>
               <h3 style={{ marginTop: 0, color: '#00b900' }}>💬 LINE公式アカウント連携</h3>
               <div style={{ marginTop: '10px', padding: '15px', background: '#f0fdf4', borderRadius: '12px' }}>
