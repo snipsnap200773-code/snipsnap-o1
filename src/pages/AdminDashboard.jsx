@@ -332,10 +332,10 @@ function AdminDashboard() {
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0, fontSize: '0.9rem' }}>📂 カテゴリ設定</h3>
               <form onSubmit={handleCategorySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-                <input placeholder="カテゴリ名（例：美容室）" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} style={inputStyle} required />
+                <input placeholder="カテゴリ名（例：占い）" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} style={inputStyle} required />
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input placeholder="識別キー（例：hair）" value={newUrlKey} onChange={(e) => setNewUrlKey(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-                  <input placeholder="専用屋号（例：ソロプレ美容室）" value={newCustomShopName} onChange={(e) => setNewCustomShopName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                  <input placeholder="識別キー（例：uranai）" value={newUrlKey} onChange={(e) => setNewUrlKey(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+                  <input placeholder="専用屋号（例：占いの館）" value={newCustomShopName} onChange={(e) => setNewCustomShopName(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
                 </div>
                 {/* 🆕 専用サブタイトル入力欄 */}
                 <input 

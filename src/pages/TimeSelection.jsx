@@ -26,6 +26,7 @@ function TimeSelection() {
     setLoading(false);
   };
 
+  // ✅ 三土手さんの重要ロジック：定休日判定（第n週、最終週などの複雑な計算を完全維持）
   const checkIsRegularHoliday = (date) => {
     if (!shop?.business_hours?.regular_holidays) return false;
     const holidays = shop.business_hours.regular_holidays;
@@ -57,22 +58,28 @@ function TimeSelection() {
     return days;
   }, [startDate]);
 
+  // ✅ 10分〜30分の可変インターバルに対応したスロット生成（三土手さんのロジックを拡張）
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
     let minOpen = "23:59", maxClose = "00:00";
     Object.values(shop.business_hours).forEach(h => {
       if (typeof h === 'object' && h.is_closed) return;
-      if (typeof h === 'object' && h.open < minOpen) minOpen = h.open;
-      if (typeof h === 'object' && h.close > maxClose) maxClose = h.close;
+      if (typeof h === 'object' && h.open && h.open < minOpen) minOpen = h.open;
+      if (typeof h === 'object' && h.close && h.close > maxClose) maxClose = h.close;
     });
+    
     const slots = [];
+    // ✅ 拡張ポイント：AdminDashboardで設定されたコマ単位を使用
     const interval = shop.slot_interval_min || 15;
+    
     let current = new Date();
     const [h, m] = minOpen.split(':').map(Number);
     current.setHours(h, m, 0, 0);
+    
     const dayEnd = new Date();
     const [eh, em] = maxClose.split(':').map(Number);
     dayEnd.setHours(eh, em, 0, 0);
+    
     while (current < dayEnd) {
       slots.push(current.toTimeString().slice(0, 5));
       current.setMinutes(current.getMinutes() + interval);
@@ -80,6 +87,7 @@ function TimeSelection() {
     return slots;
   }, [shop]);
 
+  // ✅ 三土手さんの重要ロジック：空き状況チェック（自動詰め、リードタイム、休憩時間を完全維持）
   const checkAvailability = (date, timeStr) => {
     if (!shop?.business_hours) return { status: 'none' };
     if (checkIsRegularHoliday(date)) return { status: 'closed', label: '休' };
@@ -105,6 +113,7 @@ function TimeSelection() {
     if (dateStr === todayStr && targetDateTime < now) return { status: 'past', label: '－' };
     if (new Date(dateStr) < limitDate) return { status: 'past', label: '－' };
 
+    // ✅ 拡張ポイント：選択された間隔で必要時間を計算
     const interval = shop.slot_interval_min || 15;
     const totalMinRequired = (totalSlotsNeeded * interval);
     const potentialEndTime = new Date(targetDateTime.getTime() + totalMinRequired * 60 * 1000);
@@ -122,6 +131,7 @@ function TimeSelection() {
 
     if (isBooked) return { status: 'booked', label: '×' };
 
+    // ✅ 三土手さんの高度なロジック：自動詰め（隙間ブロック）
     if (shop.auto_fill_logic) {
       const dayRes = existingReservations.filter(r => r.start_time.startsWith(dateStr));
       if (dayRes.length > 0) {
@@ -159,7 +169,7 @@ function TimeSelection() {
 
   if (loading) return <div style={{textAlign:'center', padding:'100px'}}>読み込み中...</div>;
 
-  // ✅ テーマカラーを抽出（デフォルト青）
+  // ✅ 三土手さんのテーマカラー連動を完全維持
   const themeColor = shop?.theme_color || '#2563eb';
 
   return (
@@ -168,7 +178,6 @@ function TimeSelection() {
         <button onClick={() => navigate(-1)} style={{ border: 'none', background: 'none', color: '#666', fontWeight: 'bold' }}>← 戻る</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>日時選択</div>
-          {/* ✅ 所要時間のカラー連動 */}
           <div style={{ fontSize: '0.7rem', color: themeColor }}>所要時間: {totalSlotsNeeded * (shop?.slot_interval_min || 15)}分</div>
         </div>
         <div style={{ width: '40px' }}></div>
@@ -214,9 +223,7 @@ function TimeSelection() {
                         borderRight: '1px solid #e2e8f0', 
                         borderBottom: '1px solid #e2e8f0', 
                         cursor: res.status === 'available' ? 'pointer' : 'default', 
-                        // ✅ 背景色：選択時はテーマカラー、不可時は薄いグレー
                         background: isSelected ? themeColor : (['none', 'closed', 'rest', 'past', 'booked', 'gap'].includes(res.status) ? '#f1f5f9' : '#fff'), 
-                        // ✅ 文字色：選択時は白、可能時はテーマカラー
                         color: isSelected ? '#fff' : (res.status === 'available' ? themeColor : '#cbd5e1'), 
                         height: '42px' 
                       }}
@@ -234,7 +241,6 @@ function TimeSelection() {
       {selectedDateTime.time && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', padding: '20px', borderTop: '1px solid #e2e8f0', textAlign: 'center', zIndex: 1000, boxShadow: '0 -4px 12px rgba(0,0,0,0.1)' }}>
           <div style={{ marginBottom: '10px', fontSize: '0.9rem' }}>選択：<b>{selectedDateTime.date.replace(/-/g, '/')} {selectedDateTime.time}</b></div>
-          {/* ✅ 下部ボタンのカラー連動 */}
           <button style={{ width: '100%', maxWidth: '400px', padding: '16px', background: themeColor, color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold' }} onClick={() => navigate(`/shop/${shopId}/confirm`, { state: { ...location.state, ...selectedDateTime } })}>予約内容の確認へ進む</button>
         </div>
       )}

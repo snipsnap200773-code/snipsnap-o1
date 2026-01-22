@@ -271,6 +271,7 @@ function AdminReservations() {
     return days;
   }, [startDate]);
 
+  // ✅ 10分〜30分の可変インターバルに対応したスロット生成ロジック
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
     let minTotalMinutes = 24 * 60;
@@ -287,7 +288,8 @@ function AdminReservations() {
     });
     if (!hasOpenDay) { minTotalMinutes = 9 * 60; maxTotalMinutes = 18 * 60; }
     const slots = [];
-    const interval = shop.slot_interval_min || 30;
+    // ✅ 拡張ポイント：AdminDashboardで設定されたコマ単位を使用（デフォルトは15分）
+    const interval = shop.slot_interval_min || 15;
     for (let m = minTotalMinutes; m <= maxTotalMinutes; m += interval) {
       const h = Math.floor(m / 60); const mm = m % 60;
       slots.push(`${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
@@ -347,7 +349,9 @@ function AdminReservations() {
 
   const handleBlockTime = async () => {
     const start = new Date(`${selectedDate}T${targetTime}:00`);
-    const end = new Date(start.getTime() + (shop.slot_interval_min || 30) * 60000);
+    // ✅ 拡張ポイント：AdminDashboardで設定されたコマ単位を使用（デフォルトは15分）
+    const interval = shop.slot_interval_min || 15;
+    const end = new Date(start.getTime() + interval * 60000);
     const insertData = {
       shop_id: shopId, customer_name: '管理者ブロック', res_type: 'blocked',
       start_at: start.toISOString(), end_at: end.toISOString(),
@@ -360,7 +364,8 @@ function AdminReservations() {
 
   const handleBlockFullDay = async () => {
     if (!window.confirm(`${selectedDate.replace(/-/g, '/')} を終日「予約不可」にしますか？`)) return;
-    const interval = shop.slot_interval_min || 30;
+    // ✅ 拡張ポイント：AdminDashboardで設定されたコマ単位を使用（デフォルトは15分）
+    const interval = shop.slot_interval_min || 15;
     const dayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(selectedDate).getDay()];
     const hours = shop.business_hours?.[dayName];
     const openStr = (hours && !hours.is_closed && hours.open) ? hours.open : "09:00";
@@ -417,7 +422,6 @@ function AdminReservations() {
       {isPC && (
         <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #e2e8f0', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px', background: '#fff', zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* ✅ ロゴ背景のカラー連動 */}
             <div style={{ width: '35px', height: '35px', background: themeColor, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>S</div>
             <h1 style={{ fontSize: '1.2rem', fontWeight: '900', margin: 0 }}>SnipSnap Admin</h1>
           </div>
@@ -431,7 +435,6 @@ function AdminReservations() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', fontSize: '0.8rem' }}>
               {['月','火','水','木','金','土','日'].map(d => <div key={d} style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 'bold' }}>{d}</div>)}
-              {/* ✅ ミニカレンダー選択日のカラー連動 */}
               {miniCalendarDays.map((date, i) => date ? <div key={i} onClick={() => { setStartDate(date); setSelectedDate(getJapanDateStr(date)); }} style={{ padding: '8px 0', cursor: 'pointer', borderRadius: '50%', background: getJapanDateStr(date) === selectedDate ? themeColor : 'none', color: getJapanDateStr(date) === selectedDate ? '#fff' : '#475569' }}>{date.getDate()}</div> : <div key={i} />)}
             </div>
           </div>
@@ -462,7 +465,6 @@ function AdminReservations() {
                           borderBottom: '1px solid #f8fafc', 
                           cursor: 'pointer',
                           fontSize: '0.9rem',
-                          // ✅ 検索候補ハイライトのカラー連動
                           background: index === selectedIndex ? themeColorLight : 'transparent'
                         }}
                       >
@@ -493,9 +495,7 @@ function AdminReservations() {
                   const isToday = getJapanDateStr(new Date()) === getJapanDateStr(date);
                   return (
                     <th key={date.toString()} style={{ padding: '4px 0', borderBottom: '1px solid #ddd' }}>
-                      {/* ✅ 曜日のカラー連動 */}
                       <div style={{ fontSize: '0.6rem', color: isToday ? themeColor : '#666' }}>{['日','月','火','水','木','金','土'][date.getDay()]}</div>
-                      {/* ✅ 今日の丸印のカラー連動 */}
                       <div style={{ fontSize: isPC ? '1.5rem' : '0.9rem', fontWeight: 'bold', color: isToday ? '#fff' : '#333', background: isToday ? themeColor : 'none', width: isPC ? '40px' : '22px', height: isPC ? '40px' : '22px', borderRadius: '50%', margin: '2px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{date.getDate()}</div>
                     </th>
                   );
@@ -518,7 +518,6 @@ function AdminReservations() {
                       if (res.isRegularHoliday) { bgColor = '#f3f4f6'; textColor = '#94a3b8'; }
                       else if (res.res_type === 'blocked') { bgColor = '#fee2e2'; textColor = '#ef4444'; borderColor = '#ef4444'; }
                       else if (res.res_type === 'system_blocked') { bgColor = '#f8fafc'; textColor = '#cbd5e1'; }
-                      // ✅ 予約確定ブロックのカラー連動（背景は薄く、左線は濃く）
                       else if (isStart) { bgColor = themeColorLight; textColor = '#1e293b'; borderColor = themeColor; }
                       else { bgColor = '#fdfdfd'; textColor = '#cbd5e1'; }
                     }
@@ -541,7 +540,6 @@ function AdminReservations() {
         {!isPC && (
           <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', display: 'flex', background: '#fff', borderRadius: '50px', boxShadow: '0 8px 30px rgba(0,0,0,0.15)', padding: '5px', zIndex: 100, border: '1px solid #eee' }}>
             <button onClick={goPrev} style={floatNavBtnStyle}>◀</button>
-            {/* ✅ 今日の文字色のカラー連動 */}
             <button onClick={goToday} style={{ ...floatNavBtnStyle, width: '80px', color: themeColor, fontSize: '0.9rem' }}>今日</button>
             <button onClick={goNext} style={floatNavBtnStyle}>▶</button>
           </div>
@@ -566,7 +564,6 @@ function AdminReservations() {
                   <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     {selectedRes?.res_type === 'normal' && (
                       <div style={{ background: themeColorLight, padding: '10px', borderRadius: '8px', marginBottom: '15px', border: `1px solid ${themeColor}` }}>
-                        {/* ✅ モーダル内のラベル・バッジのカラー連動 */}
                         <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: themeColor }}>📋 予約メニュー</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
                           {selectedRes.options?.people ? (
@@ -602,7 +599,6 @@ function AdminReservations() {
                     <label style={labelStyle}>顧客メモ</label>
                     <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ ...inputStyle, height: '80px' }} placeholder="好み、注意事項など" />
                     
-                    {/* ✅ 保存ボタンのカラー連動 */}
                     <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: themeColor, color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
                     {showDetailModal && selectedRes && (
                       <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? themeColor : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
@@ -618,7 +614,6 @@ function AdminReservations() {
                   {!selectedRes?.isRegularHoliday && (showCustomerModal ? customerFullHistory : customerHistory).map(h => (
                     <div key={h.id} style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
                       <div style={{ fontWeight: 'bold' }}>{new Date(h.start_time).toLocaleDateString('ja-JP')}</div>
-                      {/* ✅ 来店履歴メニューのカラー連動 */}
                       <div style={{ color: themeColor, marginTop: '2px' }}>
                         {h.options?.people 
                           ? h.options.people.map(p => p.services.map(s => s.name).join(', ')).join(' / ')
@@ -640,10 +635,8 @@ function AdminReservations() {
         <div onClick={() => setShowMenuModal(false)} style={overlayStyle}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', padding: '35px', borderRadius: '30px', width: '90%', maxWidth: '340px', textAlign: 'center', position: 'relative' }}>
             <h3 style={{ margin: '0 0 10px 0', color: '#64748b', fontSize: '0.9rem' }}>{selectedDate.replace(/-/g, '/')}</h3>
-            {/* ✅ 選択時間のカラー連動 */}
             <p style={{ fontWeight: '900', color: themeColor, fontSize: '2.2rem', margin: '0 0 30px 0' }}>{targetTime}</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {/* ✅ 予約作成ボタンのカラー連動 */}
               <button onClick={() => navigate(`/shop/${shopId}/reserve`, { state: { adminDate: selectedDate, adminTime: targetTime } })} style={{ padding: '22px', background: themeColor, color: '#fff', border: 'none', borderRadius: '20px', fontWeight: '900', fontSize: '1.2rem' }}>📝 予約を入れる</button>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <button onClick={handleBlockTime} style={{ padding: '15px', background: '#fff', color: '#ef4444', border: '2px solid #fee2e2', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.85rem' }}>✕ この枠のみ</button>
