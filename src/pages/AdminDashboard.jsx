@@ -166,7 +166,7 @@ function AdminDashboard() {
         // 🆕 リマインド設定をデータベースへ保存
         notify_line_remind_enabled: notifyLineRemindEnabled,
         owner_name: ownerName, owner_name_kana: ownerNameKana,
-        business_type: businessType, line_channel_access_token: lineToken, line_admin_user_id: lineAdminId
+        business_type: businessType, line_channel_access_token: lineToken, line_admin_user_id: lineAdminId, theme_color: shopData.theme_color
       }).eq('id', shopId);
     if (!error) showMsg('すべての設定を保存しました！'); else alert('保存に失敗しました。');
   };
