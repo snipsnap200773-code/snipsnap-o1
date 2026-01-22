@@ -143,32 +143,63 @@ function ShopDetail() {
             {shop.intro_text || '店舗の詳細情報は準備中です。'}
           </p>
 
-          {/* --- 🆕 専用サービス（別ブランド）への誘導バナーエリア --- */}
+          {/* --- 🆕 運営する別ブランドのご紹介セクション --- */}
           {specialCategories.length > 0 && (
             <div style={{ margin: '25px 0', padding: '20px', background: '#f8fafc', borderRadius: '20px', border: `1px dashed ${themeColor}` }}>
               <h3 style={{ fontSize: '0.85rem', color: themeColor, marginBottom: '15px', textAlign: 'center', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <Sparkles size={16} /> 併設メニューのご案内
+                <Sparkles size={16} /> 運営する別ブランドのご紹介
               </h3>
-              <div style={{ display: 'grid', gap: '12px' }}>
+              <div style={{ display: 'grid', gap: '15px' }}>
                 {specialCategories.map(cat => (
                   <div 
                     key={cat.id} 
-                    onClick={() => navigate(`/shop/${shopId}/reserve?type=${cat.url_key}`)}
                     style={{ 
-                      background: '#fff', padding: '15px', borderRadius: '15px', cursor: 'pointer',
+                      background: '#fff', padding: '18px', borderRadius: '15px',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0'
                     }}
                   >
-                    <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1a1a1a' }}>
+                    <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1a1a1a', marginBottom: '6px' }}>
                       {cat.custom_shop_name || cat.name}
                     </div>
+                    
+                    {/* ✅ サブタイトル全表示 ＆ 改行ロジック適用 */}
                     {cat.custom_description && (
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', lineHeight: '1.4' }}>
-                        {cat.custom_description.split('/')[0]} {/* サブタイトルの1行目だけチラ見せ */}
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '15px', lineHeight: '1.5' }}>
+                        {cat.custom_description.split('/').map((line, idx) => (
+                          <React.Fragment key={idx}>
+                            {line}
+                            {idx < cat.custom_description.split('/').length - 1 && <br />}
+                          </React.Fragment>
+                        ))}
                       </div>
                     )}
-                    <div style={{ marginTop: '10px', fontSize: '0.7rem', color: themeColor, fontWeight: 'bold', textAlign: 'right' }}>
-                      専用予約ページを開く →
+                    
+                    {/* 🆕 ボタンエリア（公式サイト ＆ 予約） */}
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      {cat.custom_official_url && (
+                        <a 
+                          href={cat.custom_official_url} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          style={{ 
+                            flex: 1, textAlign: 'center', padding: '10px', borderRadius: '10px',
+                            background: '#f1f5f9', color: '#475569', fontSize: '0.75rem', 
+                            fontWeight: 'bold', textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                          }}
+                        >
+                          <ExternalLink size={14} /> 公式サイト
+                        </a>
+                      )}
+                      <button 
+                        onClick={() => navigate(`/shop/${shopId}/reserve?type=${cat.url_key}`)}
+                        style={{ 
+                          flex: 1, padding: '10px', borderRadius: '10px', border: 'none',
+                          background: themeColor, color: '#fff', fontSize: '0.75rem', 
+                          fontWeight: 'bold', cursor: 'pointer'
+                        }}
+                      >
+                        予約ページへ →
+                      </button>
                     </div>
                   </div>
                 ))}
