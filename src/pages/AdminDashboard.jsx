@@ -215,8 +215,8 @@ function AdminDashboard() {
       name: newCategoryName, 
       url_key: newUrlKey, 
       custom_shop_name: newCustomShopName,
-      custom_description: newCustomDescription // 🆕 カラム追加分
-      custom_official_url: newCustomOfficialUrl // 🆕 ここを追加
+      custom_description: newCustomDescription, // 👈 ここに「,」が必要です！
+       custom_official_url: newCustomOfficialUrl // 🆕 ここを追加
     };
     if (editingCategoryId) await supabase.from('service_categories').update(payload).eq('id', editingCategoryId);
     else await supabase.from('service_categories').insert([{ ...payload, shop_id: shopId, sort_order: categories.length }]);
