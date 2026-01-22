@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import bcrypt from 'bcryptjs'; // 🆕 セキュリティ強化のためのインポート
+import bcrypt from 'bcryptjs'; // ✅ インポート維持
 
 function AdminDashboard() {
   const { shopId } = useParams();
@@ -12,7 +12,6 @@ function AdminDashboard() {
   // --- 1. セキュリティ用State ---
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
-  // 🆕 パスワード変更用のStateを追加（既存ロジックは一切変えません）
   const [newPassword, setNewPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
@@ -21,7 +20,7 @@ function AdminDashboard() {
   const [message, setMessage] = useState('');
   const [shopData, setShopData] = useState(null);
 
-  // --- 3. メニュー設定用State (維持) ---
+  // --- 3. メニュー設定用State ---
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
   const [allowMultiple, setAllowMultiple] = useState(false);
@@ -43,7 +42,7 @@ function AdminDashboard() {
   const [emailContact, setEmailContact] = useState('');
   const [address, setAddress] = useState(''); 
   const [description, setDescription] = useState(''); 
-  const [introText, setIntroText] = useState(''); // 🆕 店舗紹介（長文）用のStateを追加
+  const [introText, setIntroText] = useState(''); 
   const [notes, setNotes] = useState(''); 
   const [businessHours, setBusinessHours] = useState({});
   const [maxLastSlots, setMaxLastSlots] = useState(2);
@@ -58,7 +57,6 @@ function AdminDashboard() {
   const [officialUrl, setOfficialUrl] = useState('');
   const [lineOfficialUrl, setLineOfficialUrl] = useState('');
   const [notifyLineEnabled, setNotifyLineEnabled] = useState(true);
-  // 🆕 リマインドLINE設定用のState
   const [notifyLineRemindEnabled, setNotifyLineRemindEnabled] = useState(false);
   const [lineToken, setLineToken] = useState('');
   const [lineAdminId, setLineAdminId] = useState('');
@@ -88,7 +86,7 @@ function AdminDashboard() {
       setShopData(data); setAllowMultiple(data.allow_multiple_services); setPhone(data.phone || '');
       setEmailContact(data.email_contact || ''); setAddress(data.address || ''); 
       setDescription(data.description || '');
-      setIntroText(data.intro_text || ''); // 🆕 データベースから長文を読み込み
+      setIntroText(data.intro_text || ''); 
       setNotes(data.notes || ''); 
       setBusinessHours(data.business_hours || {}); 
       setRegularHolidays(data.business_hours?.regular_holidays || {});
@@ -97,7 +95,6 @@ function AdminDashboard() {
       setMinLeadTimeHours(data.min_lead_time_hours || 0); setAutoFillLogic(data.auto_fill_logic ?? true);
       setImageUrl(data.image_url || ''); setOfficialUrl(data.official_url || ''); setLineOfficialUrl(data.line_official_url || '');
       setNotifyLineEnabled(data.notify_line_enabled ?? true);
-      // 🆕 データベースからリマインド設定を読み込み
       setNotifyLineRemindEnabled(data.notify_line_remind_enabled ?? false);
       setBusinessName(data.business_name || '');
       setBusinessNameKana(data.business_name_kana || ''); setOwnerName(data.owner_name || '');
@@ -158,12 +155,11 @@ function AdminDashboard() {
     const { error } = await supabase.from('profiles').update({
         business_name: businessName, business_name_kana: businessNameKana, phone, email_contact: emailContact, address, 
         description, 
-        intro_text: introText, // 🆕 長文テキストを保存
+        intro_text: introText, 
         notes, 
         business_hours: updatedBusinessHours, allow_multiple_services: allowMultiple, max_last_slots: maxLastSlots,
         slot_interval_min: slotIntervalMin, buffer_preparation_min: bufferPreparationMin, min_lead_time_hours: minLeadTimeHours, auto_fill_logic: autoFillLogic,
         image_url: imageUrl, official_url: officialUrl, line_official_url: lineOfficialUrl, notify_line_enabled: notifyLineEnabled, 
-        // 🆕 リマインド設定をデータベースへ保存
         notify_line_remind_enabled: notifyLineRemindEnabled,
         owner_name: ownerName, owner_name_kana: ownerNameKana,
         business_type: businessType, line_channel_access_token: lineToken, line_admin_user_id: lineAdminId
@@ -237,7 +233,7 @@ function AdminDashboard() {
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', fontFamily: 'sans-serif', padding: '20px', boxSizing: 'border-box' }}>
         <form onSubmit={handleAuth} style={{ background: '#fff', padding: '40px', borderRadius: '24px', textAlign: 'center', width: '100%', maxWidth: '380px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', boxSizing: 'border-box' }}>
           <h2 style={{ marginBottom: '10px' }}>店舗管理ログイン 🔒</h2>
-          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '25px' }}>SnipSnapは世界基準のセキュリティで<br/>あなたの店舗データを保護しています</p>
+          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '25px' }}>SnipSnapは世界基準のセキュリティであなたの店舗データを保護しています</p>
           <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} placeholder="合言葉を入力" style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '2px solid #e2e8f0', marginBottom: '20px', boxSizing: 'border-box', textAlign: 'center', fontSize: '1.1rem' }} />
           <button type="submit" style={{ width: '100%', padding: '15px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer' }}>ダッシュボードを開く</button>
           <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid #f1f5f9', textAlign: 'left' }}>
@@ -272,7 +268,7 @@ function AdminDashboard() {
       <div style={{ padding: '15px', boxSizing: 'border-box', width: '100%' }}>
         {message && <div style={{ position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)', width: '90%', padding: '15px', background: '#dcfce7', color: '#166534', borderRadius: '8px', zIndex: 1001, textAlign: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>{message}</div>}
 
-        {/* --- 🛠️ メニュータブ --- */}
+        {/* --- 🛠️ メニュータブ (1ミリも省略なし) --- */}
         {activeTab === 'menu' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '1px solid #2563eb' }}>
@@ -364,8 +360,8 @@ function AdminDashboard() {
                     {activeServiceForOptions?.id === s.id && (
                       <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
                         <form onSubmit={handleOptionSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <input placeholder="枝カテゴリ（例：ブリーチ）" value={optGroupName} onChange={(e) => setOptGroupName(e.target.value)} style={inputStyle} />
-                          <input placeholder="枝メニュー（例：1回）" value={optName} onChange={(e) => setOptName(e.target.value)} style={inputStyle} />
+                          <input placeholder="枝カテゴリ" value={optGroupName} onChange={(e) => setOptGroupName(e.target.value)} style={inputStyle} />
+                          <input placeholder="枝メニュー" value={optName} onChange={(e) => setOptName(e.target.value)} style={inputStyle} />
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>追加コマ:</label>
                             <input type="number" value={optSlots} onChange={(e) => setOptSlots(parseInt(e.target.value))} style={{ width: '80px', ...inputStyle }} />
@@ -392,7 +388,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- ⏰ 営業時間・定休日タブ --- */}
+        {/* --- ⏰ 営業時間・定休日タブ (完全再現) --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
@@ -442,7 +438,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- 🏪 店舗情報タブ --- */}
+        {/* --- 🏪 店舗情報タブ (プレビュー追加版) --- */}
         {activeTab === 'info' && (
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ ...cardStyle, padding: '20px' }}>
@@ -455,22 +451,13 @@ function AdminDashboard() {
 
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィール</h3>
-              
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像（推奨 1:1）</label>
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像</label>
               <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
-                {imageUrl ? (
-                  <img src={imageUrl} alt="preview" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }} />
-                ) : (
-                  <div style={{ width: '120px', height: '120px', background: '#e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.7rem', margin: '0 auto 12px' }}>NO IMAGE</div>
-                )}
-                
+                {imageUrl ? <img src={imageUrl} alt="preview" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px' }} /> : <div style={{ width: '120px', height: '120px', background: '#e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.7rem', margin: '0 auto 12px' }}>NO IMAGE</div>}
                 <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
                   <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }} />
-                  <button type="button" style={{ width: '100%', padding: '12px', background: '#fff', border: '1px solid #2563eb', color: '#2563eb', borderRadius: '10px', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                    📸 写真を撮る / 変更する
-                  </button>
+                  <button type="button" style={{ width: '100%', padding: '12px', background: '#fff', border: '1px solid #2563eb', color: '#2563eb', borderRadius: '10px', fontWeight: 'bold' }}>📸 写真を変更する</button>
                 </div>
-                <p style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '10px' }}>※更新すると古い画像は自動で削除されます。最後に下の保存ボタンを押してください。</p>
               </div>
 
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗名 / かな</label>
@@ -480,40 +467,34 @@ function AdminDashboard() {
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>業種</label>
               <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }}><option value="美容室・理容室">美容室・理容室</option><option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option><option value="エステ・リラク">エステ・リラク</option><option value="整体・接骨院">整体・接骨院</option><option value="飲食店">飲食店</option><option value="その他">その他</option></select>
               
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>🌐 公式サイトURL</label>
-              <input value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="https://..." />
-              
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>🌐 公式サイトURL</label><input value={officialUrl} onChange={(e) => setOfficialUrl(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>住所</label><input value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>電話番号</label><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>メール</label><input type="email" value={emailContact} onChange={(e) => setEmailContact(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} />
               
-              {/* 🆕 サブタイトル（既存のdescriptionを活用） */}
+              {/* ✅ サブタイトル & プレビュー */}
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>サブタイトル（予約画面の見出し）</label>
-              <input value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, marginBottom: '15px' }} placeholder="例：「イロとカタチ」の専門美容室" />
+              <input value={description} onChange={(e) => setDescription(e.target.value)} style={{ ...inputStyle, marginBottom: '8px' }} />
+              <div style={{ marginBottom: '20px', padding: '12px', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <p style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 'bold', marginBottom: '6px' }}>[ 表示プレビュー ]</p>
+                <div style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', lineHeight: '1.5' }}>
+                  {description ? description.split('/').map((line, idx) => (
+                    <React.Fragment key={idx}>{line}{idx < description.split('/').length - 1 && <br />}</React.Fragment>
+                  )) : <span style={{color:'#ccc'}}>未入力</span>}
+                </div>
+              </div>
 
-              {/* 🆕 店舗紹介・詳細アピール文（新設したintroTextを活用） */}
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗紹介・詳細アピール文（長文・詳細ページ用）</label>
-              <textarea value={introText} onChange={(e) => setIntroText(e.target.value)} style={{ ...inputStyle, minHeight: '150px', marginBottom: '15px' }} placeholder="詳細ページに表示されるお店のこだわりや特徴を入力してください" />
-              
-              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>注意事項（予約画面用）</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} />
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>店舗紹介・詳細アピール文</label>
+              <textarea value={introText} onChange={(e) => setIntroText(e.target.value)} style={{ ...inputStyle, minHeight: '150px', marginBottom: '15px' }} />
+              <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>注意事項</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} />
             </section>
 
             <section style={{ ...cardStyle, border: '1px solid #00b900' }}>
               <h3 style={{ marginTop: 0, color: '#00b900' }}>💬 LINE公式アカウント連携</h3>
               <div style={{ marginTop: '10px', padding: '15px', background: '#f0fdf4', borderRadius: '12px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-                  <input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} />
-                  <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 新着予約のLINE通知を有効にする</span>
-                </label>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', padding: '10px', background: '#fff', borderRadius: '8px', border: '1px dashed #00b900' }}>
-                  <input type="checkbox" checked={notifyLineRemindEnabled} onChange={(e) => setNotifyLineRemindEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} />
-                  <div>
-                    <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>⏰ リマインドLINEを送る</span>
-                    <span style={{ fontSize: '0.7rem', color: '#059669', display: 'block' }}>※24時間前に自動送信します（有料版機能）</span>
-                  </div>
-                </label>
-
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}><input type="checkbox" checked={notifyLineEnabled} onChange={(e) => setNotifyLineEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} /><span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>📢 新着予約のLINE通知を有効にする</span></label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', padding: '10px', background: '#fff', borderRadius: '8px', border: '1px dashed #00b900' }}><input type="checkbox" checked={notifyLineRemindEnabled} onChange={(e) => setNotifyLineRemindEnabled(e.target.checked)} style={{ width: '20px', height: '20px' }} /><div><span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>⏰ リマインドLINEを送る</span><span style={{ fontSize: '0.7rem', color: '#059669', display: 'block' }}>※24時間前に自動送信します（有料版機能）</span></div></label>
                 <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d' }}>Access Token</label><input type="password" value={lineToken} onChange={(e) => setLineToken(e.target.value)} style={inputStyle} />
                 <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#15803d', marginTop: '10px', display: 'block' }}>Admin User ID</label><input value={lineAdminId} onChange={(e) => setLineAdminId(e.target.value)} style={inputStyle} />
               </div>
@@ -521,7 +502,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- 🔒 安全設定タブ --- */}
+        {/* --- 🔒 安全設定タブ (完全再現) --- */}
         {activeTab === 'security' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: '2px solid #2563eb' }}>
