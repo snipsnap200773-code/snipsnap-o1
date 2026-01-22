@@ -27,8 +27,8 @@ function AdminDashboard() {
   
   // ✅ カテゴリ設定用のStateを拡張（識別キー・専用屋号・専用サブタイトル）
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newUrlKey, setNewUrlKey] = useState(''); 
-  const [newCustomShopName, setNewCustomShopName] = useState(''); 
+  const [newUrlKey, setNewUrlKey] = useState(''); // URL識別キー
+  const [newCustomShopName, setNewCustomShopName] = useState(''); // 専用屋号
   const [newCustomDescription, setNewCustomDescription] = useState(''); // 🆕 追加
 
   const [editingCategoryId, setEditingCategoryId] = useState(null);
@@ -451,8 +451,7 @@ function AdminDashboard() {
                         <button onClick={() => moveItem('service', services.filter(ser => ser.category === cat.name), s.id, 'down')} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>▼</button>
                         <button onClick={() => { setEditingServiceId(s.id); setNewServiceName(s.name); setNewServiceSlots(s.slots); setSelectedCategory(s.category); menuFormRef.current?.scrollIntoView({ behavior: 'smooth' }); }} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>✎</button>
                         <button onClick={() => deleteService(s.id)} style={{ padding: '5px 5px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>×</button>
-                      </div>                     
-                    </div>
+                      </div>                     </div>
                     {/* ✅ 枝メニュー（オプション）の展開（省略せず維持） */}
                     {activeServiceForOptions?.id === s.id && (
                       <div style={{ marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '10px', border: '1px solid #eee' }}>
@@ -485,7 +484,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- ⏰ 営業時間・定休日タブ（省略せず維持） --- */}
+        {/* --- ⏰ 営業時間・定休日タブ --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: `2px solid ${themeColor}` }}>
@@ -493,13 +492,41 @@ function AdminDashboard() {
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>1コマの単位</label>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {[15, 30].map(min => (<button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? themeColor : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '8px', fontWeight: 'bold' }}>{min}分</button>))}
+                  {/* ✅ コマ単位を [10, 15, 20, 30] に拡張 */}
+                  {[10, 15, 20, 30].map(min => (
+                    <button 
+                      key={min} 
+                      onClick={() => setSlotIntervalMin(min)} 
+                      style={{ 
+                        flex: 1, padding: '10px', 
+                        background: slotIntervalMin === min ? themeColor : '#fff', 
+                        color: slotIntervalMin === min ? '#fff' : '#333', 
+                        border: '1px solid #ccc', borderRadius: '8px', fontWeight: 'bold' 
+                      }}
+                    >
+                      {min}分
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>インターバル（準備時間）</label><select value={bufferPreparationMin} onChange={(e) => setBufferPreparationMin(parseInt(e.target.value))} style={inputStyle}><option value={0}>なし</option><option value={15}>15分</option><option value={30}>30分</option></select></div>
-              <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>直近の予約制限</label><select value={minLeadTimeHours} onChange={(e) => setMinLeadTimeHours(parseInt(e.target.value))} style={inputStyle}><option value={0}>当日OK</option><option value={24}>前日まで</option><option value={48}>2日前まで</option><option value={72}>3日前まで</option></select></div>
+              
+              {/* ✅ インターバル（準備時間）の選択肢も [10, 15, 20, 30] に拡張 */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>インターバル（準備時間）</label>
+                <select value={bufferPreparationMin} onChange={(e) => setBufferPreparationMin(parseInt(e.target.value))} style={inputStyle}>
+                  <option value={0}>なし</option>
+                  <option value={10}>10分</option>
+                  <option value={15}>15分</option>
+                  <option value={20}>20分</option>
+                  <option value={30}>30分</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '15px' }}><label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>直近の予約制限</label><select value={minLeadTimeHours} onChange={(e) => setMinLeadTimeHours(parseInt(e.target.value))} style={inputStyle}><option value={0}>当日OK</option><option value={24}>前日まで</option><option value={48}>2日前まで</option></select></div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '12px' }}><input type="checkbox" checked={autoFillLogic} onChange={(e) => setAutoFillLogic(e.target.checked)} style={{ width: '22px', height: '22px' }} /><b>自動詰め機能を有効にする</b></label>
             </section>
+            
+            {/* 曜日別営業時間・定休日（省略せず維持） */}
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>⏰ 曜日別営業時間・休憩</h3>
               {Object.keys(dayMap).map(day => (
@@ -540,35 +567,23 @@ function AdminDashboard() {
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ ...cardStyle, padding: '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {/* ✅ 1. 予約管理画面を最上部に追加 */}
                 <UrlBox label="📈 予約管理画面" url={`${window.location.origin}/admin/${shopId}/reservations`} color="#ef4444" copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}/reservations`)} />
-                
                 <UrlBox label={`🔑 店舗主用設定 (PW: ${shopData?.admin_password})`} url={`${window.location.origin}/admin/${shopId}`} color={themeColor} copy={() => copyToClipboard(`${window.location.origin}/admin/${shopId}`)} />
                 <UrlBox label="💬 LINEリッチメニュー用URL" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
-                
-                {/* ✅ ラベルを変更 (ノーマル) */}
                 <UrlBox label="📅 お客様用予約 (ノーマル)" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
-
-                {/* ✅ 2. 識別キーが設定されているカテゴリの専用URLを動的に生成 */}
                 {categories.filter(c => c.url_key).map(c => (
-                  <UrlBox 
-                    key={c.id}
-                    label={`🔮 専用予約：${c.custom_shop_name || c.name}`} 
-                    url={`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`} 
-                    color="#7c3aed" 
-                    copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`)} 
-                  />
+                  <UrlBox key={c.id} label={`🔮 専用予約：${c.custom_shop_name || c.name}`} url={`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`} color="#7c3aed" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`)} />
                 ))}
               </div>
             </section>
 
+            {/* 店舗プロフィール入力欄（省略せず維持） */}
             <section style={cardStyle}>
               <h3 style={{ marginTop: 0 }}>🏪 店舗プロフィール</h3>
-              
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>店舗画像（推奨 1:1）</label>
               <div style={{ marginBottom: '20px', padding: '15px', background: '#f8fafc', borderRadius: '16px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
                 {imageUrl ? (
-                  <img src={imageUrl} alt="preview" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }} />
+                  <img src={imageUrl} alt="preview" style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '12px', marginBottom: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }} />
                 ) : (
                   <div style={{ width: '120px', height: '120px', background: '#e2e8f0', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.7rem', margin: '0 auto 12px' }}>NO IMAGE</div>
                 )}
