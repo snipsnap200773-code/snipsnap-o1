@@ -37,6 +37,9 @@ function ReservationForm() {
   const [loading, setLoading] = useState(true);
   const [lineUser, setLineUser] = useState(null);
 
+  // 🆕 【着せ替え用】画面に表示するブランド情報
+  const [displayBranding, setDisplayBranding] = useState({ name: '', desc: '' });
+
   const categoryRefs = useRef({});
   const serviceRefs = useRef({});
 
@@ -67,20 +70,38 @@ function ReservationForm() {
     
     if (shopRes.data) {
       setShop(shopRes.data);
+      
+      // ✅ 1. まずは初期値として本来の店名と説明文をセット
+      setDisplayBranding({ 
+        name: shopRes.data.business_name, 
+        desc: shopRes.data.description 
+      });
+
       if (!shopRes.data.is_suspended) {
-        // ✅ カテゴリ取得の修正
+        // カテゴリ取得
         let catQuery = supabase.from('service_categories').select('*').eq('shop_id', shopId).order('sort_order');
-        
         const catRes = await catQuery;
         
         if (catRes.data) {
-  // 🆕 【入り口識別ロジック：厳格版】
-  const filteredCats = entryType 
-    ? catRes.data.filter(c => c.url_key === entryType) // URL指定があるなら、完全に一致するものだけ出す
-    : catRes.data.filter(c => !c.url_key);            // URL指定がないなら、url_keyが空のもの（一般メニュー）だけ出す
-  
-  setCategories(filteredCats);
-}
+          // 2. 入り口識別キー（url_key）による絞り込み
+          const filteredCats = entryType 
+            ? catRes.data.filter(c => c.url_key === entryType) 
+            : catRes.data.filter(c => !c.url_key);
+          
+          setCategories(filteredCats);
+
+          // 🆕 3. 【強制着せ替えロジック】
+          // URLにtypeがある場合、そのurl_keyを持つカテゴリから専用屋号と専用説明文を取得して表示を上書きする
+          if (entryType) {
+            const brandingSource = catRes.data.find(c => c.url_key === entryType);
+            if (brandingSource) {
+              setDisplayBranding({
+                name: brandingSource.custom_shop_name || shopRes.data.business_name,
+                desc: brandingSource.custom_description || shopRes.data.description
+              });
+            }
+          }
+        }
 
         const servRes = await supabase.from('services').select('*').eq('shop_id', shopId).order('sort_order');
         if (servRes.data) setServices(servRes.data);
@@ -91,7 +112,7 @@ function ReservationForm() {
     setLoading(false);
   };
 
-  // --- 複数名対応の計算ロジック ---
+  // --- 複数名対応の計算ロジック（維持） ---
   const currentPersonSlots = selectedServices.reduce((sum, s) => sum + s.slots, 0) + 
     Object.values(selectedOptions).reduce((sum, opt) => sum + (opt.additional_slots || 0), 0);
 
@@ -206,17 +227,12 @@ function ReservationForm() {
   const handleNextStep = () => {
     window.scrollTo(0,0);
 
-    // 🆕 【重要】選択されたメニューのカテゴリから「専用屋号」を探す
-    // 複数カテゴリある場合は、最初のカテゴリの屋号を優先（三土手さんの設計に合わせます）
-    const firstSelectedCat = categories.find(c => c.name === selectedServices[0]?.category);
-    const customShopName = firstSelectedCat?.custom_shop_name || null;
-
     const commonState = { 
       people: [...people, { services: selectedServices, options: selectedOptions, slots: currentPersonSlots }],
       totalSlotsNeeded,
       lineUser,
-      // 🆕 後の画面に専用屋号を引き継ぐ
-      customShopName 
+      // ✅ 着せ替え後の店名を次の画面に引き継ぐ
+      customShopName: displayBranding.name 
     };
 
     if (isAdminMode) {
@@ -253,7 +269,8 @@ function ReservationForm() {
       <Link to="/" style={{ position: 'fixed', top: '15px', left: '15px', zIndex: 1100, background: 'rgba(255,255,255,0.9)', color: '#666', textDecoration: 'none', fontSize: '0.7rem', padding: '6px 10px', borderRadius: '15px', border: '1px solid #ddd' }}>← 戻る</Link>
       
       <div style={{ marginTop: '30px', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '20px' }}>
-        <h2 style={{ margin: '0 0 10px 0', fontSize: '1.4rem' }}>{shop.business_name}</h2>
+        {/* ✅ 着せ替え後の店名を表示 */}
+        <h2 style={{ margin: '0 0 10px 0', fontSize: '1.4rem' }}>{displayBranding.name}</h2>
         
         {lineUser && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', padding: '10px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
@@ -280,12 +297,13 @@ function ReservationForm() {
           </div>
         )}
         
-        {shop.description && (
+        {/* ✅ 着せ替え後のサブタイトルを表示（/ による改行対応） */}
+        {displayBranding.desc && (
           <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6' }}>
-            {shop.description.split('/').map((line, idx) => (
+            {displayBranding.desc.split('/').map((line, idx) => (
               <React.Fragment key={idx}>
                 {line}
-                {idx < shop.description.split('/').length - 1 && <br />}
+                {idx < displayBranding.desc.split('/').length - 1 && <br />}
               </React.Fragment>
             ))}
           </p>
