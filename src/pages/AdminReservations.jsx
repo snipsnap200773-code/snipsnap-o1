@@ -567,7 +567,7 @@ function AdminReservations() {
                                 // ✅ 🆕 出し分けロジック: PCはフルネーム+様、スマホは苗字のみ(縦書き)
                                 <div style={{
                                   fontWeight: 'bold',
-                                  fontSize: isPC ? '0.8rem' : 'calc(0.5rem + 0.2vw)', 
+                                  fontSize: isPC ? '1rem' : 'calc(0.8rem + 0.2vw)', 
                                   writingMode: isPC ? 'horizontal-tb' : 'vertical-rl', 
                                   textOrientation: 'upright',
                                   lineHeight: '1.1',
