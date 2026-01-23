@@ -149,7 +149,7 @@ function AdminDashboard() {
 
   const handleUpdatePassword = async () => {
     if (newPassword.length < 8) { alert("セキュリティのため、パスワードは8文字以上に設定してください。"); return; }
-    if (window.confirm("パスワードを更新します。一度更新されると運営者（三土手）もあなたのパスワードを知ることはできなくなります。よろしいですか？")) {
+    if (window.confirm("パスワードを更新します。一度更新されると運営者もあなたのパスワードを知ることはできなくなります。よろしいですか？")) {
       const salt = bcrypt.genSaltSync(10);
       const hashedPassword = bcrypt.hashSync(newPassword, salt);
       const { error } = await supabase.from('profiles').update({ hashed_password: hashedPassword, admin_password: '********' }).eq('id', shopId);
@@ -603,7 +603,7 @@ function AdminDashboard() {
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: `2px solid ${themeColor}` }}>
               <h3 style={{ marginTop: 0, color: themeColor }}>🔐 セキュリティ設定</h3>
-              <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '20px' }}>パスワードを変更すると、三土手であっても解読不可能なハッシュ化が施されます。</p>
+              <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '20px' }}>パスワードを変更すると、運営者であっても解読不可能なハッシュ化が施されます。</p>
               {!isChangingPassword ? (<button onClick={() => setIsChangingPassword(true)} style={{ width: '100%', padding: '15px', border: `1px solid ${themeColor}`, color: themeColor, borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>パスワードを変更する</button>) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>新しいパスワード (8文字以上)</label>

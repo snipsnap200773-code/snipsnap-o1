@@ -172,14 +172,14 @@ Deno.serve(async (req) => {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: 'SnipSnap 運営事務局 <infec@snipsnap.biz>',
+          from: 'SOLO 運営事務局 <infec@snipsnap.biz>',
           to: [owner_email],
-          subject: `【SnipSnap】ベータ版へのご登録ありがとうございます！`,
+          subject: `【SOLO】ベータ版へのご登録ありがとうございます！`,
           html: `
             <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 30px; border-radius: 12px;">
               <h1 style="color: #2563eb; font-size: 1.5rem; margin-top: 0;">${shopName} 様</h1>
-              <p>この度は <strong>SnipSnap（スニップスナップ）</strong> にお申し込みいただき、誠にありがとうございます。</p>
-              <p>現在、SnipSnapは <strong>ベータ版として全機能を無料</strong> で提供しております。 まずは以下の専用URLより、メニューの登録や店舗の設定を行ってください。</p>
+              <p>この度は <strong>SOLO</strong> にお申し込みいただき、誠にありがとうございます。</p>
+              <p>現在、SOLOは <strong>ベータ版として全機能を無料</strong> で提供しております。 まずは以下の専用URLより、メニューの登録や店舗の設定を行ってください。</p>
               
               <div style="background: #f1f5f9; padding: 20px; border-radius: 10px; margin: 25px 0;">
                 <h2 style="font-size: 1rem; margin-top: 0; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px;">🔑 管理者用ログイン情報</h2>
@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: 'SnipSnap システム通知 <infec@snipsnap.biz>',
+          from: 'SOLO システム通知 <infec@snipsnap.biz>',
           to: ['snipsnap.2007.7.3@gmail.com'],
           subject: `【新規申込】${shopName} 様がベータ版の利用を開始しました`,
           html: `
