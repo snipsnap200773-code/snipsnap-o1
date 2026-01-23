@@ -298,7 +298,7 @@ function AdminReservations() {
     return days;
   }, [startDate]);
 
-  // ✅ 10分〜30分の可変インターバルに対応したスロット生成ロジックを維持
+  // ✅ 10分〜30分の可変インターバルに対応したスロット生成ロジック
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
     let minTotalMinutes = 24 * 60;
@@ -535,7 +535,6 @@ function AdminReservations() {
                     const dStr = getJapanDateStr(date); const res = getStatusAt(dStr, time);
                     const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === time;
                     
-                    // ✅ ツイン・カレンダー用の出し分けロジック
                     const isOtherShop = res && res.shop_id !== shopId && res.res_type !== 'system_blocked' && !res.isRegularHoliday;
 
                     let bgColor = '#fff'; let borderColor = '#f1f5f9'; let textColor = '#cbd5e1';
@@ -543,7 +542,7 @@ function AdminReservations() {
                     
                     if (res) {
                       if (res.isRegularHoliday) { bgColor = '#f3f4f6'; textColor = '#94a3b8'; }
-                      else if (isOtherShop) { bgColor = '#f1f5f9'; textColor = '#94a3b8'; borderColor = '#cbd5e1'; } // 🆕 他店舗：薄いグレー
+                      else if (isOtherShop) { bgColor = '#f1f5f9'; textColor = '#94a3b8'; borderColor = '#cbd5e1'; } 
                       else if (res.res_type === 'blocked') { bgColor = '#fee2e2'; textColor = '#ef4444'; borderColor = '#ef4444'; }
                       else if (res.res_type === 'system_blocked') { bgColor = '#f8fafc'; textColor = '#cbd5e1'; }
                       else if (isStart) { bgColor = themeColorLight; textColor = '#1e293b'; borderColor = themeColor; }
@@ -552,8 +551,32 @@ function AdminReservations() {
                     return (
                       <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                         {res && (
-                          <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: (isNormalRes && !isOtherShop) ? 'flex-start' : 'center', textAlign: (isNormalRes && !isOtherShop) ? 'left' : 'center' }}>
-                            {res.res_type === 'blocked' ? (res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')) : (res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.7rem' }}>{isOtherShop ? `(${res.profiles?.business_name})` : `${res.customer_name} 様`}</div> : '・'))}
+                          <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
+                            {res.res_type === 'blocked' ? (
+                              res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : 
+                              (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')
+                            ) : (
+                              res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : 
+                              (isStart ? (
+                                // ✅ 🆕 縦書き ＆ 様なし ＆ 文字サイズ自動調整ロジック
+                                <div style={{
+                                  fontWeight: 'bold',
+                                  fontSize: isPC ? '0.8rem' : 'calc(0.5rem + 0.2vw)', // デバイス幅に合わせたフォントサイズ調整
+                                  writingMode: isPC ? 'horizontal-tb' : 'vertical-rl', // スマホのみ縦書き
+                                  textOrientation: 'upright', // 縦書き時の文字の向きを直立に
+                                  lineHeight: '1.1',
+                                  height: '100%',
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {isOtherShop ? `(${res.profiles?.business_name})` : res.customer_name}
+                                </div>
+                              ) : '・')
+                            )}
                           </div>
                         )}
                       </td>
