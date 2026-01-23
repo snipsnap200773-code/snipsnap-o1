@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+// ✅ 成功している予約画面に合わせて supabaseAnon を追加
+import { supabase, supabaseAnon } from '../supabaseClient';
 
 function TrialRegistration() {
   const navigate = useNavigate();
@@ -61,12 +62,13 @@ function TrialRegistration() {
 
       // 💡 2. 司令塔（index.ts）を呼び出して歓迎メールを送信
       const baseUrl = window.location.origin;
-      await supabase.functions.invoke('send-reservation-email', {
+      // ✅ 成功実績のある supabaseAnon.functions.invoke に変更
+      await supabaseAnon.functions.invoke('send-reservation-email', {
         body: {
           type: 'welcome',
           shopName: formData.shopName,
           owner_email: formData.email,
-          // 🆕 三土手さんへの通知メールに必要なデータを追加（index.ts側の変数名に合わせる）
+          // 🆕 以下の3つを足すことで、index.ts側が「三土手さんへの通知メール」を正しく作成できるようになります
           ownerName: formData.ownerName,
           phone: formData.phone,
           businessType: formData.businessType,
