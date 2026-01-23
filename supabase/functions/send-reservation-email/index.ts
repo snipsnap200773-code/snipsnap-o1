@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
       const currentHour = nowJST.getUTCHours(); // +9時間しているのでこれでJSTの時が取れる
       if (currentHour >= 23 || currentHour < 9) {
         return new Response(JSON.stringify({ 
-          message: `現在は日本時間 ${currentHour}時 のため、深夜・早朝の送信を控えます。9時以降の実行時に送信されます。` 
+          message: `現在は日本時間 ${currentHour}時 のため、深夜・早早朝の送信を控えます。9時以降の実行時に送信されます。` 
         }), { headers: corsHeaders });
       }
 
@@ -161,93 +161,80 @@ Deno.serve(async (req) => {
     }
 
     // ==========================================
-    // 🚀 パターンA：店主様への歓迎メール ＆ 三土手さんへの通知送信
+    // 🚀 パターンA：店主様への歓迎メール ＆ 三土手さんへの通知送信 (修正版)
     // ==========================================
     if (type === 'welcome') {
-      // 1. 店主様への歓迎メール送信（ベータ版表記に更新）
-      const welcomeRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: 'SnipSnap 運営事務局 <infec@snipsnap.biz>',
-          to: [owner_email],
-          subject: `【SnipSnap】ベータ版へのご登録ありがとうございます！`,
-          html: `
-            <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 30px; border-radius: 12px;">
-              <h1 style="color: #2563eb; font-size: 1.5rem; margin-top: 0;">${shopName} 様</h1>
-              <p>この度は <strong>SnipSnap（スニップスナップ）</strong> にお申し込みいただき、誠にありがとうございます。</p>
-              <p>現在、SnipSnapは <strong>ベータ版として全機能を無料</strong> で提供しております。 まずは以下の専用URLより、メニューの登録や店舗の設定を行ってください。</p>
-              
-              <div style="background: #f1f5f9; padding: 20px; border-radius: 10px; margin: 25px 0;">
-                <h2 style="font-size: 1rem; margin-top: 0; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px;">🔑 管理者用ログイン情報</h2>
-                <p style="margin: 15px 0 5px 0;"><strong>● 設定画面（メニュー作成・営業時間など）</strong><br>
-                <a href="${dashboard_url}" style="color: #2563eb;">${dashboard_url}</a></p>
-                
-                <p style="margin: 15px 0 5px 0;"><strong>● 予約台帳（日々の予約確認・キャンセル操作）</strong><br>
-                <a href="${reservations_url}" style="color: #2563eb;">${reservations_url}</a></p>
-                
-                <p style="margin: 15px 0 5px 0;"><strong>● ログインパスワード</strong><br>
-                <span style="font-size: 1.2rem; color: #e11d48; font-weight: bold; background: #fff; padding: 2px 8px; border-radius: 4px;">${password}</span></p>
-              </div>
+      // 💡 確実に届く予約メールと同じ「送信元（from）」の形式に統一
+      const STABLE_FROM = '予約管理システム <infec@snipsnap.biz>';
 
-              <div style="background: #f0fdf4; padding: 20px; border-radius: 10px; margin: 25px 0; border: 1px solid #bbf7d0;">
-                <h2 style="font-size: 1rem; margin-top: 0; color: #166534; border-bottom: 2px solid #bbf7d0; padding-bottom: 8px;">📅 お客様用 予約URL</h2>
-                <p style="margin-bottom: 8px;"><strong>【SNS・HP掲載用】</strong><br>
-                <a href="${reserve_url}" style="color: #15803d; font-weight: bold;">${reserve_url}</a></p>
-                
-                <p style="margin-top: 15px; margin-bottom: 8px;"><strong>【LINEリッチメニュー専用】</strong>（読込が爆速になります）<br>
-                <code style="background: #fff; padding: 3px 8px; border: 1px solid #bbf7d0; border-radius: 4px; color: #166534; display: block; word-break: break-all;">${reserve_url}?openExternalBrowser=1</code></p>
+      // 💡 2通のメール送信をPromise.allで並列実行し、確実に両方の完了を待ちます
+      const [resOwner, resAdmin] = await Promise.all([
+        // 1. 店舗オーナー様への歓迎メール送信
+        fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
+          body: JSON.stringify({
+            from: STABLE_FROM,
+            to: [owner_email],
+            subject: `【SnipSnap】ベータ版へのご登録ありがとうございます！`,
+            html: `
+              <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 30px; border-radius: 12px;">
+                <h1 style="color: #2563eb; font-size: 1.5rem; margin-top: 0;">${shopName} 様</h1>
+                <p>この度は <strong>SnipSnap</strong> にお申し込みいただき、誠にありがとうございます。</p>
+                <div style="background: #f1f5f9; padding: 20px; border-radius: 10px; margin: 25px 0;">
+                  <h2 style="font-size: 1rem; margin-top: 0; color: #1e293b; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px;">🔑 管理者用ログイン情報</h2>
+                  <p style="margin: 15px 0 5px 0;"><strong>● 設定画面</strong><br><a href="${dashboard_url}">${dashboard_url}</a></p>
+                  <p style="margin: 15px 0 5px 0;"><strong>● 予約台帳</strong><br><a href="${reservations_url}">${reservations_url}</a></p>
+                  <p style="margin: 15px 0 5px 0;"><strong>● ログインパスワード</strong><br><span style="font-size: 1.2rem; color: #e11d48; font-weight: bold; background: #fff; padding: 2px 8px; border-radius: 4px;">${password}</span></p>
+                </div>
+                <div style="background: #f0fdf4; padding: 20px; border-radius: 10px; margin: 25px 0; border: 1px solid #bbf7d0;">
+                  <h2 style="font-size: 1rem; margin-top: 0; color: #166534; border-bottom: 2px solid #bbf7d0; padding-bottom: 8px;">📅 お客様用 予約URL</h2>
+                  <p><a href="${reserve_url}" style="color: #15803d; font-weight: bold;">${reserve_url}</a></p>
+                </div>
               </div>
-
-              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0;">
-              <p style="font-size: 0.85rem; color: #64748b;">
-                ※公式LINEとの通知連携方法は、設定画面の下部にある「連携ガイド」を参考に進めてください。<br><br>
-                ご不明な点がございましたら、このメールに返信の形で運営事務局までお問い合わせください。
-              </p>
-            </div>
-          `,
+            `,
+          }),
         }),
-      });
-
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: 'SnipSnap システム通知 <infec@snipsnap.biz>',
-          to: ['snipsnap.2007.7.3@gmail.com'],
-          subject: `【新規申込】${shopName} 様がベータ版の利用を開始しました`,
-          html: `
-            <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 2px solid #2563eb; padding: 25px; border-radius: 12px;">
-              <h2 style="color: #2563eb; margin-top: 0;">🚀 新規ベータ版申し込み通知</h2>
-              <p>運営事務局 三土手様、お疲れ様です。新しい店舗の登録がありました！</p>
-              <div style="background: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
-                <p style="margin: 5px 0;">🏪 <strong>店舗名:</strong> ${shopName} 様</p>
-                <p style="margin: 5px 0;">👤 <strong>代表者:</strong> ${ownerName || '未入力'} 様</p>
-                <p style="margin: 5px 0;">📧 <strong>メール:</strong> ${owner_email}</p>
-                <p style="margin: 5px 0;">📞 <strong>電話番号:</strong> ${ownerPhone || '未入力'}</p>
-                <p style="margin: 5px 0;">🏢 <strong>業種:</strong> ${businessType || '未選択'}</p>
+        // 2. 運営事務局（三土手さん）への通知送信
+        fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
+          body: JSON.stringify({
+            from: 'SnipSnap システム通知 <infec@snipsnap.biz>',
+            to: ['snipsnap.2007.7.3@gmail.com'],
+            subject: `【新規申込】${shopName} 様がベータ版の利用を開始しました`,
+            html: `
+              <div style="font-family: sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 2px solid #2563eb; padding: 25px; border-radius: 12px;">
+                <h2 style="color: #2563eb; margin-top: 0;">🚀 新規ベータ版申し込み通知</h2>
+                <div style="background: #f8fafc; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin: 20px 0;">
+                  <p>🏪 <strong>店舗名:</strong> ${shopName} 様</p>
+                  <p>👤 <strong>代表者:</strong> ${ownerName || '未入力'} 様</p>
+                  <p>📧 <strong>メール:</strong> ${owner_email}</p>
+                  <p>📞 <strong>電話番号:</strong> ${ownerPhone || '未入力'}</p>
+                  <p>🏢 <strong>業種:</strong> ${businessType || '未選択'}</p>
+                </div>
               </div>
-              <p style="font-size: 0.9rem; color: #64748b;">管理画面から店舗の状態を確認できます。</p>
-            </div>
-          `,
-        }),
-      });
+            `,
+          }),
+        })
+      ]);
 
-      const welcomeData = await welcomeRes.json();
-      return new Response(JSON.stringify(welcomeData), {
+      // 💡 【重要】Resendからの詳細な返答をSupabaseログに書き出し
+      if (!resOwner.ok) {
+        console.error("[Resend ERROR] Owner Welcome Mail Failed:", await resOwner.text());
+      }
+      if (!resAdmin.ok) {
+        console.error("[Resend ERROR] Admin Notify Mail Failed:", await resAdmin.text());
+      }
+
+      return new Response(JSON.stringify({ success: resOwner.ok && resAdmin.ok }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     // ==========================================
-    // 🚀 パターンB：通常の予約通知処理（既存ロジック）
+    // 🚀 パターンB：通常の予約通知処理 (既存ロジック完全維持)
     // ==========================================
     const { data: shopProfile } = await supabaseAdmin
       .from('profiles')
