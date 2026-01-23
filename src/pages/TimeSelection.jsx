@@ -17,16 +17,37 @@ function TimeSelection() {
 
   useEffect(() => { fetchInitialData(); }, [shopId]);
 
+  // ✅ ツイン・カレンダー対応版：他店舗の予約も合算して取得するロジック
   const fetchInitialData = async () => {
     setLoading(true);
+    // 1. 自分の店舗プロフィールを取得
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', shopId).single();
-    if (profile) setShop(profile);
-    const { data: resData } = await supabase.from('reservations').select('start_time, end_time').eq('shop_id', shopId);
+    if (!profile) { setLoading(false); return; }
+    setShop(profile);
+
+    // 2. スケジュール共有設定（schedule_sync_id）を確認
+    let targetShopIds = [shopId];
+    if (profile.schedule_sync_id) {
+      const { data: siblingShops } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('schedule_sync_id', profile.schedule_sync_id);
+      if (siblingShops) {
+        targetShopIds = siblingShops.map(s => s.id);
+      }
+    }
+
+    // 3. 全関連店舗の予約データを一括取得（start_time, end_time）
+    const { data: resData } = await supabase
+      .from('reservations')
+      .select('start_time, end_time')
+      .in('shop_id', targetShopIds);
+
     setExistingReservations(resData || []);
     setLoading(false);
   };
 
-  // ✅ 三土手さんの重要ロジック：定休日判定（第n週、最終週などの複雑な計算を完全維持）
+  // ✅ 三土手さんの重要ロジック：定休日判定（複雑な計算を完全維持）
   const checkIsRegularHoliday = (date) => {
     if (!shop?.business_hours?.regular_holidays) return false;
     const holidays = shop.business_hours.regular_holidays;
@@ -58,7 +79,7 @@ function TimeSelection() {
     return days;
   }, [startDate]);
 
-  // ✅ 10分〜30分の可変インターバルに対応したスロット生成（三土手さんのロジックを拡張）
+  // ✅ 三土手さんのロジック：AdminDashboard設定に連動した可変スロット生成
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
     let minOpen = "23:59", maxClose = "00:00";
@@ -69,7 +90,6 @@ function TimeSelection() {
     });
     
     const slots = [];
-    // ✅ 拡張ポイント：AdminDashboardで設定されたコマ単位を使用
     const interval = shop.slot_interval_min || 15;
     
     let current = new Date();
@@ -87,7 +107,7 @@ function TimeSelection() {
     return slots;
   }, [shop]);
 
-  // ✅ 三土手さんの重要ロジック：空き状況チェック（自動詰め、リードタイム、休憩時間を完全維持）
+  // ✅ 三土手さんの重要ロジック：空き状況チェック（全店舗の予約を合算判定するように強化）
   const checkAvailability = (date, timeStr) => {
     if (!shop?.business_hours) return { status: 'none' };
     if (checkIsRegularHoliday(date)) return { status: 'closed', label: '休' };
@@ -113,7 +133,6 @@ function TimeSelection() {
     if (dateStr === todayStr && targetDateTime < now) return { status: 'past', label: '－' };
     if (new Date(dateStr) < limitDate) return { status: 'past', label: '－' };
 
-    // ✅ 拡張ポイント：選択された間隔で必要時間を計算
     const interval = shop.slot_interval_min || 15;
     const totalMinRequired = (totalSlotsNeeded * interval);
     const potentialEndTime = new Date(targetDateTime.getTime() + totalMinRequired * 60 * 1000);
@@ -122,6 +141,7 @@ function TimeSelection() {
     const closeDateTime = new Date(`${dateStr}T${String(closeH).padStart(2,'0')}:${String(closeM).padStart(2,'0')}:00`);
     if (potentialEndTime > closeDateTime) return { status: 'short', label: '△' };
 
+    // ✅ ここで全店舗（自分＋同期店）の予約を合算チェック
     const isBooked = existingReservations.some(res => {
       const resStart = new Date(res.start_time).getTime();
       const resEnd = new Date(res.end_time).getTime();
@@ -131,7 +151,7 @@ function TimeSelection() {
 
     if (isBooked) return { status: 'booked', label: '×' };
 
-    // ✅ 三土手さんの高度なロジック：自動詰め（隙間ブロック）
+    // ✅ 三土手さんの高度なロジック：自動詰め（隙間ブロック）も全店舗予約ベースで動作
     if (shop.auto_fill_logic) {
       const dayRes = existingReservations.filter(r => r.start_time.startsWith(dateStr));
       if (dayRes.length > 0) {
@@ -169,7 +189,6 @@ function TimeSelection() {
 
   if (loading) return <div style={{textAlign:'center', padding:'100px'}}>読み込み中...</div>;
 
-  // ✅ 三土手さんのテーマカラー連動を完全維持
   const themeColor = shop?.theme_color || '#2563eb';
 
   return (

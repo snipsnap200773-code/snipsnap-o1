@@ -56,11 +56,32 @@ function AdminReservations() {
 
   useEffect(() => { fetchData(); }, [shopId, startDate]);
 
+  // ✅ ツイン・カレンダー対応版 fetchData
   const fetchData = async () => {
     setLoading(true);
+    // 1. 自分の店舗プロフィールを取得
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', shopId).single();
-    if (profile) setShop(profile);
-    const { data: resData } = await supabase.from('reservations').select('*').eq('shop_id', shopId);
+    if (!profile) { setLoading(false); return; }
+    setShop(profile);
+
+    // 2. スケジュール共有設定（schedule_sync_id）を確認
+    let targetShopIds = [shopId];
+    if (profile.schedule_sync_id) {
+      const { data: siblingShops } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('schedule_sync_id', profile.schedule_sync_id);
+      if (siblingShops) {
+        targetShopIds = siblingShops.map(s => s.id);
+      }
+    }
+
+    // 3. 全関連店舗の予約データを合算して取得（店名も一緒に取得）
+    const { data: resData } = await supabase
+      .from('reservations')
+      .select('*, profiles(business_name)') // プロフィールから店名も結合
+      .in('shop_id', targetShopIds);
+
     setReservations(resData || []);
     setLoading(false);
   };
@@ -114,6 +135,12 @@ function AdminReservations() {
   };
 
   const openDetail = async (res) => {
+    // 他店舗の予約は詳細を開けない（または閲覧のみにする）ように制御
+    if (res.shop_id !== shopId) {
+      alert(`こちらは他店舗（${res.profiles?.business_name || '別ブランド'}）の予約枠です。詳細は各店舗の管理画面で確認してください。`);
+      return;
+    }
+
     setSelectedRes(res);
     let cust = null;
     if (res.line_user_id) {
@@ -144,7 +171,7 @@ function AdminReservations() {
         line_user_id: res.line_user_id || null
       });
     }
-    const history = reservations.filter(r => r.res_type === 'normal' && r.id !== res.id && (r.customer_name === res.customer_name) && new Date(r.start_time) < new Date(res.start_time)).sort((a, b) => new Date(b.start_time) - new Date(a.start_time)).slice(0, 5);
+    const history = reservations.filter(r => r.shop_id === shopId && r.res_type === 'normal' && r.id !== res.id && (r.customer_name === res.customer_name) && new Date(r.start_time) < new Date(res.start_time)).sort((a, b) => new Date(b.start_time) - new Date(a.start_time)).slice(0, 5);
     setCustomerHistory(history);
     setShowDetailModal(true);
   };
@@ -271,7 +298,7 @@ function AdminReservations() {
     return days;
   }, [startDate]);
 
-  // ✅ 10分〜30分の可変インターバルに対応したスロット生成ロジック
+  // ✅ 10分〜30分の可変インターバルに対応したスロット生成ロジックを維持
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
     let minTotalMinutes = 24 * 60;
@@ -288,7 +315,6 @@ function AdminReservations() {
     });
     if (!hasOpenDay) { minTotalMinutes = 9 * 60; maxTotalMinutes = 18 * 60; }
     const slots = [];
-    // ✅ 拡張ポイント：AdminDashboardで設定されたコマ単位を使用（デフォルトは15分）
     const interval = shop.slot_interval_min || 15;
     for (let m = minTotalMinutes; m <= maxTotalMinutes; m += interval) {
       const h = Math.floor(m / 60); const mm = m % 60;
@@ -315,7 +341,7 @@ function AdminReservations() {
       return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
     }
     const buffer = shop?.buffer_preparation_min || 0;
-    const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal');
+    const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal' && r.shop_id === shopId);
     const isInBuffer = dayRes.some(r => {
       const resEnd = new Date(r.end_time).getTime();
       return currentSlotStart >= resEnd && currentSlotStart < (resEnd + buffer * 60 * 1000);
@@ -349,7 +375,6 @@ function AdminReservations() {
 
   const handleBlockTime = async () => {
     const start = new Date(`${selectedDate}T${targetTime}:00`);
-    // ✅ 拡張ポイント：AdminDashboardで設定されたコマ単位を使用（デフォルトは15分）
     const interval = shop.slot_interval_min || 15;
     const end = new Date(start.getTime() + interval * 60000);
     const insertData = {
@@ -364,7 +389,6 @@ function AdminReservations() {
 
   const handleBlockFullDay = async () => {
     if (!window.confirm(`${selectedDate.replace(/-/g, '/')} を終日「予約不可」にしますか？`)) return;
-    // ✅ 拡張ポイント：AdminDashboardで設定されたコマ単位を使用（デフォルトは15分）
     const interval = shop.slot_interval_min || 15;
     const dayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(selectedDate).getDay()];
     const hours = shop.business_hours?.[dayName];
@@ -404,9 +428,8 @@ function AdminReservations() {
 
   if (loading) return <div style={{textAlign:'center', padding:'50px'}}>読み込み中...</div>;
 
-  // ✅ テーマカラーの取得（設定がない場合はデフォルトの青）
   const themeColor = shop?.theme_color || '#2563eb';
-  const themeColorLight = `${themeColor}15`; // 透過色（15%）
+  const themeColorLight = `${themeColor}15`; 
 
   const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', color: themeColor };
   const floatNavBtnStyle = { border: 'none', background: 'none', width: '60px', height: '50px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
@@ -511,11 +534,16 @@ function AdminReservations() {
                   {weekDays.map(date => {
                     const dStr = getJapanDateStr(date); const res = getStatusAt(dStr, time);
                     const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === time;
+                    
+                    // ✅ ツイン・カレンダー用の出し分けロジック
+                    const isOtherShop = res && res.shop_id !== shopId && res.res_type !== 'system_blocked' && !res.isRegularHoliday;
+
                     let bgColor = '#fff'; let borderColor = '#f1f5f9'; let textColor = '#cbd5e1';
                     const isNormalRes = res && res.res_type === 'normal';
                     
                     if (res) {
                       if (res.isRegularHoliday) { bgColor = '#f3f4f6'; textColor = '#94a3b8'; }
+                      else if (isOtherShop) { bgColor = '#f1f5f9'; textColor = '#94a3b8'; borderColor = '#cbd5e1'; } // 🆕 他店舗：薄いグレー
                       else if (res.res_type === 'blocked') { bgColor = '#fee2e2'; textColor = '#ef4444'; borderColor = '#ef4444'; }
                       else if (res.res_type === 'system_blocked') { bgColor = '#f8fafc'; textColor = '#cbd5e1'; }
                       else if (isStart) { bgColor = themeColorLight; textColor = '#1e293b'; borderColor = themeColor; }
@@ -524,8 +552,8 @@ function AdminReservations() {
                     return (
                       <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                         {res && (
-                          <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: isNormalRes ? 'flex-start' : 'center', textAlign: isNormalRes ? 'left' : 'center' }}>
-                            {res.res_type === 'blocked' ? (res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')) : (res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{res.customer_name} 様</div> : '・'))}
+                          <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: (isNormalRes && !isOtherShop) ? 'flex-start' : 'center', textAlign: (isNormalRes && !isOtherShop) ? 'left' : 'center' }}>
+                            {res.res_type === 'blocked' ? (res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')) : (res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : (isStart ? <div style={{ fontWeight: 'bold', fontSize: '0.7rem' }}>{isOtherShop ? `(${res.profiles?.business_name})` : `${res.customer_name} 様`}</div> : '・'))}
                           </div>
                         )}
                       </td>
@@ -586,7 +614,7 @@ function AdminReservations() {
                     {editFields.line_user_id && (
                       <div style={{ background: '#f0fdf4', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bbf7d0', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '1rem' }}>💬</span>
-                        <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 'bold' }}>LINE連携済み（次回からこのお名前が自動表示されます）</span>
+                        <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 'bold' }}>LINE連携済み</span>
                       </div>
                     )}
 
