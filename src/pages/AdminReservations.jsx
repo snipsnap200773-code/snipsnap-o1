@@ -43,7 +43,6 @@ function AdminReservations() {
   const [customerFullHistory, setCustomerFullHistory] = useState([]);
   const [editFields, setEditFields] = useState({ name: '', phone: '', email: '', memo: '', line_user_id: null });
 
-  // 🆕 キーボード選択用のIndex管理
   const [selectedIndex, setSelectedIndex] = useState(-1);
 
   useEffect(() => {
@@ -56,15 +55,12 @@ function AdminReservations() {
 
   useEffect(() => { fetchData(); }, [shopId, startDate]);
 
-  // ✅ ツイン・カレンダー対応版 fetchData
   const fetchData = async () => {
     setLoading(true);
-    // 1. 自分の店舗プロフィールを取得
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', shopId).single();
     if (!profile) { setLoading(false); return; }
     setShop(profile);
 
-    // 2. スケジュール共有設定（schedule_sync_id）を確認
     let targetShopIds = [shopId];
     if (profile.schedule_sync_id) {
       const { data: siblingShops } = await supabase
@@ -76,10 +72,9 @@ function AdminReservations() {
       }
     }
 
-    // 3. 全関連店舗の予約データを合算して取得（店名も一緒に取得）
     const { data: resData } = await supabase
       .from('reservations')
-      .select('*, profiles(business_name)') // プロフィールから店名も結合
+      .select('*, profiles(business_name)')
       .in('shop_id', targetShopIds);
 
     setReservations(resData || []);
@@ -91,7 +86,7 @@ function AdminReservations() {
       if (!searchTerm) { setCustomers([]); setSelectedIndex(-1); return; }
       const { data } = await supabase.from('customers').select('*').eq('shop_id', shopId).ilike('name', `%${searchTerm}%`).limit(5);
       setCustomers(data || []);
-      setSelectedIndex(-1); // 検索ワードが変わったら選択位置をリセット
+      setSelectedIndex(-1);
     };
     const timer = setTimeout(searchCustomers, 300);
     return () => clearTimeout(timer);
@@ -113,10 +108,8 @@ function AdminReservations() {
     setShowCustomerModal(true);
   };
 
-  // 🆕 キーボード操作用ハンドラー
   const handleKeyDown = (e) => {
     if (customers.length === 0) return;
-
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex(prev => (prev < customers.length - 1 ? prev + 1 : prev));
@@ -135,7 +128,6 @@ function AdminReservations() {
   };
 
   const openDetail = async (res) => {
-    // 他店舗の予約は詳細を開けない（または閲覧のみにする）ように制御
     if (res.shop_id !== shopId) {
       alert(`こちらは他店舗（${res.profiles?.business_name || '別ブランド'}）の予約枠です。詳細は各店舗の管理画面で確認してください。`);
       return;
@@ -176,72 +168,27 @@ function AdminReservations() {
     setShowDetailModal(true);
   };
 
-  // 🆕 【重複エラー解決版】名簿保存 ＆ 予約データの同期
   const handleUpdateCustomer = async () => {
     try {
       let targetCustomerId = selectedCustomer?.id;
-
       if (!targetCustomerId) {
         let checkQuery = supabase.from('customers').select('id').eq('shop_id', shopId).eq('name', editFields.name);
-        if (editFields.line_user_id) {
-          checkQuery = checkQuery.eq('line_user_id', editFields.line_user_id);
-        } else if (editFields.phone) {
-          checkQuery = checkQuery.eq('phone', editFields.phone);
-        }
-        
+        if (editFields.line_user_id) { checkQuery = checkQuery.eq('line_user_id', editFields.line_user_id); } 
+        else if (editFields.phone) { checkQuery = checkQuery.eq('phone', editFields.phone); }
         const { data: existingCust } = await checkQuery.maybeSingle();
-        if (existingCust) {
-          targetCustomerId = existingCust.id;
-        }
+        if (existingCust) { targetCustomerId = existingCust.id; }
       }
-
-      const payload = {
-        shop_id: shopId,
-        name: editFields.name,
-        phone: editFields.phone,
-        email: editFields.email,
-        memo: editFields.memo,
-        line_user_id: editFields.line_user_id,
-        updated_at: new Date().toISOString()
-      };
-
-      if (targetCustomerId) {
-        payload.id = targetCustomerId;
-      }
-
+      const payload = { shop_id: shopId, name: editFields.name, phone: editFields.phone, email: editFields.email, memo: editFields.memo, line_user_id: editFields.line_user_id, updated_at: new Date().toISOString() };
+      if (targetCustomerId) { payload.id = targetCustomerId; }
       const { error: custError } = await supabase.from('customers').upsert(payload, { onConflict: 'id' });
-
-      if (custError) { 
-        alert('名簿保存エラー: ' + custError.message); 
-        return;
-      }
-
-      let resQuery = supabase.from('reservations').update({ 
-        customer_name: editFields.name,
-        customer_phone: editFields.phone,
-        customer_email: editFields.email
-      }).eq('shop_id', shopId);
-
-      if (editFields.line_user_id) {
-        resQuery = resQuery.eq('line_user_id', editFields.line_user_id);
-      } else if (selectedRes) {
-        resQuery = resQuery.eq('customer_name', selectedRes.customer_name);
-      }
-
+      if (custError) { alert('名簿保存エラー: ' + custError.message); return; }
+      let resQuery = supabase.from('reservations').update({ customer_name: editFields.name, customer_phone: editFields.phone, customer_email: editFields.email }).eq('shop_id', shopId);
+      if (editFields.line_user_id) { resQuery = resQuery.eq('line_user_id', editFields.line_user_id); } 
+      else if (selectedRes) { resQuery = resQuery.eq('customer_name', selectedRes.customer_name); }
       const { error: resSyncError } = await resQuery;
-
-      if (resSyncError) {
-        console.error('予約データの同期に失敗しましたが名簿は更新されました:', resSyncError.message);
-      }
-
-      alert('名簿情報を更新し、カレンダーにも反映しました！'); 
-      setShowCustomerModal(false); 
-      setShowDetailModal(false); 
-      fetchData(); 
-    } catch (err) {
-      console.error(err);
-      alert('予期せぬエラーが発生しました');
-    }
+      if (resSyncError) { console.error('予約データの同期失敗:', resSyncError.message); }
+      alert('情報を更新しました！'); setShowCustomerModal(false); setShowDetailModal(false); fetchData(); 
+    } catch (err) { console.error(err); alert('予期せぬエラーが発生しました'); }
   };
 
   const deleteRes = async (id) => {
@@ -298,7 +245,6 @@ function AdminReservations() {
     return days;
   }, [startDate]);
 
-  // ✅ 10分〜30分の可変インターバルに対応したスロット生成ロジック
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
     let minTotalMinutes = 24 * 60;
@@ -440,6 +386,13 @@ function AdminReservations() {
   const labelStyle = { fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' };
   const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '1rem', boxSizing: 'border-box' };
 
+  // 🆕 苗字だけを抽出する関数（半角・全角スペース対応）
+  const getFamilyName = (fullName) => {
+    if (!fullName) return "";
+    const parts = fullName.split(/[\s\u3000]+/); // 空白または全角空白で分割
+    return parts[0]; // 最初の要素（苗字）を返す
+  };
+
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#fff', overflow: 'hidden', position: 'fixed', inset: 0 }}>
       {isPC && (
@@ -558,12 +511,12 @@ function AdminReservations() {
                             ) : (
                               res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : 
                               (isStart ? (
-                                // ✅ 🆕 縦書き ＆ 様なし ＆ 文字サイズ自動調整ロジック
+                                // ✅ 🆕 縦書き ＆ スペースがある場合は苗字のみ ＆ 文字サイズ自動調整
                                 <div style={{
                                   fontWeight: 'bold',
-                                  fontSize: isPC ? '0.8rem' : 'calc(0.5rem + 0.2vw)', // デバイス幅に合わせたフォントサイズ調整
-                                  writingMode: isPC ? 'horizontal-tb' : 'vertical-rl', // スマホのみ縦書き
-                                  textOrientation: 'upright', // 縦書き時の文字の向きを直立に
+                                  fontSize: isPC ? '0.8rem' : 'calc(0.5rem + 0.2vw)', 
+                                  writingMode: isPC ? 'horizontal-tb' : 'vertical-rl', 
+                                  textOrientation: 'upright',
                                   lineHeight: '1.1',
                                   height: '100%',
                                   width: '100%',
@@ -573,7 +526,7 @@ function AdminReservations() {
                                   overflow: 'hidden',
                                   whiteSpace: 'nowrap'
                                 }}>
-                                  {isOtherShop ? `(${res.profiles?.business_name})` : res.customer_name}
+                                  {isOtherShop ? `(${res.profiles?.business_name})` : getFamilyName(res.customer_name)}
                                 </div>
                               ) : '・')
                             )}
