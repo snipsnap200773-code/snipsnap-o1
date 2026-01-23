@@ -8,12 +8,10 @@ function AdminManagement() {
   const navigate = useNavigate();
   
   // --- 状態管理 ---
-  const [activeMenu, setActiveMenu] = useState('work'); // デフォルトを日常業務に
+  const [activeMenu, setActiveMenu] = useState('work');
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [todayReservations, setTodayReservations] = useState([]);
-
-  // 施術商品管理用
   const [services, setServices] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -25,11 +23,9 @@ function AdminManagement() {
 
   const fetchInitialData = async () => {
     setLoading(true);
-    // 1. 店舗情報
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', shopId).single();
     if (profile) setShop(profile);
 
-    // 2. 本日の予約リスト（日常業務用）
     if (activeMenu === 'work') {
       const { data: resData } = await supabase
         .from('reservations')
@@ -42,7 +38,6 @@ function AdminManagement() {
       setTodayReservations(resData || []);
     }
 
-    // 3. 施術メニュー（施術商品用）
     if (activeMenu === 'master_tech') {
       const { data: svData } = await supabase.from('services').select('*').eq('shop_id', shopId).order('category_name', { ascending: true });
       setServices(svData || []);
@@ -62,32 +57,31 @@ function AdminManagement() {
     setIsSaving(false);
   };
 
-  // --- スタイル定義 ---
+  // --- スタイル定義（修正版） ---
   const outerWrapperStyle = {
-    width: '100vw',
+    width: '100%',
     minHeight: '100vh',
-    background: '#b19cd9',
+    background: '#fff', // 背景を白に変更
     display: 'flex',
-    justifyContent: 'center', // 🆕 全体をセンターへ
-    alignItems: 'flex-start',
-    padding: '20px 0',
-    overflowX: 'hidden'
+    justifyContent: 'center', // 横方向中央揃え
+    alignItems: 'center', // 縦方向中央揃え
+    padding: '20px',
+    boxSizing: 'border-box'
   };
 
   const containerStyle = {
     display: 'flex',
-    width: '1200px', // 🆕 横幅を固定して安定させる
+    width: '100%',
+    maxWidth: '1200px', // コンテンツの最大幅を指定
     height: '850px',
-    background: '#e0d7f7',
-    border: '3px double #fff',
-    borderRadius: '10px',
-    boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
-    overflow: 'hidden'
+    // background, border, boxShadow を削除してシンプルに
+    overflow: 'hidden',
+    border: '1px solid #eee' // 薄い枠線だけ追加してまとまりを出す
   };
 
   const sidebarStyle = {
     width: '280px',
-    background: '#e0d7f7',
+    background: '#e0d7f7', // 左カラムの背景色は維持
     borderRight: '2px solid #4b2c85',
     padding: '20px',
     display: 'flex',
@@ -100,7 +94,8 @@ function AdminManagement() {
     padding: '20px',
     display: 'flex',
     flexDirection: 'column',
-    background: '#fff' // コンテンツ内側は白背景で見やすく
+    background: '#fff',
+    overflowY: 'auto'
   };
 
   const btnStyle = (id, color) => ({
@@ -111,12 +106,11 @@ function AdminManagement() {
     textAlign: 'center', marginBottom: '4px'
   });
 
-  // 受付帳のテーブルスタイル
   const workTableStyle = { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' };
   const workThStyle = { background: '#f3f0ff', border: '1px solid #4b2c85', padding: '8px', textAlign: 'center' };
   const workTdStyle = (isAlt) => ({ 
     border: '1px solid #e2e8f0', padding: '10px', 
-    background: isAlt ? '#fff0f5' : '#fff', // 🆕 画像のような1行おきのピンク色
+    background: isAlt ? '#fff0f5' : '#fff',
     textAlign: 'center'
   });
 
@@ -124,7 +118,7 @@ function AdminManagement() {
     <div style={outerWrapperStyle}>
       <div style={containerStyle}>
         
-        {/* ⬅️ 左カラム：メニュー */}
+        {/* 左カラム */}
         <div style={sidebarStyle}>
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
             <h2 style={{ fontSize: '1.2rem', fontStyle: 'italic', margin: 0 }}>Beauty Advanced</h2>
@@ -142,10 +136,8 @@ function AdminManagement() {
           </div>
         </div>
 
-        {/* ➡️ 右カラム：反映エリア */}
+        {/* 右カラム */}
         <div style={contentAreaStyle}>
-          
-          {/* 日常業務 [受付台帳] */}
           {activeMenu === 'work' && (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#d34817', padding: '10px 15px', borderRadius: '4px 4px 0 0', color: '#fff' }}>
@@ -157,7 +149,6 @@ function AdminManagement() {
                 </div>
               </div>
 
-              {/* 日付操作バー */}
               <div style={{ display: 'flex', gap: '5px', padding: '10px', background: '#fdf2f0', borderBottom: '2px solid #d34817' }}>
                 <div style={{ background: '#fff', padding: '5px 15px', border: '1px solid #d34817', fontWeight: 'bold' }}>{todayStr.replace(/-/g, '/')}</div>
                 <button style={{ padding: '5px 10px', background: '#d34817', color: '#fff', border: 'none' }}>前日</button>
@@ -169,7 +160,6 @@ function AdminManagement() {
                 </div>
               </div>
 
-              {/* メインテーブル */}
               <div style={{ flex: 1, overflowY: 'auto', marginTop: '10px' }}>
                 <table style={workTableStyle}>
                   <thead>
@@ -201,7 +191,6 @@ function AdminManagement() {
                         <td style={workTdStyle(idx % 2)}><button style={{ background: '#d34817', color: '#fff', border: 'none', cursor: 'pointer' }}>×</button></td>
                       </tr>
                     ))}
-                    {/* 空行の埋め合わせ */}
                     {[...Array(Math.max(0, 10 - todayReservations.length))].map((_, i) => (
                       <tr key={`empty-${i}`}>
                         {[...Array(9)].map((_, j) => (
@@ -213,7 +202,6 @@ function AdminManagement() {
                 </table>
               </div>
 
-              {/* 🆕 フッター集計バー */}
               <div style={{ display: 'flex', gap: '1px', background: '#d34817', padding: '5px', marginTop: '10px' }}>
                 <div style={footerLabelStyle}>客数</div>
                 <div style={footerValueStyle}>{todayReservations.length}</div>
@@ -225,32 +213,56 @@ function AdminManagement() {
             </div>
           )}
 
-          {/* 施術商品エリア (第1弾の内容を維持) */}
           {activeMenu === 'master_tech' && (
             <div>
-              <h2 style={{ color: '#4285f4', borderBottom: '2px solid #4285f4', paddingBottom: '10px' }}>初期設定 [施術商品マスター]</h2>
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-                <tr style={{ background: '#f3f0ff' }}>
-                  <th style={tableThStyle}>メニュー名</th>
-                  <th style={tableThStyle}>価格 (税抜)</th>
-                </tr>
-                {services.map(s => (
-                  <tr key={s.id} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={tableTdStyle}>{s.name}</td>
-                    <td style={tableTdStyle}>¥ <input type="number" value={s.price || 0} onChange={(e) => handleUpdateService(s.id, 'price', parseInt(e.target.value))} style={priceInputStyle} /></td>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #4285f4', paddingBottom: '10px' }}>
+                <h2 style={{ color: '#4285f4', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Tag size={24} /> 初期設定 [施術商品マスター]
+                </h2>
+                <button 
+                  onClick={saveServices} 
+                  disabled={isSaving}
+                  style={{ padding: '10px 25px', background: '#008000', color: '#fff', border: '1px solid #000', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                  <Save size={18} /> {isSaving ? '保存中...' : '一括保存'}
+                </button>
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ background: '#f3f0ff' }}>
+                    <th style={tableThStyle}>カテゴリー</th>
+                    <th style={tableThStyle}>メニュー名</th>
+                    <th style={tableThStyle}>標準価格 (税抜)</th>
+                    <th style={tableThStyle}>時間 (分)</th>
                   </tr>
-                ))}
+                </thead>
+                <tbody>
+                  {services.map(s => (
+                    <tr key={s.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={tableTdStyle}><span style={{ color: '#666', fontSize: '0.8rem' }}>{s.category_name}</span></td>
+                      <td style={{ ...tableTdStyle, fontWeight: 'bold' }}>{s.name}</td>
+                      <td style={tableTdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          ¥ <input type="number" value={s.price || 0} onChange={(e) => handleUpdateService(s.id, 'price', parseInt(e.target.value))} style={priceInputStyle} />
+                        </div>
+                      </td>
+                      <td style={tableTdStyle}>{s.duration_min}分</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
-              <button onClick={saveServices} style={{ marginTop: '20px', padding: '10px 30px', background: '#008000', color: '#fff', border: 'none', cursor: 'pointer' }}>一括保存</button>
             </div>
           )}
 
-          {/* TOPページ */}
           {activeMenu === 'home' && (
             <div style={{ background: 'rgba(255,255,255,0.4)', padding: '30px', borderRadius: '10px', border: '3px double #4b2c85' }}>
-              <h3>ライセンス取得ユーザー情報</h3>
+              <h3 style={{ borderBottom: '2px solid #4b2c85', paddingBottom: '10px' }}>ライセンス取得ユーザー情報</h3>
               <p><strong>店舗名:</strong> {shop?.business_name}</p>
               <p><strong>担当者:</strong> {shop?.owner_name}</p>
+              <p><strong>TEL:</strong> {shop?.phone}</p>
+              <p style={{ marginTop: '50px', textAlign: 'right', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                {new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '□')}□
+              </p>
             </div>
           )}
         </div>
@@ -259,10 +271,9 @@ function AdminManagement() {
   );
 }
 
-// 共通スタイル
-const tableThStyle = { padding: '12px', textAlign: 'left', borderBottom: '2px solid #4b2c85' };
+const tableThStyle = { padding: '12px', textAlign: 'left', borderBottom: '2px solid #4b2c85', color: '#4b2c85' };
 const tableTdStyle = { padding: '12px' };
-const priceInputStyle = { width: '80px', padding: '5px' };
+const priceInputStyle = { width: '100px', padding: '5px', borderRadius: '4px', border: '1px solid #cbd5e1', textAlign: 'right', fontSize: '1rem', fontWeight: 'bold' };
 const footerLabelStyle = { background: '#f3f0ff', padding: '5px 15px', fontSize: '0.8rem', fontWeight: 'bold', border: '1px solid #d34817' };
 const footerValueStyle = { background: '#fff', padding: '5px 20px', fontSize: '1rem', fontWeight: '900', border: '1px solid #d34817', minWidth: '80px', textAlign: 'right', marginRight: '10px' };
 
