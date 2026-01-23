@@ -66,6 +66,11 @@ function TrialRegistration() {
           type: 'welcome',
           shopName: formData.shopName,
           owner_email: formData.email,
+          // 🆕 三土手さんへの通知メールに必要なデータを追加（index.ts側の変数名に合わせる）
+          ownerName: formData.ownerName,
+          phone: formData.phone,
+          businessType: formData.businessType,
+          // --------------------------------------------------
           dashboard_url: `${baseUrl}/admin/${data.id}`,
           reservations_url: `${baseUrl}/admin/${data.id}/reservations`,
           reserve_url: `${baseUrl}/shop/${data.id}/reserve`,
@@ -120,34 +125,33 @@ function TrialRegistration() {
             <input name="shopNameKana" placeholder="店舗名のふりがな" onChange={handleChange} required style={{ ...inputStyle, marginBottom: '10px' }} />
             <select name="businessType" onChange={handleChange} required style={{ ...inputStyle, appearance: 'none' }}>
               <option value="">-- 業種を選択してください --</option>
-                        <option value="美容室・理容室">美容室・理容室</option>
-                        <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
-                        <option value="エステ・リラク">エステ・リラク</option>
-                        <option value="整体・接骨院・針灸">整体・接骨院・針灸</option>
-                        <option value="飲食店・カフェ">飲食店・カフェ</option>
-                        <option value="その他・ライフ">その他・ライフ</option>
+              <option value="美容室・理容室">美容室・理容室</option>
+              <option value="ネイル・アイラッシュ">ネイル・アイラッシュ</option>
+              <option value="エステ・リラク">エステ・リラク</option>
+              <option value="整体・接骨院・針灸">整体・接骨院・針灸</option>
+              <option value="飲食店・カフェ">飲食店・カフェ</option>
+              <option value="その他・ライフ">その他・ライフ</option>
             </select>
           </section>
 
-<section>
-  <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', display: 'block', marginBottom: '8px' }}>📞 連絡先・ログイン設定</label>
-  <input type="email" name="email" placeholder="メールアドレス" onChange={handleChange} required style={{ ...inputStyle, marginBottom: '10px' }} />
-  <input type="tel" name="phone" placeholder="電話番号" onChange={handleChange} required style={{ ...inputStyle, marginBottom: '10px' }} />
-  <div style={{ background: '#fef3c7', padding: '15px', borderRadius: '12px', border: '1px solid #fcd34d' }}>
-    <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#92400e' }}>🔑 管理画面パスワード設定</label>
-    {/* 🆕 placeholderを「8文字以上」に変更。さらに minLength="8" を追加するとブラウザ側でもチェックしてくれます */}
-    <input 
-      type="password" 
-      name="password" 
-      placeholder="8文字以上で設定" 
-      onChange={handleChange} 
-      required 
-      minLength="8" 
-      style={{ ...inputStyle, marginTop: '5px', border: '1px solid #f59e0b' }} 
-    />
-    <p style={{ fontSize: '0.65rem', color: '#b45309', marginTop: '5px', margin: 0 }}>※管理画面へのログイン時に使用します。忘れないよう控えてください。</p>
-  </div>
-</section>
+          <section>
+            <label style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1e293b', display: 'block', marginBottom: '8px' }}>📞 連絡先・ログイン設定</label>
+            <input type="email" name="email" placeholder="メールアドレス" onChange={handleChange} required style={{ ...inputStyle, marginBottom: '10px' }} />
+            <input type="tel" name="phone" placeholder="電話番号" onChange={handleChange} required style={{ ...inputStyle, marginBottom: '10px' }} />
+            <div style={{ background: '#fef3c7', padding: '15px', borderRadius: '12px', border: '1px solid #fcd34d' }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#92400e' }}>🔑 管理画面パスワード設定</label>
+              <input 
+                type="password" 
+                name="password" 
+                placeholder="8文字以上で設定" 
+                onChange={handleChange} 
+                required 
+                minLength="8" 
+                style={{ ...inputStyle, marginTop: '5px', border: '1px solid #f59e0b' }} 
+              />
+              <p style={{ fontSize: '0.65rem', color: '#b45309', marginTop: '5px', margin: 0 }}>※管理画面へのログイン時に使用します。忘れないよう控えてください。</p>
+            </div>
+          </section>
 
           <button type="submit" disabled={isSubmitting} style={{ ...buttonStyle, background: isSubmitting ? '#94a3b8' : '#2563eb' }}>
             {isSubmitting ? '登録処理中...' : '無料で利用を開始する 🚀'}
