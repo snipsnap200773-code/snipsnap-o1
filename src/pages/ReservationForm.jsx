@@ -43,13 +43,16 @@ function ReservationForm() {
   const categoryRefs = useRef({});
   const serviceRefs = useRef({});
 
-  useEffect(() => {
+useEffect(() => {
+    // 🆕 ページ表示時に強制的に最上部へ
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+
     fetchData();
     if (isLineSource || isLineApp) {
       initLiff();
     }
   }, [shopId]);
-
+  
   const initLiff = async () => {
     try {
       await liff.init({ liffId: '2008606267-eJadD70Z' }); 
