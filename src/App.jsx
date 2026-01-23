@@ -10,6 +10,7 @@ import AdminReservations from './pages/AdminReservations';
 import TrialRegistration from './pages/TrialRegistration';
 import CancelReservation from './pages/CancelReservation';
 import ShopList from './pages/ShopList';
+import AdminManagement from './pages/AdminManagement';
 // 🗑️ OnePlayPortal のインポートを削除しました
 import ShopDetail from './pages/ShopDetail';
 
@@ -45,6 +46,7 @@ function App() {
               <Route path="/shop/:shopId/confirm" element={<ConfirmReservation />} />
               <Route path="/cancel" element={<CancelReservation />} />
               <Route path="/shop/:shopId/admin" element={<AdminDashboard />} />
+              <Route path="/admin/:shopId/management" element={<AdminManagement />} />
             </Routes>
           </div>
         } />
