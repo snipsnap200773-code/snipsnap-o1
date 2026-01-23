@@ -107,9 +107,11 @@ function TimeSelection() {
     return slots;
   }, [shop]);
 
-  // ✅ 三土手さんの重要ロジック：空き状況チェック（全店舗の予約を合算判定するように強化）
+// ✅ 三土手さんの重要ロジック：空き状況チェック（全店舗の予約を合算判定するように強化 ＆ 曜日判定バグ修正版）
   const checkAvailability = (date, timeStr) => {
     if (!shop?.business_hours) return { status: 'none' };
+    
+    // 1. 定休日設定（赤いボタン）のチェック。これが最優先。
     if (checkIsRegularHoliday(date)) return { status: 'closed', label: '休' };
 
     const dayOfWeek = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][date.getDay()];
@@ -118,9 +120,18 @@ function TimeSelection() {
     const now = new Date();
     const todayStr = now.toLocaleDateString('sv-SE');
 
-    if (!hours || hours.is_closed) return { status: 'closed', label: '休' };
-    if (timeStr < hours.open || timeStr >= hours.close) return { status: 'none', label: '' };
-    if (hours.rest_start && hours.rest_end && timeStr >= hours.rest_start && timeStr < hours.rest_end) return { status: 'rest', label: '休' };
+    // ❌ 【修正箇所】ここで !hours や is_closed を見て「休」を返すのをやめました。
+    // これにより、定休日ボタンが押されていない限り、勝手に「休」になることはありません。
+
+    // 2. 営業時間外の判定
+    // 営業時間が入力されている場合のみチェックし、未入力ならデフォルト（例: 09:00-18:00）として扱う、
+    // あるいは「設定なし＝営業外」とするかは三土手さんの仕様次第ですが、
+    // ここでは安全のため「!hours」の場合はデフォルト値を通るように書き換えます。
+    const openTime = hours?.open || "09:00";
+    const closeTime = hours?.close || "18:00";
+
+    if (timeStr < openTime || timeStr >= closeTime) return { status: 'none', label: '' };
+    if (hours?.rest_start && hours?.rest_end && timeStr >= hours.rest_start && timeStr < hours.rest_end) return { status: 'rest', label: '休' };
 
     const targetDateTime = new Date(`${dateStr}T${timeStr}:00`);
     const buffer = shop.buffer_preparation_min || 0;
@@ -137,10 +148,11 @@ function TimeSelection() {
     const totalMinRequired = (totalSlotsNeeded * interval);
     const potentialEndTime = new Date(targetDateTime.getTime() + totalMinRequired * 60 * 1000);
 
-    const [closeH, closeM] = hours.close.split(':').map(Number);
+    const [closeH, closeM] = closeTime.split(':').map(Number);
     const closeDateTime = new Date(`${dateStr}T${String(closeH).padStart(2,'0')}:${String(closeM).padStart(2,'0')}:00`);
     if (potentialEndTime > closeDateTime) return { status: 'short', label: '△' };
 
+    // ...（以下、existingReservations.some による予約重複チェックや自動詰めロジックへ続く）
     // ✅ ここで全店舗（自分＋同期店）の予約を合算チェック
     const isBooked = existingReservations.some(res => {
       const resStart = new Date(res.start_time).getTime();
