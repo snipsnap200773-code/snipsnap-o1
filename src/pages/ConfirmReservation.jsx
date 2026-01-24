@@ -185,6 +185,7 @@ function ConfirmReservation() {
           }]);
       }
 
+      // ✅ 綺麗なメニュー名のラベルを作成 (カレンダーや台帳の表示用)
       const menuLabel = people.length > 1
         ? people.map((p, i) => `${i + 1}人目: ${p.services.map(s => s.name).join(', ')}`).join(' / ')
         : (people[0]?.services?.map(s => s.name).join(', ') || 'メニューなし');
@@ -203,6 +204,7 @@ function ConfirmReservation() {
           res_type: 'normal',
           line_user_id: lineUser?.userId || null,
           cancel_token: cancelToken,
+          menu_name: menuLabel, // 🆕 ここで新設したmenu_nameカラムに保存！
           options: { 
             people: people,
             // 🆕 予約データにも「入り口別の屋号」を記録しておく（後で確認しやすくするため）

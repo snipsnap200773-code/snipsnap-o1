@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { 
   Save, Clipboard, Calendar, FolderPlus, PlusCircle, Trash2, 
-  Tag, ChevronDown, RefreshCw, ChevronLeft, ChevronRight, Settings, Users, Percent, Plus, Minus
+  Tag, ChevronDown, RefreshCw, ChevronLeft, ChevronRight, Settings, Users, Percent, Plus, Minus, X, CheckCircle, User, FileText, History, ShoppingBag
 } from 'lucide-react';
 
 function AdminManagement() {
@@ -11,29 +11,46 @@ function AdminManagement() {
   const navigate = useNavigate();
   const cleanShopId = shopId?.trim();
 
+  // --- 画面管理・日付 ---
   const [activeMenu, setActiveMenu] = useState('work');
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('sv-SE'));
+  const [viewMonth, setViewMonth] = useState(new Date());
 
-  // --- 統合マスターデータ ---
+  // --- マスターデータ ---
   const [categories, setCategories] = useState([]);
   const [services, setServices] = useState([]);
   const [serviceOptions, setServiceOptions] = useState([]); 
   const [adminAdjustments, setAdminAdjustments] = useState([]);
-  
-  // 削除予定のIDを記録する箱
+  const [products, setProducts] = useState([]); // 🆕 店販
   const [deletedAdjIds, setDeletedAdjIds] = useState([]);
+  const [deletedProductIds, setDeletedProductIds] = useState([]);
 
-  // 日常業務(予約)用
+  // --- 日常業務用 ---
   const [todayReservations, setTodayReservations] = useState([]);
-  const todayStr = new Date().toLocaleDateString('sv-SE');
+
+  // --- レジパネル用State ---
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [selectedRes, setSelectedRes] = useState(null);
+  const [checkoutAdjustments, setCheckoutAdjustments] = useState([]); 
+  const [checkoutProducts, setCheckoutProducts] = useState([]); // 🆕 今回売れた店販
+  const [finalPrice, setFinalPrice] = useState(0);
+
+  // --- 顧客情報（カルテ）パネル用State ---
+  const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerMemo, setCustomerMemo] = useState('');
+  const [firstArrivalDate, setFirstArrivalDate] = useState(''); 
+  const [pastVisits, setPastVisits] = useState([]);
+  const [isSavingMemo, setIsSavingMemo] = useState(false);
 
   useEffect(() => {
     if (cleanShopId) {
       fetchInitialData();
     }
-  }, [cleanShopId, activeMenu]);
+  }, [cleanShopId, activeMenu, selectedDate]);
 
   const fetchInitialData = async () => {
     try {
@@ -41,31 +58,29 @@ function AdminManagement() {
       const shopRes = await supabase.from('profiles').select('*').eq('id', cleanShopId).single();
       if (shopRes.data) setShop(shopRes.data);
 
-      if (activeMenu === 'work') {
-        const { data: resData } = await supabase
-          .from('reservations')
-          .select('*')
-          .eq('shop_id', cleanShopId)
-          .gte('start_time', `${todayStr}T00:00:00`)
-          .lte('start_time', `${todayStr}T23:59:59`)
-          .order('start_time', { ascending: true });
-        setTodayReservations(resData || []);
-      }
+      // 受付台帳データの取得 (選択された日付でフィルタ)
+      const { data: resData } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('shop_id', cleanShopId)
+        .gte('start_time', `${selectedDate}T00:00:00`)
+        .lte('start_time', `${selectedDate}T23:59:59`)
+        .order('start_time', { ascending: true });
+      setTodayReservations(resData || []);
 
-      if (activeMenu === 'master_tech') {
-        const [catRes, servRes, optRes, adjRes] = await Promise.all([
-          supabase.from('service_categories').select('*').eq('shop_id', cleanShopId).order('sort_order'),
-          supabase.from('services').select('*').eq('shop_id', cleanShopId).order('sort_order'),
-          supabase.from('service_options').select('*'),
-          supabase.from('admin_adjustments').select('*')
-        ]);
-
-        setCategories(catRes.data || []);
-        setServices(servRes.data || []);
-        setServiceOptions(optRes.data || []);
-        setAdminAdjustments(adjRes.data || []);
-        setDeletedAdjIds([]);
-      }
+      // マスターデータの取得
+      const [catRes, servRes, optRes, adjRes, prodRes] = await Promise.all([
+        supabase.from('service_categories').select('*').eq('shop_id', cleanShopId).order('sort_order'),
+        supabase.from('services').select('*').eq('shop_id', cleanShopId).order('sort_order'),
+        supabase.from('service_options').select('*'),
+        supabase.from('admin_adjustments').select('*'),
+        supabase.from('products').select('*').eq('shop_id', cleanShopId).order('sort_order')
+      ]);
+      setCategories(catRes.data || []);
+      setServices(servRes.data || []);
+      setServiceOptions(optRes.data || []);
+      setAdminAdjustments(adjRes.data || []);
+      setProducts(prodRes.data || []);
     } catch (err) {
       console.error("Fetch Error:", err);
     } finally {
@@ -73,212 +88,414 @@ function AdminManagement() {
     }
   };
 
+  const parseReservationDetails = (res) => {
+    if (!res) return { menuName: '', totalPrice: 0, items: [], subItems: [] };
+    let menuName = res.menu_name;
+    const opt = typeof res.options === 'string' ? JSON.parse(res.options) : res.options;
+    const target = opt?.people?.[0] || opt || {};
+    const items = target.services || [];
+    const subItems = Object.values(target.options || {});
+    if (!menuName || menuName === '---') {
+      menuName = items.length > 0 ? items.map(s => s.name).join(', ') : 'メニューなし';
+    }
+    const basePrice = items.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+    const optPrice = subItems.reduce((sum, o) => sum + (Number(o.additional_price) || 0), 0);
+    
+    // 金額0円の補填ロジック
+    let finalBase = basePrice + optPrice;
+    if (finalBase === 0 && items.length > 0) {
+      items.forEach(item => {
+        const master = services.find(s => s.id === item.id || s.name === item.name);
+        if (master) finalBase += Number(master.price || 0);
+      });
+    }
+    return { menuName, totalPrice: finalBase, items, subItems };
+  };
+
   const saveAllMasters = async () => {
     setIsSaving(true);
     try {
-      const formattedServices = services.map(svc => ({
-        id: svc.id, shop_id: cleanShopId, name: svc.name, price: svc.price || 0,
-        category: svc.category, sort_order: svc.sort_order || 0
-      }));
-
-      const formattedOptions = serviceOptions.map(opt => ({
-        id: opt.id, service_id: opt.service_id, group_name: opt.group_name,
-        option_name: opt.option_name, additional_price: opt.additional_price || 0
-      }));
-
-      const formattedAdjustments = adminAdjustments.map(adj => ({
-        id: adj.id, service_id: adj.service_id, name: adj.name, price: adj.price || 0,
-        is_percent: adj.is_percent || false, is_minus: adj.is_minus || false
-      }));
+      const formattedServices = services.map(svc => ({ id: svc.id, shop_id: cleanShopId, name: svc.name, price: svc.price || 0, category: svc.category, sort_order: svc.sort_order || 0 }));
+      const formattedOptions = serviceOptions.map(opt => ({ id: opt.id, service_id: opt.service_id, group_name: opt.group_name, option_name: opt.option_name, additional_price: opt.additional_price || 0 }));
+      const formattedAdjustments = adminAdjustments.map(adj => ({ id: adj.id, service_id: adj.service_id, name: adj.name, price: adj.price || 0, is_percent: adj.is_percent || false, is_minus: adj.is_minus || false }));
+      const formattedProducts = products.map((p, i) => ({ id: p.id, shop_id: cleanShopId, name: p.name, price: p.price || 0, sort_order: i }));
 
       const promises = [
         supabase.from('services').upsert(formattedServices),
         supabase.from('service_options').upsert(formattedOptions),
-        supabase.from('admin_adjustments').upsert(formattedAdjustments)
+        supabase.from('admin_adjustments').upsert(formattedAdjustments),
+        supabase.from('products').upsert(formattedProducts)
       ];
+      if (deletedAdjIds.length > 0) promises.push(supabase.from('admin_adjustments').delete().in('id', deletedAdjIds));
+      if (deletedProductIds.length > 0) promises.push(supabase.from('products').delete().in('id', deletedProductIds));
 
-      if (deletedAdjIds.length > 0) {
-        promises.push(supabase.from('admin_adjustments').delete().in('id', deletedAdjIds));
-      }
-
-      const results = await Promise.all(promises);
-      results.forEach(res => { if (res.error) throw res.error; });
-
-      alert("すべての設定と削除を同期しました！");
-      setDeletedAdjIds([]);
+      await Promise.all(promises);
+      alert("設定を保存しました。");
       fetchInitialData();
-    } catch (err) {
-      alert("保存失敗: " + err.message);
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (err) { alert("保存失敗: " + err.message); } finally { setIsSaving(false); }
   };
 
   const addAdjustment = (svcId = null) => {
-    const name = prompt("管理用メニュー名を入力（例：薬剤50g、10%OFF、シニア割 等）");
-    if (name) {
-      setAdminAdjustments([...adminAdjustments, { 
-        id: crypto.randomUUID(), service_id: svcId, name: name, price: 0, 
-        is_percent: false, is_minus: false 
-      }]);
-    }
+    const name = prompt("項目名を入力");
+    if (name) setAdminAdjustments([...adminAdjustments, { id: crypto.randomUUID(), service_id: svcId, name, price: 0, is_percent: false, is_minus: false }]);
   };
 
-  const handleRemoveAdj = (id) => {
-    setAdminAdjustments(adminAdjustments.filter(a => a.id !== id));
-    if (id.includes('-')) setDeletedAdjIds([...deletedAdjIds, id]);
+  const addProduct = () => {
+    const name = prompt("商品名を入力");
+    if (name) setProducts([...products, { id: crypto.randomUUID(), name, price: 0 }]);
   };
 
-  // 🆕 ＋・－・％ の切り替えロジック
   const cycleAdjType = (id) => {
     setAdminAdjustments(adminAdjustments.map(a => {
       if (a.id !== id) return a;
-      if (!a.is_percent && !a.is_minus) return { ...a, is_minus: true, is_percent: false }; // ＋ → －
-      if (a.is_minus) return { ...a, is_minus: false, is_percent: true }; // － → ％
-      return { ...a, is_minus: false, is_percent: false }; // ％ → ＋
+      if (!a.is_percent && !a.is_minus) return { ...a, is_minus: true, is_percent: false };
+      if (a.is_minus) return { ...a, is_minus: false, is_percent: true };
+      return { ...a, is_minus: false, is_percent: false };
     }));
   };
 
+  const openCheckout = (res) => {
+    const info = parseReservationDetails(res);
+    setSelectedRes(res);
+    setCheckoutAdjustments([]); 
+    setCheckoutProducts([]);
+    setFinalPrice(info.totalPrice);
+    setIsCheckoutOpen(true);
+    setIsCustomerInfoOpen(false);
+  };
+
+  const toggleCheckoutAdj = (adj) => {
+    const isSelected = checkoutAdjustments.find(a => a.id === adj.id);
+    const newSelection = isSelected ? checkoutAdjustments.filter(a => a.id !== adj.id) : [...checkoutAdjustments, adj];
+    setCheckoutAdjustments(newSelection);
+    calculateFinalTotal(newSelection, checkoutProducts);
+  };
+
+  const toggleCheckoutProduct = (prod) => {
+    const isSelected = checkoutProducts.find(p => p.id === prod.id);
+    const newSelection = isSelected ? checkoutProducts.filter(p => p.id !== prod.id) : [...checkoutProducts, prod];
+    setCheckoutProducts(newSelection);
+    calculateFinalTotal(checkoutAdjustments, newSelection);
+  };
+
+  const calculateFinalTotal = (currentAdjs, currentProds) => {
+    const info = parseReservationDetails(selectedRes);
+    let total = info.totalPrice;
+    currentProds.forEach(p => total += Number(p.price || 0));
+    currentAdjs.filter(a => !a.is_percent).forEach(a => { total += a.is_minus ? -Number(a.price) : Number(a.price); });
+    currentAdjs.filter(a => a.is_percent).forEach(a => { total = total * (1 - (Number(a.price) / 100)); });
+    setFinalPrice(Math.max(0, Math.round(total)));
+  };
+
+  const completePayment = async () => {
+    try {
+      const { error } = await supabase.from('reservations').update({ total_price: finalPrice, status: 'completed' }).eq('id', selectedRes.id);
+      if (error) throw error;
+      alert("お会計を確定しました。");
+      setIsCheckoutOpen(false); fetchInitialData();
+    } catch (err) { alert("エラー: " + err.message); }
+  };
+
+  const openCustomerInfo = async (res) => {
+    setSelectedRes(res);
+    const { data: cust } = await supabase.from('customers').select('*').eq('shop_id', cleanShopId).eq('name', res.customer_name).maybeSingle();
+    const { data: history } = await supabase.from('reservations').select('*').eq('shop_id', cleanShopId).eq('customer_name', res.customer_name).order('start_time', { ascending: false });
+    setSelectedCustomer(cust || { name: res.customer_name, phone: res.customer_phone, email: res.customer_email });
+    setCustomerMemo(cust?.memo || '');
+    setPastVisits(history || []);
+    setFirstArrivalDate(cust?.first_arrival_date || (history?.length > 0 ? history[history.length - 1].start_time.split('T')[0] : ''));
+    setIsCustomerInfoOpen(true); setIsCheckoutOpen(false);
+  };
+
+  const saveCustomerMemo = async () => {
+    if (!selectedCustomer?.id) return alert("名簿登録が必要です");
+    setIsSavingMemo(true);
+    try {
+      await supabase.from('customers').update({ memo: customerMemo, first_arrival_date: firstArrivalDate }).eq('id', selectedCustomer.id);
+      alert("カルテを更新しました");
+    } catch (err) { alert("保存失敗: " + err.message); } finally { setIsSavingMemo(false); }
+  };
+
+  // --- 売上集計 ＆ カレンダーロジック ---
+  const dailyTotalSales = useMemo(() => {
+    return todayReservations.filter(r => r.status === 'completed').reduce((sum, r) => sum + (r.total_price || 0), 0);
+  }, [todayReservations]);
+
+  const calendarDays = useMemo(() => {
+    const year = viewMonth.getFullYear(); const month = viewMonth.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days = [];
+    for (let i = 0; i < (firstDay === 0 ? 6 : firstDay - 1); i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
+    return days;
+  }, [viewMonth]);
+
+  // --- スタイル定義 ---
   const fullPageWrapper = { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', display: 'flex', background: '#fff', zIndex: 9999, overflow: 'hidden' };
-  const sidebarStyle = { width: '260px', background: '#e0d7f7', borderRight: '2px solid #4b2c85', padding: '20px', display: 'flex', flexDirection: 'column', flexShrink: 0 };
+  const sidebarStyle = { width: '260px', background: '#e0d7f7', borderRight: '2px solid #4b2c85', padding: '15px', display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto' };
   const navBtnStyle = (active, color) => ({ width: '100%', padding: '12px', background: active ? '#fff' : color, color: active ? '#000' : '#fff', border: '1px solid #000', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '6px', boxShadow: active ? 'inset 2px 2px 5px rgba(0,0,0,0.3)' : '2px 2px 0px rgba(0,0,0,0.5)' });
+  const thStyle = { padding: '12px', border: '1px solid #4b2c85', textAlign: 'center' };
+  const tdStyle = { padding: '12px', border: '1px solid #eee', textAlign: 'center' };
+  const cardStyle = { background: '#fff', border: '2px solid #4b2c85', borderRadius: '8px', marginBottom: '30px', overflow: 'hidden' };
+  const catHeaderStyle = { background: '#f3f0ff', padding: '15px 20px', borderBottom: '2px solid #4b2c85' };
+  const svcRowStyle = { padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px' };
+  const priceInputStyle = { border: '1px solid #ddd', padding: '5px', width: '100px', textAlign: 'right', fontWeight: '900', color: '#d34817' };
+  const optAddBtnStyle = { background: '#fff', border: '1px dashed #4285f4', color: '#4285f4', padding: '5px 12px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 'bold' };
+  const checkoutOverlayStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.3)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' };
+  const checkoutPanelStyle = { width: '450px', background: '#fff', height: '100%', boxShadow: '-5px 0px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', animation: 'slideIn 0.3s ease-out' };
+  const checkoutHeaderStyle = { background: '#4b2c85', color: '#fff', padding: '20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+  const checkoutRowStyle = { display: 'flex', justifyContent: 'space-between', padding: '15px 0', borderBottom: '1px solid #eee' };
+  const checkoutFooterStyle = { background: '#f8fafc', padding: '25px', borderTop: '2px solid #ddd' };
+  const adjBtnStyle = (active) => ({ padding: '10px 15px', background: active ? '#ef4444' : '#fff', color: active ? '#fff' : '#ef4444', border: '1px solid #ef4444', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' });
+  const completeBtnStyle = { width: '100%', padding: '15px', background: '#008000', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' };
+  const footerLabelStyle = { background: '#f3f0ff', padding: '8px 20px', fontSize: '0.8rem', fontWeight: 'bold', border: '1px solid #d34817' };
+  const footerValueStyle = { background: '#fff', padding: '8px 25px', fontSize: '1.2rem', fontWeight: '900', minWidth: '100px', textAlign: 'right' };
+  const optInputStyle = { background: 'transparent', border: 'none', fontSize: '0.9rem', fontWeight: 'bold' };
+  const miniPriceInput = { border: 'none', background: '#e0f2fe', width: '60px', textAlign: 'right', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' };
+  const pubChipStyle = { background: '#f0f9ff', border: '1px solid #bae6fd', padding: '4px 12px', borderRadius: '4px', display: 'flex', gap: '5px', alignItems: 'center' };
+  const adjChipStyle = { background: '#fff5f5', border: '1px solid #feb2b2', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '5px', borderRadius: '20px' };
+  const typeBtnStyle = { border: '1px solid #ef4444', background: '#fff', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#ef4444' };
 
   return (
     <div style={fullPageWrapper}>
-      {/* ⬅️ サイドバー */}
+      {/* ⬅️ サイドバー ＆ ミニカレンダー */}
       <div style={sidebarStyle}>
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h2 style={{ fontSize: '2.5rem', fontStyle: 'italic', fontWeight: '900', color: '#4b2c85', margin: 0 }}>SOLO</h2>
-          <p style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>MANAGEMENT</p>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '2.2rem', fontStyle: 'italic', fontWeight: '900', color: '#4b2c85', margin: 0 }}>SOLO</h2>
+          <p style={{ fontSize: '0.6rem', fontWeight: 'bold' }}>MANAGEMENT</p>
         </div>
         <button style={navBtnStyle(activeMenu === 'work', '#d34817')} onClick={() => setActiveMenu('work')}>日常業務</button>
         <button style={navBtnStyle(activeMenu === 'master_tech', '#4285f4')} onClick={() => setActiveMenu('master_tech')}>施術商品</button>
-        <div style={{ marginTop: 'auto' }}>
+        
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '10px', marginTop: '15px', border: '1px solid #4b2c85' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{viewMonth.getFullYear()}年{viewMonth.getMonth()+1}月</span>
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <button onClick={() => setViewMonth(new Date(viewMonth.setMonth(viewMonth.getMonth()-1)))} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>◀</button>
+              <button onClick={() => setViewMonth(new Date(viewMonth.setMonth(viewMonth.getMonth()+1)))} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>▶</button>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', textAlign: 'center' }}>
+            {['月','火','水','木','金','土','日'].map(d => <div key={d} style={{ fontSize: '0.6rem', color: '#94a3b8' }}>{d}</div>)}
+            {calendarDays.map((d, i) => d ? (
+              <div key={i} onClick={() => setSelectedDate(d.toLocaleDateString('sv-SE'))} style={{ fontSize: '0.7rem', padding: '4px 0', cursor: 'pointer', borderRadius: '4px', background: d.toLocaleDateString('sv-SE') === selectedDate ? '#4b2c85' : 'none', color: d.toLocaleDateString('sv-SE') === selectedDate ? '#fff' : '#333' }}>{d.getDate()}</div>
+            ) : <div key={i} />)}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
           <button style={navBtnStyle(false, '#ff1493')} onClick={() => navigate(`/admin/${cleanShopId}/reservations`)}>業 務 終 了</button>
         </div>
       </div>
 
-      {/* ➡️ メインエリア */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* 🚀 メインコンテンツ */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
         
-        {/* ✅ 日常業務 (受付台帳) 完全復旧版 */}
         {activeMenu === 'work' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div style={{ background: '#d34817', padding: '15px 25px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontStyle: 'italic', fontSize: '1.4rem' }}>SOLO - 受付台帳 -</h2>
-              <div style={{ background: '#fff', color: '#d34817', padding: '5px 15px', fontWeight: 'bold' }}>{todayStr}</div>
+              <h2 style={{ margin: 0, fontStyle: 'italic', fontSize: '1.4rem' }}>受付台帳：{selectedDate.replace(/-/g, '/')}</h2>
+              <div style={{ background: '#fff', color: '#d34817', padding: '5px 15px', fontWeight: 'bold' }}>{todayReservations.length}件の予約</div>
             </div>
-            
             <div style={{ flex: 1, overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f3f0ff', borderBottom: '2px solid #4b2c85' }}>
-                    <th style={thStyle}>時間</th><th style={thStyle}>お客様名</th><th style={thStyle}>メニュー(予定)</th><th style={thStyle}>お会計</th><th style={thStyle}></th>
+                    <th style={thStyle}>時間</th><th style={thStyle}>お客様名 (カルテ)</th><th style={thStyle}>メニュー(予定)</th><th style={thStyle}>お会計 (レジ)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {todayReservations.length > 0 ? todayReservations.map((res) => (
-                    <tr key={res.id} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={tdStyle}>{new Date(res.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                      <td style={{ ...tdStyle, background: '#008000', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>{res.customer_name}</td>
-                      <td style={tdStyle}>{res.options?.people?.[0]?.services?.map(s => s.name).join(', ') || '---'}</td>
-                      <td style={{ ...tdStyle, fontWeight: 'bold' }}>¥ 0</td>
-                      <td style={tdStyle}><button style={{ color: '#d34817', border: 'none', background: 'none', cursor: 'pointer' }}>✕</button></td>
-                    </tr>
-                  )) : (
-                    <tr><td colSpan="5" style={{ padding: '50px', textAlign: 'center', color: '#999' }}>本日の予約はありません。</td></tr>
+                  {todayReservations.length > 0 ? todayReservations.map((res) => {
+                    const info = parseReservationDetails(res);
+                    return (
+                      <tr key={res.id} style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }}>
+                        <td onClick={() => openCheckout(res)} style={tdStyle}>{new Date(res.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td onClick={() => openCustomerInfo(res)} style={{ ...tdStyle, background: res.status === 'completed' ? '#eee' : '#008000', color: '#fff', fontWeight: 'bold' }}>{res.customer_name} {res.status === 'completed' && '✓'}</td>
+                        <td onClick={() => openCheckout(res)} style={tdStyle}>{info.menuName}</td>
+                        <td onClick={() => openCheckout(res)} style={{ ...tdStyle, fontWeight: 'bold' }}>¥ {(res.total_price || info.totalPrice).toLocaleString()}</td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr><td colSpan="4" style={{ padding: '50px', textAlign: 'center', color: '#999' }}>予約はありません。</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div style={{ display: 'flex', background: '#d34817', padding: '10px 25px', gap: '5px' }}>
-              <div style={footerLabelStyle}>客数</div><div style={footerValueStyle}>{todayReservations.length}</div>
-              <div style={footerLabelStyle}>お会計累計</div><div style={footerValueStyle}>0</div>
+            <div style={{ display: 'flex', background: '#d34817', padding: '15px 25px', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', color: '#fff' }}>
+               <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>本日のお会計確定 合計</div>
+               <div style={{ fontSize: '1.8rem', fontWeight: '900' }}>¥ {dailyTotalSales.toLocaleString()}</div>
             </div>
           </div>
         )}
 
-        {/* ✅ 施術商品マスター (＋－％完全版) */}
+        {/* マスター設定画面 */}
         {activeMenu === 'master_tech' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
             <div style={{ background: '#4285f4', padding: '15px 25px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0, fontStyle: 'italic' }}>SOLO - 施術マスター (完全同期) -</h2>
+              <h2 style={{ margin: 0, fontStyle: 'italic' }}>商品マスター設定</h2>
               <button onClick={saveAllMasters} disabled={isSaving} style={{ padding: '8px 30px', background: '#008000', color: '#fff', border: '1px solid #fff', fontWeight: 'bold', cursor: 'pointer' }}>一括保存</button>
             </div>
-
             <div style={{ flex: 1, overflowY: 'auto', padding: '30px' }}>
               {categories.map(cat => (
                 <div key={cat.id} style={cardStyle}>
-                  <div style={catHeaderStyle}><span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#4b2c85' }}>📁 {cat.name}</span></div>
+                  <div style={catHeaderStyle}><span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>📁 {cat.name}</span></div>
                   {services.filter(s => s.category === cat.name).map(svc => (
-                    <div key={svc.id} style={{ borderBottom: '2px solid #e2e8f0' }}>
-                      <div style={svcRowStyle}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-                          <Tag size={16} color="#4285f4" />
-                          <span style={{ fontWeight: 'bold', minWidth: '180px', fontSize: '1.1rem' }}>{svc.name}</span>
-                          <span style={{ fontSize: '0.8rem' }}>基本料金:</span>
-                          <input type="number" value={svc.price || 0} onChange={(e) => setServices(services.map(s => s.id === svc.id ? {...s, price: parseInt(e.target.value)} : s))} style={priceInputStyle} />
-                        </div>
-                        <button onClick={() => addAdjustment(svc.id)} style={optAddBtnStyle}>＋ 個別調整を追加</button>
-                      </div>
-
-                      <div style={{ padding: '0 20px 20px 50px' }}>
-                        <div style={{ marginBottom: '10px' }}>
-                          <p style={{ fontSize: '0.75rem', color: '#4285f4', fontWeight: 'bold' }}><Users size={14} /> 予約オプション料金設定</p>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '5px' }}>
-                            {serviceOptions.filter(o => o.service_id === svc.id).map(opt => (
-                              <div key={opt.id} style={pubChipStyle}>
-                                <span style={{ fontSize: '0.8rem' }}>{opt.option_name}</span>
-                                <span style={{ fontSize: '0.8rem' }}>+¥</span>
-                                <input type="number" value={opt.additional_price || 0} onChange={(e) => setServiceOptions(serviceOptions.map(o => o.id === opt.id ? {...o, additional_price: parseInt(e.target.value)} : o))} style={miniPriceInput} />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <p style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 'bold' }}><Settings size={14} /> メニュー個別調整 (＋－％対応)</p>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '5px' }}>
-                            {adminAdjustments.filter(a => a.service_id === svc.id).map(adj => (
-                              <div key={adj.id} style={adjChipStyle}>
-                                <input value={adj.name} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, name: e.target.value} : a))} style={optInputStyle} />
-                                <button onClick={() => cycleAdjType(adj.id)} style={typeBtnStyle}>
-                                  {adj.is_percent ? <Percent size={14} /> : adj.is_minus ? <Minus size={14} /> : <Plus size={14} />}
-                                </button>
-                                <input type="number" value={adj.price || 0} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, price: parseInt(e.target.value)} : a))} style={optPriceStyle} />
-                                <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{adj.is_percent ? '%' : '円'}</span>
-                                <button onClick={() => handleRemoveAdj(adj.id)} style={{ border: 'none', background: 'none', color: '#ff1493' }}>✕</button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
+                    <div key={svc.id} style={svcRowStyle}>
+                       <span style={{ fontWeight: 'bold', minWidth: '180px' }}>{svc.name}</span>
+                       <input type="number" value={svc.price || 0} onChange={(e) => setServices(services.map(s => s.id === svc.id ? {...s, price: parseInt(e.target.value)} : s))} style={priceInputStyle} />
+                       <button onClick={() => addAdjustment(svc.id)} style={optAddBtnStyle}>＋ プロ調整</button>
+                       <div style={{ flex: 1, display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                          {adminAdjustments.filter(a => a.service_id === svc.id).map(adj => (
+                            <div key={adj.id} style={adjChipStyle}>
+                              <span>{adj.name}</span>
+                              <button onClick={() => cycleAdjType(adj.id)} style={typeBtnStyle}>{adj.is_percent ? '%' : adj.is_minus ? '-' : '+'}</button>
+                              <input type="number" value={adj.price || 0} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, price: parseInt(e.target.value)} : a))} style={miniPriceInput} />
+                              <button onClick={() => setAdminAdjustments(adminAdjustments.filter(a => a.id !== adj.id))} style={{border:'none', background:'none'}}>×</button>
+                            </div>
+                          ))}
+                       </div>
                     </div>
                   ))}
                 </div>
               ))}
 
-              {/* 🆕 最下部：プロの微調整 (管理専用・全体調整) */}
+              <div style={{ ...cardStyle, border: '3px solid #008000' }}>
+                <div style={{ ...catHeaderStyle, background: '#f0fdf4', display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#008000' }}>🧴 店販商品マスター</span>
+                  <button onClick={addProduct} style={{ ...optAddBtnStyle, borderColor: '#008000', color: '#008000' }}>＋ 商品を追加</button>
+                </div>
+                <div style={{ padding: '20px' }}>
+                  {products.map((p) => (
+                    <div key={p.id} style={{ ...svcRowStyle, borderBottom: '1px solid #eee' }}>
+                      <input value={p.name} onChange={(e) => setProducts(products.map(x => x.id === p.id ? {...x, name: e.target.value} : x))} style={{ ...optInputStyle, width: '200px' }} />
+                      <input type="number" value={p.price || 0} onChange={(e) => setProducts(products.map(x => x.id === p.id ? {...x, price: parseInt(e.target.value)} : x))} style={priceInputStyle} />
+                      <button onClick={() => { setDeletedProductIds([...deletedProductIds, p.id]); setProducts(products.filter(x => x.id !== p.id)); }} style={{ color: '#ef4444', border: 'none', background: 'none' }}><Trash2 size={18} /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div style={{ ...cardStyle, border: '3px solid #ef4444' }}>
-                <div style={{ ...catHeaderStyle, background: '#fff5f5' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#ef4444' }}>⚙️ 全体調整・割引マスター (＋－％)</span>
-                    <button onClick={() => addAdjustment(null)} style={{ ...optAddBtnStyle, borderColor: '#ef4444', color: '#ef4444' }}>＋ 全体調整項目を追加</button>
-                  </div>
+                <div style={{ ...catHeaderStyle, background: '#fff5f5', display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#ef4444' }}>⚙️ 全体調整 (＋－％)</span>
+                  <button onClick={() => addAdjustment(null)} style={{ ...optAddBtnStyle, borderColor: '#ef4444', color: '#ef4444' }}>＋ 共通項目を追加</button>
                 </div>
                 <div style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
                   {adminAdjustments.filter(a => a.service_id === null).map(adj => (
                     <div key={adj.id} style={{ ...adjChipStyle, padding: '10px 20px' }}>
                       <input value={adj.name} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, name: e.target.value} : a))} style={{ ...optInputStyle, width: '150px' }} />
-                      <button onClick={() => cycleAdjType(adj.id)} style={typeBtnStyle}>
-                        {adj.is_percent ? <Percent size={18} /> : adj.is_minus ? <Minus size={18} /> : <Plus size={18} />}
-                      </button>
+                      <button onClick={() => cycleAdjType(adj.id)} style={typeBtnStyle}>{adj.is_percent ? '%' : adj.is_minus ? '-' : '+'}</button>
                       <input type="number" value={adj.price || 0} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, price: parseInt(e.target.value)} : a))} style={{ ...optPriceStyle, width: '80px' }} />
-                      <span style={{ fontWeight: 'bold' }}>{adj.is_percent ? '%' : '円'}</span>
-                      <button onClick={() => handleRemoveAdj(adj.id)} style={{ color: '#ff1493', background: 'none', border: 'none' }}><Trash2 size={18} /></button>
+                      <button onClick={() => setAdminAdjustments(adminAdjustments.filter(a => a.id !== adj.id))} style={{ color: '#ff1493', background: 'none', border: 'none' }}><Trash2 size={18} /></button>
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ POSレジパネル (店販ボタン搭載 ＆ 400エラー修正版) */}
+        {isCheckoutOpen && (
+          <div style={checkoutOverlayStyle} onClick={() => setIsCheckoutOpen(false)}>
+            <div style={checkoutPanelStyle} onClick={(e) => e.stopPropagation()}>
+              <div style={checkoutHeaderStyle}>
+                <div><h3 style={{ margin: 0 }}>{selectedRes?.customer_name} 様</h3><p style={{ fontSize: '0.8rem', margin: 0 }}>レジ・お会計</p></div>
+                <button onClick={() => setIsCheckoutOpen(false)} style={{ background: 'none', border: 'none', color: '#fff' }}><X size={24} /></button>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+                <SectionTitle icon={<Clipboard size={16} />} title="施術内容" color="#4b2c85" />
+                {(() => {
+                  const info = parseReservationDetails(selectedRes);
+                  const reservationServiceIds = info.items.map(item => item.id);
+                  return (
+                    <>
+                      <div style={checkoutRowStyle}><div>{info.menuName}</div><div style={{ fontWeight: 'bold' }}>¥ {info.totalPrice.toLocaleString()}</div></div>
+                      {info.subItems.map((o, i) => (
+                        <div key={i} style={{ ...checkoutRowStyle, fontSize: '0.9rem', color: '#666', border: 'none', paddingTop: 0 }}>
+                          <div>└ {o.option_name}</div><div>+¥{Number(o.additional_price || 0).toLocaleString()}</div>
+                        </div>
+                      ))}
+
+                      <div style={{ marginTop: '30px' }}>
+                        <SectionTitle icon={<ShoppingBag size={16} />} title="店販商品を追加" color="#008000" />
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                          {products.map(prod => {
+                            const isActive = checkoutProducts.some(p => p.id === prod.id);
+                            return (
+                              <button key={prod.id} onClick={() => toggleCheckoutProduct(prod)} style={{ ...adjBtnStyle(isActive), borderColor: '#008000', color: isActive ? '#fff' : '#008000', background: isActive ? '#008000' : '#fff' }}>
+                                {prod.name} (¥{prod.price.toLocaleString()})
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '30px' }}>
+                        <SectionTitle icon={<Settings size={16} />} title="プロの微調整" color="#ef4444" />
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                          {adminAdjustments
+                            .filter(adj => adj.service_id === null || reservationServiceIds.includes(adj.service_id))
+                            .map(adj => {
+                              const isActive = checkoutAdjustments.some(a => a.id === adj.id);
+                              return (
+                                <button key={adj.id} onClick={() => toggleCheckoutAdj(adj)} style={adjBtnStyle(isActive)}>
+                                  {adj.name} ({adj.is_percent ? `${adj.price}%` : adj.is_minus ? `-¥${adj.price}` : `+¥${adj.price}`})
+                                </button>
+                              );
+                            })
+                          }
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+              <div style={checkoutFooterStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>最終合計金額</span>
+                  <span style={{ fontSize: '2.2rem', fontWeight: '900', color: '#d34817' }}>¥ {finalPrice.toLocaleString()}</span>
+                </div>
+                <button onClick={completePayment} style={completeBtnStyle}><CheckCircle size={20} /> 確定して計上</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ 顧客カルテパネル (履歴 ＆ 初回日対応版) */}
+        {isCustomerInfoOpen && (
+          <div style={checkoutOverlayStyle} onClick={() => setIsCustomerInfoOpen(false)}>
+            <div style={{ ...checkoutPanelStyle, background: '#fdfcf5' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ ...checkoutHeaderStyle, background: '#008000' }}>
+                <div><h3 style={{ margin: 0 }}>{selectedCustomer?.name} 様</h3><p style={{ fontSize: '0.8rem', margin: 0 }}>顧客カルテ</p></div>
+                <button onClick={() => setIsCustomerInfoOpen(false)} style={{ background: 'none', border: 'none', color: '#fff' }}><X size={24} /></button>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+                <SectionTitle icon={<User size={16} />} title="基本情報" color="#008000" />
+                <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', border: '1px solid #eee', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '0.85rem' }}>🗓️ <b>初回来店日：</b></span>
+                    <input type="date" value={firstArrivalDate} onChange={(e) => setFirstArrivalDate(e.target.value)} style={{ padding: '5px', border: '1px solid #008000', borderRadius: '5px', fontWeight: 'bold' }} />
+                  </div>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem' }}>📞 <b>電話：</b> {selectedCustomer?.phone || '未登録'}</p>
+                  <p style={{ margin: 0, fontSize: '0.85rem' }}>🔢 <b>来店回数：</b> {pastVisits.length} 回</p>
+                </div>
+                <SectionTitle icon={<FileText size={16} />} title="顧客メモ (共通カルテ)" color="#d34817" />
+                <textarea value={customerMemo} onChange={(e) => setCustomerMemo(e.target.value)} style={{ width: '100%', minHeight: '120px', padding: '10px', borderRadius: '10px', border: '2px solid #d34817', marginBottom: '10px' }} />
+                <button onClick={saveCustomerMemo} disabled={isSavingMemo} style={{ width: '100%', padding: '12px', background: '#d34817', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginBottom: '30px' }}>カルテを保存</button>
+                <SectionTitle icon={<History size={16} />} title="過去の履歴" color="#4b2c85" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {pastVisits.map(v => (
+                    <div key={v.id} style={{ background: '#fff', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}><b>{v.start_time.split('T')[0]}</b><span style={{color:'#d34817'}}>¥{Number(v.total_price || 0).toLocaleString()}</span></div>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: '#666' }}>{parseReservationDetails(v).menuName}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ padding: '25px', borderTop: '2px solid #ddd' }}>
+                <button onClick={() => openCheckout(selectedRes)} style={{ ...completeBtnStyle, background: '#d34817' }}><Clipboard size={20} /> お会計へ</button>
               </div>
             </div>
           </div>
@@ -288,21 +505,11 @@ function AdminManagement() {
   );
 }
 
-// --- スタイルパーツ (1ミリも省略せず) ---
-const cardStyle = { background: '#fff', border: '2px solid #4b2c85', borderRadius: '8px', marginBottom: '30px', overflow: 'hidden' };
-const catHeaderStyle = { background: '#f3f0ff', padding: '15px 20px', borderBottom: '2px solid #4b2c85' };
-const svcRowStyle = { padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px' };
-const thStyle = { padding: '12px', border: '1px solid #4b2c85', textAlign: 'center' };
-const tdStyle = { padding: '12px', border: '1px solid #eee', textAlign: 'center' };
-const priceInputStyle = { border: '1px solid #ddd', padding: '5px', width: '100px', textAlign: 'right', fontWeight: '900', color: '#d34817', fontSize: '1.1rem' };
-const miniPriceInput = { border: 'none', background: '#e0f2fe', width: '60px', textAlign: 'right', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' };
-const pubChipStyle = { background: '#f0f9ff', border: '1px solid #bae6fd', padding: '4px 12px', borderRadius: '4px', display: 'flex', gap: '5px', alignItems: 'center' };
-const adjChipStyle = { background: '#fff5f5', border: '1px solid #feb2b2', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '5px', borderRadius: '20px' };
-const optInputStyle = { background: 'transparent', border: 'none', fontSize: '0.9rem', width: '110px', fontWeight: 'bold' };
-const optPriceStyle = { border: 'none', background: '#fff', width: '70px', textAlign: 'right', borderRadius: '4px', fontSize: '0.9rem', fontWeight: 'bold' };
-const optAddBtnStyle = { background: '#fff', border: '1px dashed #4285f4', color: '#4285f4', padding: '5px 12px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 'bold' };
-const typeBtnStyle = { border: '1px solid #ef4444', background: '#fff', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#ef4444' };
-const footerLabelStyle = { background: '#f3f0ff', padding: '8px 20px', fontSize: '0.8rem', fontWeight: 'bold', border: '1px solid #d34817' };
-const footerValueStyle = { background: '#fff', padding: '8px 25px', fontSize: '1.2rem', fontWeight: '900', minWidth: '100px', textAlign: 'right' };
+// 補助パーツ ＆ スタイル
+const SectionTitle = ({ icon, title, color }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color, fontWeight: 'bold', borderBottom: `2px solid ${color}`, paddingBottom: '5px', marginBottom: '15px' }}>{icon} {title}</div>
+);
+
+const optPriceStyle = { border: 'none', background: '#fff', width: '70px', textAlign: 'right', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' };
 
 export default AdminManagement;
