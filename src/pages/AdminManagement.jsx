@@ -4,9 +4,12 @@ import { supabase } from '../supabaseClient';
 import { Save, Tag, Clipboard, Search, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
 function AdminManagement() {
-  const { shopId } = useParams(); // 三土手さんの店舗ID: d1669717...
+  const { shopId } = useParams();
   const navigate = useNavigate();
   
+  // 🆕 オンラインでの 400 Bad Request 対策（空白除去）
+  const cleanShopId = shopId?.trim();
+
   const [activeMenu, setActiveMenu] = useState('work');
   const [shop, setShop] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,15 +20,14 @@ function AdminManagement() {
   const todayStr = new Date().toLocaleDateString('sv-SE');
 
   useEffect(() => {
-    if (shopId) {
+    if (cleanShopId) {
       fetchInitialData();
     }
-  }, [shopId, activeMenu]);
+  }, [cleanShopId, activeMenu]);
 
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const cleanShopId = String(shopId).trim();
 
       // 1. 店舗情報取得
       const { data: profile, error: shopError } = await supabase
@@ -34,10 +36,7 @@ function AdminManagement() {
         .eq('id', cleanShopId)
         .maybeSingle();
       
-      if (shopError) {
-        console.error("Profiles API Error:", shopError);
-        // ここでエラーが出る場合はSupabaseのRLS設定を確認してください
-      }
+      if (shopError) console.error("Profiles API Error:", shopError);
       if (profile) setShop(profile);
 
       // 2. 本日の予約リスト
@@ -79,36 +78,44 @@ function AdminManagement() {
     setIsSaving(false);
   };
 
-  // --- スタイル定義（画面幅をフルに使う設定） ---
-  const fullPageStyle = {
+  // ==========================================
+  // 🆕 独自レイアウト：ブラウザ全体の支配
+  // (index.cssの中央寄せを無視させる設定)
+  // ==========================================
+  const fullPageWrapper = {
+    position: 'fixed', // ブラウザに対して固定
+    top: 0,
+    left: 0,
     width: '100vw',
     height: '100vh',
     margin: 0,
     padding: 0,
-    display: 'flex', // 🆕 左右に分ける
+    display: 'flex',
     background: '#fff',
-    overflow: 'hidden'
+    zIndex: 9999,      // 最前面へ
+    overflow: 'hidden',
+    fontFamily: 'sans-serif'
   };
 
   const sidebarStyle = {
     width: '260px',
-    height: '100vh',
+    height: '100%',
     background: '#e0d7f7',
     borderRight: '2px solid #4b2c85',
     padding: '20px',
     display: 'flex',
     flexDirection: 'column',
     boxSizing: 'border-box',
-    flexShrink: 0 // 横幅を固定
+    flexShrink: 0
   };
 
   const mainAreaStyle = {
-    flex: 1, // 🆕 残りの幅をすべて使う（これで左余白が消える）
-    height: '100vh',
+    flex: 1,
+    height: '100%',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    minWidth: 0 // 画面が縮んでもテーブルが突き抜けないようにする
+    minWidth: 0
   };
 
   const btnStyle = (id, color) => ({
@@ -120,11 +127,11 @@ function AdminManagement() {
   });
 
   return (
-    <div style={fullPageStyle}>
-      {/* ⬅️ 左メニュー：SOLOブランドを強調 */}
+    <div style={fullPageWrapper}>
+      {/* ⬅️ 左メニュー：SOLOブランド */}
       <div style={sidebarStyle}>
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h2 style={{ fontSize: '2.2rem', fontStyle: 'italic', fontWeight: '900', margin: 0, color: '#4b2c85' }}>SOLO</h2>
+          <h2 style={{ fontSize: '2.5rem', fontStyle: 'italic', fontWeight: '900', margin: 0, color: '#4b2c85' }}>SOLO</h2>
           <p style={{ fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '2px' }}>MANAGEMENT SYSTEM</p>
         </div>
         <button style={btnStyle('work', '#d34817')} onClick={() => setActiveMenu('work')}>日常業務</button>
@@ -188,7 +195,7 @@ function AdminManagement() {
                       <td style={tdStyle(idx % 2)}><span style={{ color: '#e11d48', fontWeight: 'bold' }}>予約</span></td>
                       <td style={tdStyle(idx % 2)}>{new Date(res.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                       <td style={{ ...tdStyle(idx % 2), background: '#008000', color: '#fff', fontWeight: 'bold' }}>{res.customer_name}</td>
-                      <td style={tdStyle(idx % 2)}>{shop?.owner_name || '三土手 大造'}</td>
+                      <td style={tdStyle(idx % 2)}>{shop?.owner_name || '店主'}</td>
                       <td style={{ ...tdStyle(idx % 2), textAlign: 'left' }}>{res.options?.people?.[0]?.services?.map(s => s.name).join(', ') || '---'}</td>
                       <td style={{ ...tdStyle(idx % 2), fontWeight: '900' }}>0</td>
                       <td style={{ ...tdStyle(idx % 2), background: '#1e3a8a', color: '#fff' }}>1</td>
@@ -199,7 +206,7 @@ function AdminManagement() {
                     <tr><td colSpan="9" style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>本日の予約はありません。</td></tr>
                   )}
                   {/* 空行の埋め合わせ */}
-                  {[...Array(Math.max(0, 15 - todayReservations.length))].map((_, i) => (
+                  {[...Array(15)].map((_, i) => (
                     <tr key={`empty-${i}`}>
                       {[...Array(9)].map((_, j) => (
                         <td key={j} style={tdStyle((todayReservations.length + i) % 2)}>&nbsp;</td>
@@ -218,6 +225,31 @@ function AdminManagement() {
             </div>
           </div>
         )}
+
+        {activeMenu === 'master_tech' && (
+          <div style={{ padding: '40px', maxWidth: '1000px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '3px solid #4285f4', paddingBottom: '15px' }}>
+              <h2 style={{ color: '#4285f4', margin: 0, fontSize: '1.8rem', fontWeight: 'bold' }}>初期設定 [施術商品マスター]</h2>
+              <button onClick={saveServices} disabled={isSaving} style={{ padding: '12px 40px', background: '#008000', color: '#fff', border: '1px solid #000', fontWeight: 'bold', cursor: 'pointer' }}>一括保存</button>
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '1rem' }}>
+              <thead>
+                <tr style={{ background: '#f3f0ff' }}>
+                  <th style={tableThStyle}>メニュー名</th>
+                  <th style={tableThStyle}>標準価格 (税抜)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {services.map(s => (
+                  <tr key={s.id} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '15px', fontWeight: 'bold' }}>{s.name}</td>
+                    <td style={{ padding: '15px' }}>¥ <input type="number" value={s.price || 0} onChange={(e) => handleUpdateService(s.id, 'price', parseInt(e.target.value))} style={priceInputStyle} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -229,5 +261,7 @@ const thStyle = { background: '#f3f0ff', border: '1px solid #4b2c85', padding: '
 const tdStyle = (isAlt) => ({ border: '1px solid #e2e8f0', padding: '12px', background: isAlt ? '#fff0f5' : '#fff', textAlign: 'center' });
 const footerLabelStyle = { background: '#f3f0ff', padding: '8px 20px', fontSize: '0.8rem', fontWeight: 'bold', border: '1px solid #d34817' };
 const footerValueStyle = { background: '#fff', padding: '8px 25px', fontSize: '1.2rem', fontWeight: '900', minWidth: '100px', textAlign: 'right' };
+const tableThStyle = { padding: '15px', textAlign: 'left', borderBottom: '2px solid #4b2c85', color: '#4b2c85' };
+const priceInputStyle = { width: '120px', padding: '8px', fontSize: '1.1rem', fontWeight: 'bold', textAlign: 'right' };
 
 export default AdminManagement;
