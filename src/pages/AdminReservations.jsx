@@ -431,6 +431,9 @@ function AdminReservations() {
   const themeColor = shop?.theme_color || '#2563eb';
   const themeColorLight = `${themeColor}15`; 
 
+  // ✅ 管理機能の有効状態を確認
+  const isManagementEnabled = shop?.is_management_enabled === true;
+
   const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', color: themeColor };
   const floatNavBtnStyle = { border: 'none', background: 'none', width: '60px', height: '50px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
   const overlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' };
@@ -451,10 +454,21 @@ function AdminReservations() {
     <div style={{ display: 'flex', width: '100vw', height: '100vh', background: '#fff', overflow: 'hidden', position: 'fixed', inset: 0 }}>
       {isPC && (
         <div style={{ width: '320px', flexShrink: 0, borderRight: '1px solid #e2e8f0', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px', background: '#fff', zIndex: 100 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '35px', height: '35px', background: themeColor, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>S</div>
-            <h1 style={{ fontSize: '1.2rem', fontWeight: '900', margin: 0 }}>SnipSnap Admin</h1>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '35px', height: '35px', background: themeColor, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>S</div>
+              <h1 style={{ fontSize: '1.2rem', fontWeight: '900', margin: 0 }}>SnipSnap Admin</h1>
+            </div>
+            {/* ✅ ① ロゴ横の店舗設定用歯車アイコン */}
+            <button 
+              onClick={() => navigate(`/admin/${shopId}`)} 
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '5px', display: 'flex', alignItems: 'center', color: '#64748b' }}
+              title="店舗設定"
+            >
+              ⚙️
+            </button>
           </div>
+
           <div style={{ border: '1px solid #eee', borderRadius: '12px', padding: '15px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' }}>
               {viewMonth.getFullYear()}年 {viewMonth.getMonth() + 1}月
@@ -468,7 +482,35 @@ function AdminReservations() {
               {miniCalendarDays.map((date, i) => date ? <div key={i} onClick={() => { setStartDate(date); setSelectedDate(getJapanDateStr(date)); }} style={{ padding: '8px 0', cursor: 'pointer', borderRadius: '50%', background: getJapanDateStr(date) === selectedDate ? themeColor : 'none', color: getJapanDateStr(date) === selectedDate ? '#fff' : '#475569' }}>{date.getDate()}</div> : <div key={i} />)}
             </div>
           </div>
-          <button onClick={() => navigate(`/admin/${shopId}`)} style={{ marginTop: 'auto', padding: '15px', background: '#fff', border: '1px solid #ddd', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>店舗設定へ</button>
+
+          {/* ✅ ② サイドバー下のボタン構成変更（顧客・売上管理ボタンを追加） */}
+          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button 
+              onClick={() => isManagementEnabled && navigate(`/admin/${shopId}/management`)} 
+              style={{ 
+                padding: '15px', 
+                background: isManagementEnabled ? themeColor : '#e2e8f0', 
+                color: isManagementEnabled ? '#fff' : '#94a3b8', 
+                border: 'none', 
+                borderRadius: '12px', 
+                cursor: isManagementEnabled ? 'pointer' : 'not-allowed', 
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+              disabled={!isManagementEnabled}
+            >
+              {isManagementEnabled ? '📊 顧客・売上管理へ' : '🔒 顧客・売上管理 (未解放)'}
+            </button>
+            <button 
+              onClick={() => navigate(`/admin/${shopId}`)} 
+              style={{ padding: '15px', background: '#fff', border: '1px solid #ddd', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              店舗設定へ
+            </button>
+          </div>
         </div>
       )}
 
@@ -564,7 +606,7 @@ function AdminReservations() {
                             ) : (
                               res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : 
                               (isStart ? (
-                                // ✅ 🆕 出し分けロジック: PCはフルネーム+様、スマホは苗字のみ(縦書き)
+                                // ✅ 出し分けロジック: PCはフルネーム+様、スマホは苗字のみ(縦書き)
                                 <div style={{
                                   fontWeight: 'bold',
                                   fontSize: isPC ? '0.9rem' : 'calc(0.7rem + 0.2vw)', 
