@@ -515,20 +515,7 @@ function AdminManagement() {
                         </div>
                       ))}
 
-                      <div style={{ marginTop: '30px' }}>
-                        <SectionTitle icon={<ShoppingBag size={16} />} title="店販商品を追加" color="#008000" />
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                          {products.map(prod => {
-                            const isActive = checkoutProducts.some(p => p.id === prod.id);
-                            return (
-                              <button key={prod.id} onClick={() => toggleCheckoutProduct(prod)} style={{ ...adjBtnStyle(isActive), borderColor: '#008000', color: isActive ? '#fff' : '#008000', background: isActive ? '#008000' : '#fff' }}>
-                                {prod.name} (¥{prod.price.toLocaleString()})
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
+                      {/* ✅ 1. プロの微調整（ここが先頭に入れ替わりました） */}
                       <div style={{ marginTop: '30px' }}>
                         <SectionTitle icon={<Settings size={16} />} title="プロの微調整" color="#ef4444" />
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
@@ -543,6 +530,21 @@ function AdminManagement() {
                               );
                             })
                           }
+                        </div>
+                      </div>
+
+                      {/* ✅ 2. 店販商品を追加 */}
+                      <div style={{ marginTop: '30px' }}>
+                        <SectionTitle icon={<ShoppingBag size={16} />} title="店販商品を追加" color="#008000" />
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                          {products.map(prod => {
+                            const isActive = checkoutProducts.some(p => p.id === prod.id);
+                            return (
+                              <button key={prod.id} onClick={() => toggleCheckoutProduct(prod)} style={{ ...adjBtnStyle(isActive), borderColor: '#008000', color: isActive ? '#fff' : '#008000', background: isActive ? '#008000' : '#fff' }}>
+                                {prod.name} (¥{prod.price.toLocaleString()})
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </>
