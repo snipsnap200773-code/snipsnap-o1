@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import { 
   MapPin, Plus, Trash2, Save, Image as ImageIcon, Bell, Search, 
   Filter, Store, UserCheck, ShieldAlert, Copy, ExternalLink, 
-  Edit2, PlusSquare, Settings, List
+  Edit2, PlusSquare, Settings, List, LayoutDashboard, CheckCircle2, XCircle
 } from 'lucide-react';
 
 function SuperAdmin() {
@@ -21,7 +21,7 @@ function SuperAdmin() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [activeTab, setActiveTab] = useState('list');
 
-  // --- フォームState（ふりがな含む完全版） ---
+  // --- フォームState ---
   const [newShopName, setNewShopName] = useState('');
   const [newShopKana, setNewShopKana] = useState('');
   const [newOwnerName, setNewOwnerName] = useState('');
@@ -95,13 +95,14 @@ function SuperAdmin() {
   const stats = useMemo(() => ({
     total: createdShops.length,
     active: createdShops.filter(s => !s.is_suspended).length,
-    suspended: createdShops.filter(s => s.is_suspended).length
+    suspended: createdShops.filter(s => s.is_suspended).length,
+    managementEnabled: createdShops.filter(s => s.is_management_enabled).length // 🆕 統計に追加
   }), [createdShops]);
 
   const createNewShop = async () => {
     if (!newShopName || !newShopKana || !newOwnerName) return alert('必須項目を入力してください');
     const newPass = Math.random().toString(36).slice(-8);
-    const { error } = await supabase.from('profiles').insert([{ business_name: newShopName, business_name_kana: newShopKana, owner_name: newOwnerName, owner_name_kana: newOwnerNameKana, business_type: newBusinessType, email_contact: newEmail, phone: newPhone, admin_password: newPass, line_channel_access_token: newLineToken, line_admin_user_id: newLineAdminId, notify_line_enabled: true }]);
+    const { error } = await supabase.from('profiles').insert([{ business_name: newShopName, business_name_kana: newShopKana, owner_name: newOwnerName, owner_name_kana: newOwnerNameKana, business_type: newBusinessType, email_contact: newEmail, phone: newPhone, admin_password: newPass, line_channel_access_token: newLineToken, line_admin_user_id: newLineAdminId, notify_line_enabled: true, is_management_enabled: false }]);
     if (!error) {
       alert(`「${newShopName}」作成完了！ PW: ${newPass}`);
       setNewShopName(''); setNewShopKana(''); setNewOwnerName(''); setNewOwnerNameKana(''); fetchCreatedShops(); setActiveTab('list');
@@ -124,6 +125,16 @@ function SuperAdmin() {
 
   const toggleSuspension = async (shop) => {
     const { error } = await supabase.from('profiles').update({ is_suspended: !shop.is_suspended }).eq('id', shop.id);
+    if (!error) fetchCreatedShops();
+  };
+
+  // ✅ 🆕 顧客・売上管理機能の許可を切り替える関数
+  const toggleManagementAccess = async (shop) => {
+    const nextState = !shop.is_management_enabled;
+    const msg = nextState ? `「${shop.business_name}」に顧客・売上管理機能（AdminManagement）の使用を許可しますか？` : `許可を解除しますか？`;
+    if (!window.confirm(msg)) return;
+
+    const { error } = await supabase.from('profiles').update({ is_management_enabled: nextState }).eq('id', shop.id);
     if (!error) fetchCreatedShops();
   };
 
@@ -185,7 +196,7 @@ function SuperAdmin() {
         </div>
       </div>
       {filteredShops.map((shop, index) => (
-        <ShopCard key={shop.id} shop={shop} index={createdShops.length - createdShops.findIndex(s => s.id === shop.id)} editingShopId={editingShopId} setEditingShopId={setEditingShopId} editState={{ editName, setEditName, editKana, setEditKana, editOwnerName, setEditOwnerName, editOwnerNameKana, setEditOwnerNameKana, editBusinessType, setEditBusinessType, editEmail, setEditEmail, editPhone, setEditPhone, editPassword, setEditPassword }} onUpdate={updateShopInfo} onDelete={deleteShop} onToggleSuspension={toggleSuspension} onCopy={copyToClipboard} categories={categoriesList} />
+        <ShopCard key={shop.id} shop={shop} index={createdShops.length - createdShops.findIndex(s => s.id === shop.id)} editingShopId={editingShopId} setEditingShopId={setEditingShopId} editState={{ editName, setEditName, editKana, setEditKana, editOwnerName, setEditOwnerName, editOwnerNameKana, setEditOwnerNameKana, editBusinessType, setEditBusinessType, editEmail, setEditEmail, editPhone, setEditPhone, editPassword, setEditPassword }} onUpdate={updateShopInfo} onDelete={deleteShop} onToggleSuspension={toggleSuspension} onToggleManagement={toggleManagementAccess} onCopy={copyToClipboard} categories={categoriesList} />
       ))}
       {filteredShops.length === 0 && <div style={{textAlign:'center', padding:'40px', color:'#999'}}>該当する店舗はありません</div>}
     </div>
@@ -251,6 +262,7 @@ function SuperAdmin() {
           <div style={statsCard}>全 {stats.total}</div>
           <div style={{ ...statsCard, color: '#10b981' }}>公開 {stats.active}</div>
           <div style={{ ...statsCard, color: '#ef4444' }}>停止 {stats.suspended}</div>
+          <div style={{ ...statsCard, color: '#7c3aed', border: '1px solid #7c3aed' }}>管理許可 {stats.managementEnabled}</div>
         </div>
 
         {isMobile ? (
@@ -271,7 +283,6 @@ function SuperAdmin() {
               {renderAddShop()}
               {renderPortalSettings()}
             </div>
-            {/* 🛡️ PC版で右側が切れないように minWidth: 0 を追加 */}
             <div style={{ minWidth: 0 }}>
               {renderShopList()}
             </div>
@@ -282,15 +293,19 @@ function SuperAdmin() {
   );
 }
 
-// 🆕 店舗カード（編集項目の強化版）
-function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onUpdate, onDelete, onToggleSuspension, onCopy, categories }) {
+// 🆕 店舗カード（許可トグルを追加）
+function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onUpdate, onDelete, onToggleSuspension, onToggleManagement, onCopy, categories }) {
   const isEditing = editingShopId === shop.id;
   const isSuspended = shop.is_suspended;
+  const isMgmtEnabled = shop.is_management_enabled; // 🆕 顧客管理機能の許可状態
 
   return (
-    <div style={{ background: '#fff', padding: '15px', borderRadius: '16px', border: isSuspended ? '2px solid #ef4444' : '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}>
+    <div style={{ background: '#fff', padding: '15px', borderRadius: '16px', border: isSuspended ? '2px solid #ef4444' : (isMgmtEnabled ? '2px solid #7c3aed' : '1px solid #e2e8f0'), width: '100%', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#94a3b8' }}>No.{index}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '0.65rem', fontWeight: 'bold', color: '#94a3b8' }}>No.{index}</span>
+          {isMgmtEnabled && <span style={{ fontSize: '0.6rem', background: '#7c3aed', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>管理機能:ON</span>}
+        </div>
         <div style={{ display: 'flex', gap: '15px' }}>
           <Edit2 size={16} color="#64748b" style={{cursor:'pointer'}} onClick={() => {
             setEditingShopId(shop.id);
@@ -317,7 +332,6 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
             <input value={editState.editName} onChange={(e) => editState.setEditName(e.target.value)} style={smallInput} placeholder="店舗名" />
             <input value={editState.editKana} onChange={(e) => editState.setEditKana(e.target.value)} style={smallInput} placeholder="かな" />
           </div>
-          {/* 🆕 編集項目に「業種」「メール」「電話」を追加 */}
           <select value={editState.editBusinessType} onChange={(e) => editState.setEditBusinessType(e.target.value)} style={smallInput}>
             <option value="">-- 業種を選択 --</option>
             {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -336,6 +350,18 @@ function ShopCard({ shop, index, editingShopId, setEditingShopId, editState, onU
           <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', fontWeight: 'bold', color: '#1e293b' }}>{shop.business_name}</h4>
           <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '5px' }}>{shop.owner_name} / PW: <strong>{shop.admin_password}</strong></div>
           <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginBottom: '15px' }}>業種: {shop.business_type || "未設定"}</div>
+          
+          {/* ✅ 🆕 管理機能許可スイッチ */}
+          <div style={{ marginBottom: '15px', padding: '12px', background: isMgmtEnabled ? '#f5f3ff' : '#f8fafc', borderRadius: '12px', border: `1px dashed ${isMgmtEnabled ? '#7c3aed' : '#cbd5e1'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <LayoutDashboard size={16} color={isMgmtEnabled ? '#7c3aed' : '#64748b'} />
+              <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: isMgmtEnabled ? '#7c3aed' : '#64748b' }}>顧客・売上管理機能</span>
+            </div>
+            <button onClick={() => onToggleManagement(shop)} style={{ border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+              {isMgmtEnabled ? <CheckCircle2 size={24} color="#7c3aed" /> : <XCircle size={24} color="#cbd5e1" />}
+            </button>
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <UrlBox label="管理" url={`${window.location.origin}/admin/${shop.id}`} onCopy={onCopy} />
             <UrlBox label="予約" url={`${window.location.origin}/shop/${shop.id}/reserve`} onCopy={onCopy} />
