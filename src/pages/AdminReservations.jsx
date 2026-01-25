@@ -176,10 +176,65 @@ function AdminReservations() {
     setShowDetailModal(true);
   };
 
-  // 名簿保存 ＆ 予約データの同期
+  // ✅ 名簿保存 ＆ 統合（名寄せ）ロジック強化版
   const handleUpdateCustomer = async () => {
     try {
       let targetCustomerId = selectedCustomer?.id;
+
+      // --- 🆕 名寄せ（統合）チェックロジック ---
+      // 1. 編集中のID以外で、同じ名前の人がいないか探す
+      const { data: duplicateNameCust } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('shop_id', shopId)
+        .eq('name', editFields.name)
+        .neq('id', targetCustomerId || '00000000-0000-0000-0000-000000000000') // 自分以外
+        .maybeSingle();
+
+      // 2. もし同姓同名が見つかった場合（山田花子さんケース）
+      if (duplicateNameCust) {
+        const confirmMerge = window.confirm(
+          `「${editFields.name}」様は既に名簿に存在します。\n現在編集中のデータ（LINE連携など）を、既存の「${editFields.name}」様のデータへ統合しますか？\n\n※過去の予約履歴もすべて一つにまとまります。`
+        );
+
+        if (confirmMerge) {
+          // A. 既存の顧客データ（山田花子側）を最新情報で更新
+          const { error: mergeUpdateError } = await supabase
+            .from('customers')
+            .update({
+              phone: editFields.phone || duplicateNameCust.phone,
+              email: editFields.email || duplicateNameCust.email,
+              memo: editFields.memo || duplicateNameCust.memo,
+              line_user_id: editFields.line_user_id || duplicateNameCust.line_user_id,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', duplicateNameCust.id);
+
+          if (mergeUpdateError) throw mergeUpdateError;
+
+          // B. 現在編集していた側の予約データをすべて既存顧客側に紐付け直す
+          // （旧名「パナコン」で入っていた予約を「山田花子」の名前に救出する）
+          if (selectedCustomer) {
+             await supabase
+              .from('reservations')
+              .update({ customer_name: editFields.name })
+              .eq('shop_id', shopId)
+              .eq('customer_name', selectedCustomer.name);
+
+            // C. 不要になった重複レコード（パナコン側）を削除
+            await supabase.from('customers').delete().eq('id', selectedCustomer.id);
+          }
+
+          alert('データの統合が完了しました！');
+          setShowCustomerModal(false); 
+          setShowDetailModal(false); 
+          fetchData();
+          return;
+        } else {
+          // 統合しない場合は、そのまま保存（同姓同名が並存する状態。SQLで制約を外したので可能）
+        }
+      }
+      // --- 🆕 統合チェック終了 ---
 
       if (!targetCustomerId) {
         let checkQuery = supabase.from('customers').select('id').eq('shop_id', shopId).eq('name', editFields.name);
@@ -298,7 +353,6 @@ function AdminReservations() {
     return days;
   }, [startDate]);
 
-  // ✅ 10分〜30分の可変インターバルに対応したスロット生成ロジック
   const timeSlots = useMemo(() => {
     if (!shop?.business_hours) return [];
     let minTotalMinutes = 24 * 60;
@@ -426,12 +480,9 @@ function AdminReservations() {
   const goNextMonth = () => setStartDate(new Date(new Date(startDate).setMonth(new Date(startDate).getMonth() + 1)));
   const goToday = () => { const today = new Date(); setStartDate(today); setSelectedDate(today.toLocaleDateString('sv-SE')); navigate(`/admin/${shopId}/reservations`, { replace: true }); };
 
-  if (loading) return <div style={{textAlign:'center', padding:'50px'}}>読み込み中...</div>;
-
   const themeColor = shop?.theme_color || '#2563eb';
   const themeColorLight = `${themeColor}15`; 
 
-  // ✅ 管理機能の有効状態を確認
   const isManagementEnabled = shop?.is_management_enabled === true;
 
   const miniBtnStyle = { border: 'none', background: 'none', cursor: 'pointer', color: themeColor };
@@ -443,10 +494,9 @@ function AdminReservations() {
   const labelStyle = { fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', marginBottom: '5px', display: 'block' };
   const inputStyle = { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '12px', fontSize: '1rem', boxSizing: 'border-box' };
 
-  // 🆕 苗字だけを抽出するヘルパー関数
   const getFamilyName = (fullName) => {
     if (!fullName) return "";
-    const parts = fullName.split(/[\s\u3000]+/); // 半角・全角スペース両方に対応
+    const parts = fullName.split(/[\s\u3000]+/); 
     return parts[0];
   };
 
@@ -459,7 +509,6 @@ function AdminReservations() {
               <div style={{ width: '35px', height: '35px', background: themeColor, borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold' }}>S</div>
               <h1 style={{ fontSize: '1.2rem', fontWeight: '900', margin: 0 }}>SnipSnap Admin</h1>
             </div>
-            {/* ✅ ① ロゴ横の店舗設定用歯車アイコン */}
             <button 
               onClick={() => navigate(`/admin/${shopId}`)} 
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '5px', display: 'flex', alignItems: 'center', color: '#64748b' }}
@@ -483,7 +532,6 @@ function AdminReservations() {
             </div>
           </div>
 
-          {/* ✅ ② サイドバー下のボタン構成変更（顧客・売上管理ボタンを追加） */}
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <button 
               onClick={() => isManagementEnabled && navigate(`/admin/${shopId}/management`)} 
@@ -583,7 +631,6 @@ function AdminReservations() {
                   {weekDays.map(date => {
                     const dStr = getJapanDateStr(date); const res = getStatusAt(dStr, time);
                     const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === time;
-                    
                     const isOtherShop = res && res.shop_id !== shopId && res.res_type !== 'system_blocked' && !res.isRegularHoliday;
 
                     let bgColor = '#fff'; let borderColor = '#f1f5f9'; let textColor = '#cbd5e1';
@@ -606,7 +653,6 @@ function AdminReservations() {
                             ) : (
                               res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : 
                               (isStart ? (
-                                // ✅ 出し分けロジック: PCはフルネーム+様、スマホは苗字のみ(縦書き)
                                 <div style={{
                                   fontWeight: 'bold',
                                   fontSize: isPC ? '0.9rem' : 'calc(0.7rem + 0.2vw)', 

@@ -41,6 +41,10 @@ function AdminManagement() {
   // --- 顧客情報（カルテ）パネル用State ---
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  // 🆕 編集用State
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [customerMemo, setCustomerMemo] = useState('');
   const [firstArrivalDate, setFirstArrivalDate] = useState(''); 
   const [pastVisits, setPastVisits] = useState([]);
@@ -200,20 +204,112 @@ function AdminManagement() {
     setSelectedRes(res);
     const { data: cust } = await supabase.from('customers').select('*').eq('shop_id', cleanShopId).eq('name', res.customer_name).maybeSingle();
     const { data: history } = await supabase.from('reservations').select('*').eq('shop_id', cleanShopId).eq('customer_name', res.customer_name).order('start_time', { ascending: false });
+    
     setSelectedCustomer(cust || { name: res.customer_name, phone: res.customer_phone, email: res.customer_email });
+    
+    // 編集用フィールドをセット
+    setEditName(cust?.name || res.customer_name);
+    setEditPhone(cust?.phone || res.customer_phone || '');
+    setEditEmail(cust?.email || res.customer_email || '');
     setCustomerMemo(cust?.memo || '');
     setPastVisits(history || []);
     setFirstArrivalDate(cust?.first_arrival_date || (history?.length > 0 ? history[history.length - 1].start_time.split('T')[0] : ''));
+    
     setIsCustomerInfoOpen(true); setIsCheckoutOpen(false);
   };
 
-  const saveCustomerMemo = async () => {
-    if (!selectedCustomer?.id) return alert("名簿登録が必要です");
+  // ✅ 名寄せ統合ロジック搭載版の保存関数
+  const saveCustomerInfo = async () => {
+    if (!selectedCustomer) return;
     setIsSavingMemo(true);
+    
     try {
-      await supabase.from('customers').update({ memo: customerMemo, first_arrival_date: firstArrivalDate }).eq('id', selectedCustomer.id);
-      alert("カルテを更新しました");
-    } catch (err) { alert("保存失敗: " + err.message); } finally { setIsSavingMemo(false); }
+      const currentId = selectedCustomer.id;
+      
+      // 1. 同姓同名の別人がいないかチェック (マージ対象の検索)
+      const { data: duplicate } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('shop_id', cleanShopId)
+        .eq('name', editName)
+        .neq('id', currentId || '00000000-0000-0000-0000-000000000000')
+        .maybeSingle();
+
+      if (duplicate) {
+        const confirmMerge = window.confirm(
+          `「${editName}」様は既に名簿に存在します。\n現在編集中のデータ（カルテやLINE連携）を、既存の「${editName}」様へ統合しますか？\n\n※過去の売上履歴もすべて合算されます。`
+        );
+
+        if (confirmMerge) {
+          // A. 情報の合体 (既存側のデータを更新)
+          const mergedMemo = `${duplicate.memo || ''}\n\n--- 統合データ ---\n${customerMemo}`.trim();
+          const mergedVisits = (duplicate.total_visits || 0) + (selectedCustomer.total_visits || 0);
+
+          const { error: mergeError } = await supabase
+            .from('customers')
+            .update({
+              memo: mergedMemo,
+              total_visits: mergedVisits,
+              first_arrival_date: firstArrivalDate < (duplicate.first_arrival_date || '9999') ? firstArrivalDate : duplicate.first_arrival_date,
+              line_user_id: selectedCustomer.line_user_id || duplicate.line_user_id,
+              phone: editPhone || duplicate.phone,
+              email: editEmail || duplicate.email,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', duplicate.id);
+
+          if (mergeError) throw mergeError;
+
+          // B. 予約履歴の付け替え (旧名の予約をすべて新名へ)
+          await supabase
+            .from('reservations')
+            .update({ customer_name: editName })
+            .eq('shop_id', cleanShopId)
+            .eq('customer_name', selectedCustomer.name);
+
+          // C. 重複した古いレコードを削除
+          if (currentId) {
+            await supabase.from('customers').delete().eq('id', currentId);
+          }
+
+          alert("名寄せ統合が完了しました！履歴もすべて一つにまとまりました。");
+          setIsCustomerInfoOpen(false);
+          fetchInitialData();
+          return;
+        }
+      }
+
+      // 通常の更新/新規登録ロジック
+      const payload = {
+        shop_id: cleanShopId,
+        name: editName,
+        phone: editPhone,
+        email: editEmail,
+        memo: customerMemo,
+        first_arrival_date: firstArrivalDate,
+        updated_at: new Date().toISOString()
+      };
+
+      if (currentId) {
+        await supabase.from('customers').update(payload).eq('id', currentId);
+      } else {
+        // IDがない場合は新規登録
+        await supabase.from('customers').insert([payload]);
+      }
+
+      // 名前が変わった場合は予約テーブルも同期
+      if (selectedCustomer.name !== editName) {
+        await supabase.from('reservations').update({ customer_name: editName }).eq('shop_id', cleanShopId).eq('customer_name', selectedCustomer.name);
+      }
+
+      alert("カルテ情報を更新しました。");
+      fetchInitialData();
+    } catch (err) {
+      console.error("Save Error:", err);
+      alert("保存に失敗しました: " + err.message);
+    } finally {
+      setIsSavingMemo(false);
+    }
   };
 
   // --- 売上集計 ＆ カレンダーロジック ---
@@ -256,6 +352,7 @@ function AdminManagement() {
   const pubChipStyle = { background: '#f0f9ff', border: '1px solid #bae6fd', padding: '4px 12px', borderRadius: '4px', display: 'flex', gap: '5px', alignItems: 'center' };
   const adjChipStyle = { background: '#fff5f5', border: '1px solid #feb2b2', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '5px', borderRadius: '20px' };
   const typeBtnStyle = { border: '1px solid #ef4444', background: '#fff', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#ef4444' };
+  const editInputStyle = { width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', marginBottom: '10px' };
 
   return (
     <div style={fullPageWrapper}>
@@ -396,7 +493,7 @@ function AdminManagement() {
           </div>
         )}
 
-        {/* ✅ POSレジパネル (店販ボタン搭載 ＆ 400エラー修正版) */}
+        {/* POSレジパネル */}
         {isCheckoutOpen && (
           <div style={checkoutOverlayStyle} onClick={() => setIsCheckoutOpen(false)}>
             <div style={checkoutPanelStyle} onClick={(e) => e.stopPropagation()}>
@@ -463,35 +560,61 @@ function AdminManagement() {
           </div>
         )}
 
-        {/* ✅ 顧客カルテパネル (履歴 ＆ 初回日対応版) */}
+        {/* ✅ 顧客カルテパネル (名寄せ統合 ＆ 情報編集 搭載版) */}
         {isCustomerInfoOpen && (
           <div style={checkoutOverlayStyle} onClick={() => setIsCustomerInfoOpen(false)}>
             <div style={{ ...checkoutPanelStyle, background: '#fdfcf5' }} onClick={(e) => e.stopPropagation()}>
               <div style={{ ...checkoutHeaderStyle, background: '#008000' }}>
-                <div><h3 style={{ margin: 0 }}>{selectedCustomer?.name} 様</h3><p style={{ fontSize: '0.8rem', margin: 0 }}>顧客カルテ</p></div>
+                <div><h3 style={{ margin: 0 }}>{selectedCustomer?.name} 様</h3><p style={{ fontSize: '0.8rem', margin: 0 }}>顧客カルテ編集</p></div>
                 <button onClick={() => setIsCustomerInfoOpen(false)} style={{ background: 'none', border: 'none', color: '#fff' }}><X size={24} /></button>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-                <SectionTitle icon={<User size={16} />} title="基本情報" color="#008000" />
+                <SectionTitle icon={<User size={16} />} title="基本情報・名簿同期" color="#008000" />
                 <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', border: '1px solid #eee', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <span style={{ fontSize: '0.85rem' }}>🗓️ <b>初回来店日：</b></span>
-                    <input type="date" value={firstArrivalDate} onChange={(e) => setFirstArrivalDate(e.target.value)} style={{ padding: '5px', border: '1px solid #008000', borderRadius: '5px', fontWeight: 'bold' }} />
+                  
+                  <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#666' }}>👤 お客様名</label>
+                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={editInputStyle} placeholder="お名前" />
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#666' }}>📞 電話番号</label>
+                      <input type="tel" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} style={editInputStyle} placeholder="電話未登録" />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#666' }}>🗓️ 初回来店日</label>
+                      <input type="date" value={firstArrivalDate} onChange={(e) => setFirstArrivalDate(e.target.value)} style={editInputStyle} />
+                    </div>
                   </div>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem' }}>📞 <b>電話：</b> {selectedCustomer?.phone || '未登録'}</p>
-                  <p style={{ margin: 0, fontSize: '0.85rem' }}>🔢 <b>来店回数：</b> {pastVisits.length} 回</p>
+
+                  <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#666' }}>📧 メールアドレス</label>
+                  <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} style={editInputStyle} placeholder="メール未登録" />
+
+                  <p style={{ margin: '5px 0 0 0', fontSize: '0.85rem' }}>🔢 <b>現在の来店回数：</b> {pastVisits.length} 回</p>
+                  
+                  {selectedCustomer?.line_user_id && (
+                    <div style={{ marginTop: '10px', background: '#f0fdf4', padding: '5px 10px', borderRadius: '5px', border: '1px solid #bbf7d0', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ fontSize: '0.8rem' }}>💬 LINE連携済み</span>
+                    </div>
+                  )}
                 </div>
+
                 <SectionTitle icon={<FileText size={16} />} title="顧客メモ (共通カルテ)" color="#d34817" />
-                <textarea value={customerMemo} onChange={(e) => setCustomerMemo(e.target.value)} style={{ width: '100%', minHeight: '120px', padding: '10px', borderRadius: '10px', border: '2px solid #d34817', marginBottom: '10px' }} />
-                <button onClick={saveCustomerMemo} disabled={isSavingMemo} style={{ width: '100%', padding: '12px', background: '#d34817', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', marginBottom: '30px' }}>カルテを保存</button>
+                <textarea value={customerMemo} onChange={(e) => setCustomerMemo(e.target.value)} style={{ width: '100%', minHeight: '120px', padding: '10px', borderRadius: '10px', border: '2px solid #d34817', marginBottom: '10px' }} placeholder="好み、注意事項など" />
+                
+                <button onClick={saveCustomerInfo} disabled={isSavingMemo} style={{ width: '100%', padding: '15px', background: '#008000', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', marginBottom: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                  {isSavingMemo ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />} 名簿・カルテ情報を保存
+                </button>
+
                 <SectionTitle icon={<History size={16} />} title="過去の履歴" color="#4b2c85" />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {pastVisits.map(v => (
+                  {pastVisits.length > 0 ? pastVisits.map(v => (
                     <div key={v.id} style={{ background: '#fff', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem' }}><b>{v.start_time.split('T')[0]}</b><span style={{color:'#d34817'}}>¥{Number(v.total_price || 0).toLocaleString()}</span></div>
                       <p style={{ margin: 0, fontSize: '0.8rem', color: '#666' }}>{parseReservationDetails(v).menuName}</p>
                     </div>
-                  ))}
+                  )) : (
+                    <p style={{ textAlign: 'center', fontSize: '0.8rem', color: '#999', padding: '20px' }}>履歴はありません</p>
+                  )}
                 </div>
               </div>
               <div style={{ padding: '25px', borderTop: '2px solid #ddd' }}>
