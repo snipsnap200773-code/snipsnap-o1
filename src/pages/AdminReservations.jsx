@@ -585,12 +585,6 @@ const buffer = shop?.buffer_preparation_min || 0;
             >
               {isManagementEnabled ? '📊 顧客・売上管理へ' : '🔒 顧客・売上管理 (未解放)'}
             </button>
-            <button 
-              onClick={() => navigate(`/admin/${shopId}`)} 
-              style={{ padding: '15px', background: '#fff', border: '1px solid #ddd', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}
-            >
-              店舗設定へ
-            </button>
           </div>
         </div>
       )}
