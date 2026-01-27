@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { 
   Save, Clipboard, Calendar, FolderPlus, PlusCircle, Trash2, 
-  Tag, ChevronDown, RefreshCw, ChevronLeft, ChevronRight, Settings, Users, Percent, Plus, Minus, X, CheckCircle, User, FileText, History, ShoppingBag
+  Tag, ChevronDown, RefreshCw, ChevronLeft, ChevronRight, Settings, Users, Percent, Plus, Minus, X, CheckCircle, User, FileText, History, ShoppingBag, Edit3
 } from 'lucide-react';
 
 function AdminManagement() {
@@ -24,7 +24,7 @@ function AdminManagement() {
   const [services, setServices] = useState([]);
   const [serviceOptions, setServiceOptions] = useState([]); 
   const [adminAdjustments, setAdminAdjustments] = useState([]);
-  const [products, setProducts] = useState([]); // 🆕 店販
+  const [products, setProducts] = useState([]); 
   const [deletedAdjIds, setDeletedAdjIds] = useState([]);
   const [deletedProductIds, setDeletedProductIds] = useState([]);
 
@@ -34,11 +34,12 @@ function AdminManagement() {
   // --- レジパネル用State ---
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedRes, setSelectedRes] = useState(null);
-  const [checkoutServices, setCheckoutServices] = useState([]); // 🆕 今回の施術メニュー（変更可能）
+  const [checkoutServices, setCheckoutServices] = useState([]); // 🆕 施術メニュー
   const [checkoutAdjustments, setCheckoutAdjustments] = useState([]); 
   const [checkoutProducts, setCheckoutProducts] = useState([]); 
   const [finalPrice, setFinalPrice] = useState(0);
   const [openAdjCategory, setOpenAdjCategory] = useState(null); 
+  const [isMenuPopupOpen, setIsMenuPopupOpen] = useState(false); // 🆕 メニュー変更ポップアップ用
 
   // --- 顧客情報（カルテ）パネル用State ---
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
@@ -99,14 +100,25 @@ function AdminManagement() {
     setSelectedDate(d.toLocaleDateString('sv-SE'));
   };
 
+  // ✅ 0円エラー解消版：予約詳細の解析
   const parseReservationDetails = (res) => {
     if (!res) return { menuName: '', totalPrice: 0, items: [], subItems: [] };
-    const opt = typeof res.options === 'string' ? JSON.parse(res.options) : res.options;
-    const target = opt?.people?.[0] || opt || {};
-    const items = target.services || [];
-    const subItems = Object.values(target.options || {});
+    const opt = typeof res.options === 'string' ? JSON.parse(res.options) : (res.options || {});
+    // 構造の揺れを吸収
+    const items = opt.services || opt.people?.[0]?.services || [];
+    const subItems = Object.values(opt.options || opt.people?.[0]?.options || {});
+    
     const menuName = items.length > 0 ? items.map(s => s.name).join(', ') : 'メニューなし';
-    const basePrice = items.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+    let basePrice = items.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+    
+    // 金額が0円の場合の補填（マスターから価格を再取得）
+    if (basePrice === 0 && items.length > 0) {
+      items.forEach(item => {
+        const master = services.find(s => s.id === item.id || s.name === item.name);
+        if (master) basePrice += Number(master.price || 0);
+      });
+    }
+    
     const optPrice = subItems.reduce((sum, o) => sum + (Number(o.additional_price) || 0), 0);
     return { menuName, totalPrice: basePrice + optPrice, items, subItems };
   };
@@ -164,7 +176,7 @@ function AdminManagement() {
   const openCheckout = (res) => {
     const info = parseReservationDetails(res);
     setSelectedRes(res);
-    setCheckoutServices(info.items); // 🆕 初期施術をセット
+    setCheckoutServices(info.items); // ✅ 初期施術をセット
     setCheckoutAdjustments([]); 
     setCheckoutProducts([]);
     setFinalPrice(info.totalPrice);
@@ -173,6 +185,7 @@ function AdminManagement() {
     setIsCustomerInfoOpen(false);
   };
 
+  // ✅ ポップアップ内でのメニュー選択ロジック
   const toggleCheckoutService = (svc) => {
     const isSelected = checkoutServices.some(s => s.id === svc.id);
     const newSelection = isSelected ? checkoutServices.filter(s => s.id !== svc.id) : [...checkoutServices, svc];
@@ -195,20 +208,16 @@ function AdminManagement() {
   };
 
   const calculateFinalTotal = (currentSvcs, currentAdjs, currentProds) => {
-    // 🆕 施術メニューの合計金額を算出
     let total = currentSvcs.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
-    // 店販合算
     currentProds.forEach(p => total += Number(p.price || 0));
-    // プロ調整（金額）
     currentAdjs.filter(a => !a.is_percent).forEach(a => { total += a.is_minus ? -Number(a.price) : Number(a.price); });
-    // プロ調整（％）
     currentAdjs.filter(a => a.is_percent).forEach(a => { total = total * (1 - (Number(a.price) / 100)); });
     setFinalPrice(Math.max(0, Math.round(total)));
   };
 
   const completePayment = async () => {
     try {
-      // 🆕 予約データの同期情報を作成
+      // ✅ 予約データの同期情報を作成
       const totalSlots = checkoutServices.reduce((sum, s) => sum + (Number(s.slots) || 1), 0);
       const menuName = checkoutServices.map(s => s.name).join(', ');
       const startTime = new Date(selectedRes.start_time);
@@ -225,7 +234,7 @@ function AdminManagement() {
       }).eq('id', selectedRes.id);
 
       if (error) throw error;
-      alert("お会計を確定しました。カレンダー枠も同期されました。");
+      alert("お会計を確定しました。カレンダー予約枠も自動修正されました。");
       setIsCheckoutOpen(false); fetchInitialData();
     } catch (err) { alert("エラー: " + err.message); }
   };
@@ -327,12 +336,10 @@ function AdminManagement() {
   const miniPriceInput = { border: 'none', background: '#f1f5f9', width: '60px', textAlign: 'right', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' };
   const adjChipStyle = { background: '#fff5f5', border: '1px solid #feb2b2', padding: '8px 12px', display: 'flex', gap: '5px', borderRadius: '10px' };
   const typeBtnStyle = { border: '1px solid #ef4444', background: '#fff', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#ef4444' };
-  const optInputStyle = { background: 'transparent', border: 'none', fontSize: '0.9rem', fontWeight: 'bold' };
   const optPriceStyle = { border: 'none', background: '#fff', width: '70px', textAlign: 'right', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' };
 
   return (
     <div style={fullPageWrapper}>
-      {/* ⬅️ サイドバー */}
       <div style={sidebarStyle}>
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <h2 style={{ fontSize: '2.2rem', fontStyle: 'italic', fontWeight: '900', color: '#4b2c85', margin: 0 }}>SOLO</h2>
@@ -432,7 +439,6 @@ function AdminManagement() {
                   ))}
                 </div>
               ))}
-
               <div style={{ ...cardStyle, border: '3px solid #008000' }}>
                 <div style={{ ...catHeaderStyle, background: '#f0fdf4', display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#008000' }}>🧴 店販商品マスター</span>
@@ -448,7 +454,6 @@ function AdminManagement() {
                   ))}
                 </div>
               </div>
-
               <div style={{ ...cardStyle, border: '3px solid #ef4444' }}>
                 <div style={{ ...catHeaderStyle, background: '#fff5f5', display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#ef4444' }}>⚙️ 全体調整 (＋－％)</span>
@@ -472,7 +477,7 @@ function AdminManagement() {
           </div>
         )}
 
-        {/* 🚀 POSレジパネル（メニュー変更機能搭載） */}
+        {/* 🚀 POSレジパネル */}
         {isCheckoutOpen && (
           <div style={checkoutOverlayStyle} onClick={() => setIsCheckoutOpen(false)}>
             <div style={checkoutPanelStyle} onClick={(e) => e.stopPropagation()}>
@@ -482,24 +487,23 @@ function AdminManagement() {
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
                 
-                {/* 🆕 1. 施術メニューを選択 (時間同期機能) */}
-                <SectionTitle icon={<Clipboard size={16} />} title="施術メニュー (予約枠に同期)" color="#4b2c85" />
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
-                  {services.map(svc => {
-                    const isActive = checkoutServices.some(s => s.id === svc.id);
-                    return (
-                      <button key={svc.id} onClick={() => toggleCheckoutService(svc)} style={{ ...adjBtnStyle(isActive), borderColor: '#4b2c85', color: isActive ? '#fff' : '#4b2c85', background: isActive ? '#4b2c85' : '#fff' }}>
-                        {svc.name} (¥{svc.price.toLocaleString()})
-                      </button>
-                    );
-                  })}
+                {/* 🆕 1. 施術内容セクション (「変更」ボタン搭載) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #4b2c85', paddingBottom: '5px', marginBottom: '15px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4b2c85', fontWeight: 'bold' }}><Clipboard size={16} /> 施術内容</div>
+                  <button onClick={() => setIsMenuPopupOpen(true)} style={{ background: '#f3f0ff', color: '#4b2c85', border: '1px solid #4b2c85', borderRadius: '5px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Edit3 size={12} /> メニューを変更
+                  </button>
                 </div>
-                {/* 🆕 時間計算のプレビュー表示 */}
-                <div style={{ background: '#f3f0ff', padding: '10px', borderRadius: '8px', border: '1px solid #4b2c85', marginBottom: '25px', fontSize: '0.85rem' }}>
-                  🕒 <b>変更後の予約時間：</b> {checkoutServices.reduce((sum, s) => sum + (Number(s.slots) || 1), 0) * (shop?.slot_interval_min || 15)} 分
+                <div style={{ background: '#f9f9ff', padding: '15px', borderRadius: '10px', marginBottom: '25px', border: '1px dashed #4b2c85' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#333' }}>
+                    {checkoutServices.length > 0 ? checkoutServices.map(s => s.name).join(', ') : 'メニューなし'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>所要時間: {checkoutServices.reduce((sum, s) => sum + (Number(s.slots) || 1), 0) * (shop?.slot_interval_min || 15)} 分</span>
+                    <span style={{ color: '#4b2c85', fontWeight: 'bold' }}>¥ {checkoutServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0).toLocaleString()}</span>
+                  </div>
                 </div>
 
-                {/* 2. プロの微調整（カテゴリ・アコーディオン） */}
                 <SectionTitle icon={<Settings size={16} />} title="プロの微調整" color="#ef4444" />
                 {(() => {
                    const reservationServiceIds = checkoutServices.map(s => s.id);
@@ -516,7 +520,6 @@ function AdminManagement() {
                      </div>
                    );
                 })()}
-
                 {Object.entries(groupedWholeAdjustments).map(([catName, adjs]) => {
                   const isOpen = openAdjCategory === catName;
                   return (
@@ -535,7 +538,6 @@ function AdminManagement() {
                     </div>
                   );
                 })}
-
                 <div style={{ marginTop: '30px' }}>
                   <SectionTitle icon={<ShoppingBag size={16} />} title="店販商品を追加" color="#008000" />
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
@@ -552,6 +554,44 @@ function AdminManagement() {
                   <span style={{ fontSize: '2.2rem', fontWeight: '900', color: '#d34817' }}>¥ {finalPrice.toLocaleString()}</span>
                 </div>
                 <button onClick={completePayment} style={completeBtnStyle}><CheckCircle size={20} /> 確定して予約枠と同期</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🆕 ポップアップ式メニュー選択（ReservationForm風） */}
+        {isMenuPopupOpen && (
+          <div style={{ ...checkoutOverlayStyle, zIndex: 2000 }} onClick={() => setIsMenuPopupOpen(false)}>
+            <div style={{ ...checkoutPanelStyle, width: '400px', borderRadius: '25px 0 0 25px' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ ...checkoutHeaderStyle, background: '#4b2c85' }}>
+                <h3 style={{ margin: 0 }}>メニューの追加・変更</h3>
+                <button onClick={() => setIsMenuPopupOpen(false)} style={{ background: 'none', border: 'none', color: '#fff' }}><X size={24} /></button>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+                {categories.map(cat => (
+                  <div key={cat.id} style={{ marginBottom: '25px' }}>
+                    <h4 style={{ fontSize: '0.8rem', color: '#666', borderBottom: '1px solid #ddd', paddingBottom: '4px', marginBottom: '10px' }}>{cat.name}</h4>
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {services.filter(s => s.category === cat.name).map(svc => {
+                        const isActive = checkoutServices.some(s => s.id === svc.id);
+                        return (
+                          <button key={svc.id} onClick={() => toggleCheckoutService(svc)} style={{
+                            width: '100%', padding: '12px', textAlign: 'left', borderRadius: '10px', border: isActive ? `2px solid #4b2c85` : '1px solid #eee',
+                            background: isActive ? '#f3f0ff' : '#fff', cursor: 'pointer', transition: 'all 0.2s'
+                          }}>
+                            <div style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between' }}>
+                              <span>{isActive ? '✅ ' : ''}{svc.name}</span>
+                              <span style={{ color: '#4b2c85' }}>¥{svc.price.toLocaleString()}</span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: '20px', background: '#f8fafc', borderTop: '1px solid #ddd' }}>
+                <button onClick={() => setIsMenuPopupOpen(false)} style={{ ...completeBtnStyle, background: '#4b2c85' }}>完了して金額に反映</button>
               </div>
             </div>
           </div>
