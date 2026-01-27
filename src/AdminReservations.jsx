@@ -389,21 +389,6 @@ function AdminReservations() {
 
   const getStatusAt = (dateStr, timeStr) => {
     const dateObj = new Date(dateStr);
-    
-    // 🆕 1. 【最優先】DBにある予約や自己予定をチェック
-    const currentSlotStart = new Date(`${dateStr}T${timeStr}:00`).getTime();
-    const matches = reservations.filter(r => {
-      const start = new Date(r.start_time).getTime();
-      const end = new Date(r.end_time).getTime();
-      return currentSlotStart >= start && currentSlotStart < end;
-    });
-
-    if (matches.length > 0) {
-      const exact = matches.find(r => new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === timeStr);
-      return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
-    }
-
-    // 🆕 2. 【次点】予定がなければ定休日かどうかをチェック
     if (checkIsRegularHoliday(dateObj)) {
       return { res_type: 'blocked', customer_name: '定休日', start_time: `${dateStr}T${timeStr}:00`, isRegularHoliday: true };
     }
@@ -671,74 +656,60 @@ const buffer = shop?.buffer_preparation_min || 0;
                   <td style={{ borderRight: '1px solid #eee', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>{time}</span>
                   </td>
-{weekDays.map(date => {
-  const dStr = getJapanDateStr(date);
-  const res = getStatusAt(dStr, time);
-  const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === time;
-  const isOtherShop = res && res.shop_id !== shopId && res.res_type !== 'system_blocked' && !res.isRegularHoliday;
+                  {weekDays.map(date => {
+                    const dStr = getJapanDateStr(date); const res = getStatusAt(dStr, time);
+                    const isStart = res && new Date(res.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === time;
+                    const isOtherShop = res && res.shop_id !== shopId && res.res_type !== 'system_blocked' && !res.isRegularHoliday;
 
-  // --- 色の決定ロジック ---
-  let bgColor = '#fff'; let borderColor = '#f1f5f9'; let textColor = '#cbd5e1';
-  if (res) {
-    if (res.isRegularHoliday) { bgColor = '#f3f4f6'; textColor = '#94a3b8'; }
-    else if (isOtherShop) { bgColor = '#f1f5f9'; textColor = '#94a3b8'; borderColor = '#cbd5e1'; } 
-    else if (res.res_type === 'blocked') { bgColor = '#fee2e2'; textColor = '#ef4444'; borderColor = '#ef4444'; }
-    else if (res.res_type === 'system_blocked') { bgColor = '#f8fafc'; textColor = '#cbd5e1'; }
-    else if (isStart) { bgColor = themeColorLight; textColor = '#1e293b'; borderColor = themeColor; }
-    else { bgColor = '#fdfdfd'; textColor = '#cbd5e1'; }
-  }
-
-  return (
-    <td 
-      key={`${dStr}-${time}`} 
-      onClick={() => { 
-        setSelectedDate(dStr); 
-        setTargetTime(time); 
-        
-        // ✅ 🆕 修正ポイント：定休日(!res.isRegularHoliday)をすり抜けて予約メニュー(setShowMenuModal)を開くようにしました
-        if(res && !res.isRegularHoliday && (isStart || res.res_type === 'blocked')){ 
-          openDetail(res); 
-        } else { 
-          setShowMenuModal(true); 
-        } 
-      }} 
-      style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}
-    >
-      {res && (
-        <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-          
-          {/* ✅ 🆕 修正ポイント：ブロック枠の場合、名前が「管理者ブロック」でなければ文字を表示します */}
-          {res.res_type === 'blocked' ? (
-            res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : 
-            (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : 
-              (isStart ? (res.customer_name === '管理者ブロック' ? '✕' : <div style={{fontWeight:'bold', fontSize:'0.7rem', lineHeight:'1.1', overflow:'hidden'}}>{res.customer_name}</div>) : '✕')
-            )
-          ) : (
-            res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : 
-            (isStart ? (
-              <div style={{ 
-                fontWeight: 'bold', 
-                fontSize: isPC ? '0.9rem' : 'calc(0.7rem + 0.2vw)', 
-                writingMode: isPC ? 'horizontal-tb' : 'vertical-rl', 
-                textOrientation: 'upright', 
-                lineHeight: '1.1', 
-                height: '100%', 
-                width: '100%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                overflow: 'hidden', 
-                whiteSpace: isPC ? 'normal' : 'nowrap' 
-              }}>
-                {isOtherShop ? `(${res.profiles?.business_name})` : isPC ? `${res.customer_name} 様` : getFamilyName(res.customer_name)}
-              </div>
-            ) : '・')
-          )}
-        </div>
-      )}
-    </td>
-  );
-})}
+                    let bgColor = '#fff'; let borderColor = '#f1f5f9'; let textColor = '#cbd5e1';
+                    
+                    if (res) {
+                      if (res.isRegularHoliday) { bgColor = '#f3f4f6'; textColor = '#94a3b8'; }
+                      else if (isOtherShop) { bgColor = '#f1f5f9'; textColor = '#94a3b8'; borderColor = '#cbd5e1'; } 
+                      else if (res.res_type === 'blocked') { bgColor = '#fee2e2'; textColor = '#ef4444'; borderColor = '#ef4444'; }
+                      else if (res.res_type === 'system_blocked') { bgColor = '#f8fafc'; textColor = '#cbd5e1'; }
+                      else if (isStart) { bgColor = themeColorLight; textColor = '#1e293b'; borderColor = themeColor; }
+                      else { bgColor = '#fdfdfd'; textColor = '#cbd5e1'; }
+                    }
+                    return (
+                      <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
+                        {res && (
+                          <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
+{res.res_type === 'blocked' ? (
+  res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : 
+  (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : 
+    (isStart ? (res.customer_name === '管理者ブロック' ? '✕' : <div style={{fontWeight:'bold', fontSize:'0.7rem', lineHeight:'1.1', overflow:'hidden'}}>{res.customer_name}</div>) : '✕')
+  )
+) : (
+  res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> :                              (isStart ? (
+                                <div style={{
+                                  fontWeight: 'bold',
+                                  fontSize: isPC ? '0.9rem' : 'calc(0.7rem + 0.2vw)', 
+                                  writingMode: isPC ? 'horizontal-tb' : 'vertical-rl', 
+                                  textOrientation: 'upright',
+                                  lineHeight: '1.1',
+                                  height: '100%',
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  overflow: 'hidden',
+                                  whiteSpace: isPC ? 'normal' : 'nowrap'
+                                }}>
+                                  {isOtherShop 
+                                    ? `(${res.profiles?.business_name})` 
+                                    : isPC 
+                                      ? `${res.customer_name} 様` 
+                                      : getFamilyName(res.customer_name)
+                                  }
+                                </div>
+                              ) : '・')
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -763,65 +734,59 @@ const buffer = shop?.buffer_preparation_min || 0;
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: isPC ? '1fr 1fr' : '1fr', gap: '25px' }}>
-{/* --- ここから入れ替え --- */}
-<div style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '500px', margin: '0 auto' }}>
-  <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-    
-    {/* 📋 予約メニューの表示（予約がある場合のみ） */}
-    {selectedRes?.res_type === 'normal' && (
-      <div style={{ background: themeColorLight, padding: '10px', borderRadius: '8px', marginBottom: '15px', border: `1px solid ${themeColor}` }}>
-        <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: themeColor }}>📋 予約メニュー</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
-          {selectedRes.options?.people ? (
-            selectedRes.options.people.map((person, pIdx) => (
-              person.services.map((s, sIdx) => (
-                <span key={`${pIdx}-${sIdx}`} style={{ background: themeColor, color: '#fff', padding: '2px 8px', borderRadius: '15px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                  {selectedRes.options.people.length > 1 ? `(${pIdx + 1})${s.name}` : s.name}
-                </span>
-              ))
-            ))
-          ) : (
-            selectedRes.options?.services?.map((s, idx) => (
-              <span key={idx} style={{ background: themeColor, color: '#fff', padding: '2px 8px', borderRadius: '15px', fontSize: '0.7rem', fontWeight: 'bold' }}>{s.name}</span>
-            )) || <span style={{fontSize:'0.75rem', color:'#94a3b8'}}>メニュー情報なし</span>
-          )}
-        </div>
-      </div>
-    )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {selectedRes?.isRegularHoliday ? (
+                  <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px' }}>
+                    <p style={{ fontWeight: 'bold', color: '#64748b' }}>この日は設定画面で「定休日」として設定されています。</p>
+                  </div>
+                ) : (
+                  <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    {selectedRes?.res_type === 'normal' && (
+                      <div style={{ background: themeColorLight, padding: '10px', borderRadius: '8px', marginBottom: '15px', border: `1px solid ${themeColor}` }}>
+                        <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: themeColor }}>📋 予約メニュー</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
+                          {selectedRes.options?.people ? (
+                            selectedRes.options.people.map((person, pIdx) => (
+                              person.services.map((s, sIdx) => (
+                                <span key={`${pIdx}-${sIdx}`} style={{ background: themeColor, color: '#fff', padding: '2px 8px', borderRadius: '15px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                                  {selectedRes.options.people.length > 1 ? `(${pIdx + 1})${s.name}` : s.name}
+                                </span>
+                              ))
+                            ))
+                          ) : (
+                            selectedRes.options?.services?.map((s, idx) => (
+                              <span key={idx} style={{ background: themeColor, color: '#fff', padding: '2px 8px', borderRadius: '15px', fontSize: '0.7rem', fontWeight: 'bold' }}>{s.name}</span>
+                            )) || <span style={{fontSize:'0.75rem', color:'#94a3b8'}}>メニュー情報なし</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
-    {/* LINE連携バッジ */}
-    {editFields.line_user_id && (
-      <div style={{ background: '#f0fdf4', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bbf7d0', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ fontSize: '1rem' }}>💬</span>
-        <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 'bold' }}>LINE連携済み</span>
-      </div>
-    )}
+                    {editFields.line_user_id && (
+                      <div style={{ background: '#f0fdf4', padding: '8px 12px', borderRadius: '8px', border: '1px solid #bbf7d0', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1rem' }}>💬</span>
+                        <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 'bold' }}>LINE連携済み</span>
+                      </div>
+                    )}
 
-    {/* 📝 入力フォーム（定休日でも表示されるようになります） */}
-    <label style={labelStyle}>お客様名（または予定名）</label>
-    <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={inputStyle} />
-    
-    <label style={labelStyle}>電話番号</label>
-    <input type="tel" value={editFields.phone} onChange={(e) => setEditFields({...editFields, phone: e.target.value})} style={inputStyle} placeholder="未登録" />
-    
-    <label style={labelStyle}>メールアドレス</label>
-    <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={inputStyle} placeholder="未登録" />
-    
-    <label style={labelStyle}>顧客メモ（または詳細）</label>
-    <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ ...inputStyle, height: '120px' }} placeholder="好み、注意事項、予定の詳細など" />
-    
-    <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: themeColor, color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
-      情報を保存
-    </button>
-
-    {selectedRes && (
-      <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? themeColor : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
-        {selectedRes.res_type === 'blocked' ? '🔓 ブロック解除' : '予約を消去 ＆ 名簿掃除'}
-      </button>
-    )}
-  </div>
-</div>
-{/* --- ここまで入れ替え --- */}
+                    <label style={labelStyle}>お客様名</label>
+                    <input type="text" value={editFields.name} onChange={(e) => setEditFields({...editFields, name: e.target.value})} style={inputStyle} />
+                    <label style={labelStyle}>電話番号</label>
+                    <input type="tel" value={editFields.phone} onChange={(e) => setEditFields({...editFields, phone: e.target.value})} style={inputStyle} placeholder="未登録" />
+                    <label style={labelStyle}>メールアドレス</label>
+                    <input type="email" value={editFields.email} onChange={(e) => setEditFields({...editFields, email: e.target.value})} style={inputStyle} placeholder="未登録" />
+                    <label style={labelStyle}>顧客メモ</label>
+                    <textarea value={editFields.memo} onChange={(e) => setEditFields({...editFields, memo: e.target.value})} style={{ ...inputStyle, height: '80px' }} placeholder="好み、注意事項など" />
+                    
+                    <button onClick={handleUpdateCustomer} style={{ width: '100%', padding: '12px', background: themeColor, color: '#fff', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>名簿情報を保存</button>
+                    {showDetailModal && selectedRes && (
+                      <button onClick={() => deleteRes(selectedRes.id)} style={{ width: '100%', padding: '12px', background: selectedRes.res_type === 'blocked' ? themeColor : '#fee2e2', color: selectedRes.res_type === 'blocked' ? '#fff' : '#ef4444', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
+                        {selectedRes.res_type === 'blocked' ? (selectedRes.customer_name === '臨時休業' ? '🔓 休みを解除' : '🔓 ブロック解除') : '予約を消去 ＆ 名簿掃除'}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <div>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#64748b' }}>🕒 来店履歴</h4>
                 <div style={{ height: isPC ? '350px' : '200px', overflowY: 'auto', border: '1px solid #f1f5f9', borderRadius: '12px' }}>
