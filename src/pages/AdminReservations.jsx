@@ -135,8 +135,9 @@ function AdminReservations() {
   };
 
   const openDetail = async (res) => {
-    // 他店舗の予約は詳細を開けない（または閲覧のみにする）ように制御
-    if (res.shop_id !== shopId) {
+    // 🆕 修正ポイント： shop_id が存在し、かつ現在の店舗と違う場合のみアラートを出す
+    // (定休日などのシステムデータには shop_id がないので、スルーさせる)
+    if (res.shop_id && res.shop_id !== shopId) {
       alert(`こちらは他店舗（${res.profiles?.business_name || '別ブランド'}）の予約枠です。詳細は各店舗の管理画面で確認してください。`);
       return;
     }
