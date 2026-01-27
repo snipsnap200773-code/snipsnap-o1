@@ -435,23 +435,31 @@ function AdminReservations() {
   };
 
   const handleBlockTime = async () => {
-    // 🆕 メッセージを入力してもらう
-    const reason = window.prompt("予定またはブロックの理由を入力してください", "管理者ブロック");
-    if (reason === null) return; // キャンセル時は何もしない
+    // 🆕 1. 予定の名前を入力してもらう小窓を出す
+    const reason = window.prompt("予定名（例：打ち合わせ、忘年会）を入力してください", "管理者ブロック");
+    
+    // 🆕 2. 「キャンセル」を押されたら何もしない
+    if (reason === null) return; 
 
     const start = new Date(`${selectedDate}T${targetTime}:00`);
     const interval = shop.slot_interval_min || 15;
     const end = new Date(start.getTime() + interval * 60000);
+    
     const insertData = {
       shop_id: shopId, 
-      customer_name: reason, // 🆕 入力された文字を名前にする
+      customer_name: reason, // 🆕 3. 入力された文字を保存する
       res_type: 'blocked',
       start_at: start.toISOString(), end_at: end.toISOString(),
       start_time: start.toISOString(), end_time: end.toISOString(),
-      total_slots: 1, customer_email: 'admin@example.com', customer_phone: '---', options: { services: [] }
+      total_slots: 1, 
+      customer_email: 'admin@example.com', 
+      customer_phone: '---', 
+      options: { services: [] }
     };
+    
     const { error } = await supabase.from('reservations').insert([insertData]);
-    if (error) alert(`エラー: ${error.message}`); else { setShowMenuModal(false); fetchData(); }
+    if (error) alert(`エラー: ${error.message}`); 
+    else { setShowMenuModal(false); fetchData(); }
   };
 
   const handleBlockFullDay = async () => {
@@ -802,7 +810,12 @@ function AdminReservations() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button onClick={() => navigate(`/shop/${shopId}/reserve`, { state: { adminDate: selectedDate, adminTime: targetTime } })} style={{ padding: '22px', background: themeColor, color: '#fff', border: 'none', borderRadius: '20px', fontWeight: '900', fontSize: '1.2rem' }}>📝 予約を入れる</button>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <button onClick={handleBlockTime} style={{ padding: '15px', background: '#fff', color: '#ef4444', border: '2px solid #fee2e2', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.85rem' }}>✕ この枠のみ</button>
+<button 
+  onClick={handleBlockTime} 
+  style={{ padding: '15px', background: '#fff', color: themeColor, border: `2px solid ${themeColorLight}`, borderRadius: '20px', fontWeight: 'bold', fontSize: '0.85rem' }}
+>
+  📝 自己予定
+</button>
                 <button onClick={handleBlockFullDay} style={{ padding: '15px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.85rem' }}>🚀 今日を休みに</button>
               </div>
               <button onClick={() => setShowMenuModal(false)} style={{ padding: '15px', border: 'none', background: 'none', color: '#94a3b8' }}>キャンセル</button>
