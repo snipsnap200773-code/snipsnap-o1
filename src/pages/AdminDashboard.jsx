@@ -78,6 +78,10 @@ function AdminDashboard() {
 
   const [regularHolidays, setRegularHolidays] = useState({});
 
+  // 🆕 追加：前後拡張枠State
+  const [extraSlotsBefore, setExtraSlotsBefore] = useState(0);
+  const [extraSlotsAfter, setExtraSlotsAfter] = useState(0);
+
   const dayMap = { mon: '月曜日', tue: '火曜日', wed: '水曜日', thu: '木曜日', fri: '金曜日', sat: '土曜日', sun: '日曜日' };
   const weekLabels = [
     { key: '1', label: '第1' },
@@ -111,6 +115,9 @@ function AdminDashboard() {
       setOwnerNameKana(data.owner_name_kana || ''); setBusinessType(data.business_type || '');
       setLineToken(data.line_channel_access_token || ''); setLineAdminId(data.line_admin_user_id || '');
       setScheduleSyncId(data.schedule_sync_id || '');
+      // 🆕 拡張枠の初期値をセット
+      setExtraSlotsBefore(data.extra_slots_before || 0);
+      setExtraSlotsAfter(data.extra_slots_after || 0);
     }
   };
 
@@ -175,7 +182,10 @@ function AdminDashboard() {
         owner_name: ownerName, owner_name_kana: ownerNameKana,
         business_type: businessType, line_channel_access_token: lineToken, line_admin_user_id: lineAdminId,
         theme_color: shopData.theme_color,
-        schedule_sync_id: scheduleSyncId
+        schedule_sync_id: scheduleSyncId,
+        // 🆕 拡張枠を保存
+        extra_slots_before: extraSlotsBefore,
+        extra_slots_after: extraSlotsAfter
       }).eq('id', shopId);
     if (!error) showMsg('すべての設定を保存しました！'); else alert('保存に失敗しました。');
   };
@@ -446,7 +456,7 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* --- ⏰ 営業時間・定休日タブ：10分〜30分単位設定 --- */}
+        {/* --- ⏰ 営業時間・定休日タブ --- */}
         {activeTab === 'hours' && (
           <div style={{ width: '100%', boxSizing: 'border-box' }}>
             <section style={{ ...cardStyle, border: `2px solid ${themeColor}` }}>
@@ -454,7 +464,6 @@ function AdminDashboard() {
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>1コマの単位</label>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  {/* ✅ コマ単位設定：[10, 15, 20, 30] に拡張 */}
                   {[10, 15, 20, 30].map(min => (
                     <button key={min} onClick={() => setSlotIntervalMin(min)} style={{ flex: 1, padding: '10px', background: slotIntervalMin === min ? themeColor : '#fff', color: slotIntervalMin === min ? '#fff' : '#333', border: '1px solid #ccc', borderRadius: '8px', fontWeight: 'bold' }}>{min}分</button>
                   ))}
@@ -507,10 +516,35 @@ function AdminDashboard() {
               </div>
               <div style={{ marginTop: '25px', padding: '15px', background: '#fef2f2', borderRadius: '12px', border: '1px dashed #ef4444' }}><label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}><div style={{ flex: 1 }}><span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#991b1b' }}>定休日が祝日の場合は営業する</span></div><div onClick={() => setRegularHolidays(prev => ({...prev, open_on_holiday: !prev.open_on_holiday}))} style={{ width: '60px', height: '32px', background: regularHolidays.open_on_holiday ? '#10b981' : '#cbd5e1', borderRadius: '20px', position: 'relative', transition: '0.3s' }}><div style={{ position: 'absolute', top: '3px', left: regularHolidays.open_on_holiday ? '31px' : '3px', width: '26px', height: '26px', background: '#fff', borderRadius: '50%', transition: '0.3s' }} /></div></label></div>
             </section>
+
+            {/* ✅ 🆕 三土手さん、ここが「定休日の設定」の下に追加した新機能です！ */}
+            <section style={{ ...cardStyle, border: `2px solid ${themeColor}`, background: '#fdfcf5' }}>
+              <h3 style={{ marginTop: 0, color: themeColor, fontSize: '1rem' }}>📌 管理画面の表示拡張（余白枠）</h3>
+              <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '15px' }}>営業時間の前後に「プライベートな予定」や「打ち合わせ」を書き込める予備枠を表示します。</p>
+              
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>☀ 開店前の表示コマ数 (0〜8):</label>
+                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                    <button key={n} type="button" onClick={() => setExtraSlotsBefore(n)} style={{ width: '35px', height: '35px', borderRadius: '6px', border: '1px solid', borderColor: extraSlotsBefore === n ? themeColor : '#ccc', background: extraSlotsBefore === n ? themeColor : 'white', color: extraSlotsBefore === n ? 'white' : '#333', fontSize: '0.8rem', fontWeight: 'bold' }}>{n}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>🌙 閉店後の表示コマ数 (0〜8):</label>
+                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                    <button key={n} type="button" onClick={() => setExtraSlotsAfter(n)} style={{ width: '35px', height: '35px', borderRadius: '6px', border: '1px solid', borderColor: extraSlotsAfter === n ? themeColor : '#ccc', background: extraSlotsAfter === n ? themeColor : 'white', color: extraSlotsAfter === n ? 'white' : '#333', fontSize: '0.8rem', fontWeight: 'bold' }}>{n}</button>
+                  ))}
+                </div>
+              </div>
+              <p style={{ fontSize: '0.65rem', color: themeColor, marginTop: '10px' }}>※設定したコマ数分、管理画面のカレンダーが上下に広がります。</p>
+            </section>
           </div>
         )}
 
-        {/* --- 🏪 店舗情報タブ：URL ＆ ツイン・カレンダー ＆ LINE連携 --- */}
+        {/* --- 🏪 店舗情報タブ --- */}
         {activeTab === 'info' && (
           <div style={{ width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <section style={{ ...cardStyle, padding: '20px' }}>
@@ -520,7 +554,6 @@ function AdminDashboard() {
                 <UrlBox label="💬 LINEリッチメニュー用URL" url={`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`} color="#00b900" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?openExternalBrowser=1`)} />
                 <UrlBox label="📅 お客様用予約 (ノーマル)" url={`${window.location.origin}/shop/${shopId}/reserve`} color="#059669" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve`)} />
 
-                {/* 専用リンク ＆ 公式サイトURLコピー欄 */}
                 {categories.filter(c => c.url_key).map(c => (
                   <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                     <UrlBox label={`🔮 専用予約：${c.custom_shop_name || c.name}`} url={`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`} color="#7c3aed" copy={() => copyToClipboard(`${window.location.origin}/shop/${shopId}/reserve?type=${c.url_key}`)} />
@@ -528,7 +561,6 @@ function AdminDashboard() {
                   </div>
                 ))}
 
-                {/* ✅ 🆕 ツイン・カレンダー同期ID設定 */}
                 <div style={{ marginTop: '10px', padding: '15px', background: '#f0f9ff', borderRadius: '16px', border: '1px solid #bae6fd' }}>
                   <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#0369a1', display: 'block', marginBottom: '8px' }}>🔗 スケジュール共有設定（ツイン・カレンダー）</label>
                   <p style={{ fontSize: '0.7rem', color: '#0c4a6e', marginBottom: '10px' }}>複数のアカウントで同じ合言葉を入力すると、予約表が一つに統合されます。</p>
@@ -574,7 +606,6 @@ function AdminDashboard() {
               <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>注意事項</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inputStyle, border: '2px solid #ef4444', minHeight: '80px' }} />
             </section>
 
-            {/* ✅ 🆕 三土手さん、ここが復活したLINEセクションです！ */}
             <section style={{ ...cardStyle, border: '1px solid #00b900' }}>
               <h3 style={{ marginTop: 0, color: '#00b900' }}>💬 LINE公式アカウント連携</h3>
               <div style={{ marginTop: '10px', padding: '15px', background: '#f0fdf4', borderRadius: '12px' }}>

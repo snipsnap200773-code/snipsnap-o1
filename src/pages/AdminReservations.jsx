@@ -370,7 +370,14 @@ function AdminReservations() {
     if (!hasOpenDay) { minTotalMinutes = 9 * 60; maxTotalMinutes = 18 * 60; }
     const slots = [];
     const interval = shop.slot_interval_min || 15;
-    for (let m = minTotalMinutes; m <= maxTotalMinutes; m += interval) {
+    const extraBefore = shop.extra_slots_before || 0; // 🆕 追加
+    const extraAfter = shop.extra_slots_after || 0;   // 🆕 追加
+
+    // 🆕 拡張分を含めた開始・終了時間を計算
+    const finalStart = minTotalMinutes - (extraBefore * interval);
+    const finalEnd = maxTotalMinutes + (extraAfter * interval);
+
+    for (let m = finalStart; m <= finalEnd; m += interval) {
       const h = Math.floor(m / 60); const mm = m % 60;
       slots.push(`${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
     }
@@ -428,11 +435,17 @@ function AdminReservations() {
   };
 
   const handleBlockTime = async () => {
+    // 🆕 メッセージを入力してもらう
+    const reason = window.prompt("予定またはブロックの理由を入力してください", "管理者ブロック");
+    if (reason === null) return; // キャンセル時は何もしない
+
     const start = new Date(`${selectedDate}T${targetTime}:00`);
     const interval = shop.slot_interval_min || 15;
     const end = new Date(start.getTime() + interval * 60000);
     const insertData = {
-      shop_id: shopId, customer_name: '管理者ブロック', res_type: 'blocked',
+      shop_id: shopId, 
+      customer_name: reason, // 🆕 入力された文字を名前にする
+      res_type: 'blocked',
       start_at: start.toISOString(), end_at: end.toISOString(),
       start_time: start.toISOString(), end_time: end.toISOString(),
       total_slots: 1, customer_email: 'admin@example.com', customer_phone: '---', options: { services: [] }
