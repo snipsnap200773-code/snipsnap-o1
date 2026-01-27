@@ -34,12 +34,12 @@ function AdminManagement() {
   // --- レジパネル用State ---
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedRes, setSelectedRes] = useState(null);
-  const [checkoutServices, setCheckoutServices] = useState([]); // 🆕 施術メニュー
+  const [checkoutServices, setCheckoutServices] = useState([]); 
   const [checkoutAdjustments, setCheckoutAdjustments] = useState([]); 
   const [checkoutProducts, setCheckoutProducts] = useState([]); 
   const [finalPrice, setFinalPrice] = useState(0);
   const [openAdjCategory, setOpenAdjCategory] = useState(null); 
-  const [isMenuPopupOpen, setIsMenuPopupOpen] = useState(false); // 🆕 メニュー変更ポップアップ用
+  const [isMenuPopupOpen, setIsMenuPopupOpen] = useState(false); 
 
   // --- 顧客情報（カルテ）パネル用State ---
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
@@ -100,25 +100,19 @@ function AdminManagement() {
     setSelectedDate(d.toLocaleDateString('sv-SE'));
   };
 
-  // ✅ 0円エラー解消版：予約詳細の解析
   const parseReservationDetails = (res) => {
     if (!res) return { menuName: '', totalPrice: 0, items: [], subItems: [] };
     const opt = typeof res.options === 'string' ? JSON.parse(res.options) : (res.options || {});
-    // 構造の揺れを吸収
     const items = opt.services || opt.people?.[0]?.services || [];
     const subItems = Object.values(opt.options || opt.people?.[0]?.options || {});
-    
     const menuName = items.length > 0 ? items.map(s => s.name).join(', ') : 'メニューなし';
     let basePrice = items.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
-    
-    // 金額が0円の場合の補填（マスターから価格を再取得）
     if (basePrice === 0 && items.length > 0) {
       items.forEach(item => {
         const master = services.find(s => s.id === item.id || s.name === item.name);
         if (master) basePrice += Number(master.price || 0);
       });
     }
-    
     const optPrice = subItems.reduce((sum, o) => sum + (Number(o.additional_price) || 0), 0);
     return { menuName, totalPrice: basePrice + optPrice, items, subItems };
   };
@@ -176,7 +170,7 @@ function AdminManagement() {
   const openCheckout = (res) => {
     const info = parseReservationDetails(res);
     setSelectedRes(res);
-    setCheckoutServices(info.items); // ✅ 初期施術をセット
+    setCheckoutServices(info.items); 
     setCheckoutAdjustments([]); 
     setCheckoutProducts([]);
     setFinalPrice(info.totalPrice);
@@ -185,7 +179,6 @@ function AdminManagement() {
     setIsCustomerInfoOpen(false);
   };
 
-  // ✅ ポップアップ内でのメニュー選択ロジック
   const toggleCheckoutService = (svc) => {
     const isSelected = checkoutServices.some(s => s.id === svc.id);
     const newSelection = isSelected ? checkoutServices.filter(s => s.id !== svc.id) : [...checkoutServices, svc];
@@ -217,7 +210,6 @@ function AdminManagement() {
 
   const completePayment = async () => {
     try {
-      // ✅ 予約データの同期情報を作成
       const totalSlots = checkoutServices.reduce((sum, s) => sum + (Number(s.slots) || 1), 0);
       const menuName = checkoutServices.map(s => s.name).join(', ');
       const startTime = new Date(selectedRes.start_time);
@@ -234,7 +226,7 @@ function AdminManagement() {
       }).eq('id', selectedRes.id);
 
       if (error) throw error;
-      alert("お会計を確定しました。カレンダー予約枠も自動修正されました。");
+      alert("お会計を確定しました。予約枠も同期されました。");
       setIsCheckoutOpen(false); fetchInitialData();
     } catch (err) { alert("エラー: " + err.message); }
   };
@@ -267,7 +259,7 @@ function AdminManagement() {
           await supabase.from('customers').update({ memo: mergedMemo, total_visits: mergedVisits, line_user_id: selectedCustomer.line_user_id || duplicate.line_user_id, phone: editPhone || duplicate.phone, email: editEmail || duplicate.email, updated_at: new Date().toISOString() }).eq('id', duplicate.id);
           await supabase.from('reservations').update({ customer_name: editName }).eq('shop_id', cleanShopId).eq('customer_name', selectedCustomer.name);
           if (currentId) await supabase.from('customers').delete().eq('id', currentId);
-          alert("名寄せ統合が完了しました！");
+          alert("名寄せ統合完了！");
           setIsCustomerInfoOpen(false); fetchInitialData(); return;
         }
       }
@@ -294,7 +286,6 @@ function AdminManagement() {
     return days;
   }, [viewMonth]);
 
-  // ✅ 高度なソートロジック
   const sortItems = (items) => [...items].sort((a, b) => {
     const catA = a.category || 'その他'; const catB = b.category || 'その他';
     if (catA !== catB) return catA.localeCompare(catB, 'ja');
@@ -311,32 +302,6 @@ function AdminManagement() {
       return acc;
     }, {});
   }, [adminAdjustments]);
-
-  // --- スタイル定義 ---
-  const fullPageWrapper = { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', display: 'flex', background: '#fff', zIndex: 9999, overflow: 'hidden' };
-  const sidebarStyle = { width: '260px', background: '#e0d7f7', borderRight: '2px solid #4b2c85', padding: '15px', display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto' };
-  const navBtnStyle = (active, color) => ({ width: '100%', padding: '12px', background: active ? '#fff' : color, color: active ? '#000' : '#fff', border: '1px solid #000', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '6px', boxShadow: active ? 'inset 2px 2px 5px rgba(0,0,0,0.3)' : '2px 2px 0px rgba(0,0,0,0.5)' });
-  const thStyle = { padding: '12px', border: '1px solid #4b2c85', textAlign: 'center' };
-  const tdStyle = { padding: '12px', border: '1px solid #eee', textAlign: 'center' };
-  const cardStyle = { background: '#fff', border: '2px solid #4b2c85', borderRadius: '8px', marginBottom: '30px', overflow: 'hidden' };
-  const catHeaderStyle = { background: '#f3f0ff', padding: '15px 20px', borderBottom: '2px solid #4b2c85' };
-  const svcRowStyle = { padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px' };
-  const priceInputStyle = { border: '1px solid #ddd', padding: '5px', width: '100px', textAlign: 'right', fontWeight: '900', color: '#d34817' };
-  const optAddBtnStyle = { background: '#fff', border: '1px dashed #4285f4', color: '#4285f4', padding: '5px 12px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 'bold' };
-  const checkoutOverlayStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.3)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' };
-  const checkoutPanelStyle = { width: '450px', background: '#fff', height: '100%', boxShadow: '-5px 0px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', animation: 'slideIn 0.3s ease-out' };
-  const checkoutHeaderStyle = { background: '#4b2c85', color: '#fff', padding: '20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
-  const checkoutRowStyle = { display: 'flex', justifyContent: 'space-between', padding: '15px 0', borderBottom: '1px solid #eee' };
-  const checkoutFooterStyle = { background: '#f8fafc', padding: '25px', borderTop: '2px solid #ddd' };
-  const adjBtnStyle = (active) => ({ padding: '10px 15px', background: active ? '#ef4444' : '#fff', color: active ? '#fff' : '#ef4444', border: '1px solid #ef4444', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' });
-  const completeBtnStyle = { width: '100%', padding: '15px', background: '#008000', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' };
-  const editInputStyle = { width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', marginBottom: '10px' };
-  const headerBtnSmall = { padding: '5px 12px', borderRadius: '6px', border: '1px solid #fff', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' };
-  const categoryToggleStyle = { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', color: '#4b2c85' };
-  const miniPriceInput = { border: 'none', background: '#f1f5f9', width: '60px', textAlign: 'right', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' };
-  const adjChipStyle = { background: '#fff5f5', border: '1px solid #feb2b2', padding: '8px 12px', display: 'flex', gap: '5px', borderRadius: '10px' };
-  const typeBtnStyle = { border: '1px solid #ef4444', background: '#fff', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#ef4444' };
-  const optPriceStyle = { border: 'none', background: '#fff', width: '70px', textAlign: 'right', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' };
 
   return (
     <div style={fullPageWrapper}>
@@ -477,7 +442,6 @@ function AdminManagement() {
           </div>
         )}
 
-        {/* 🚀 POSレジパネル */}
         {isCheckoutOpen && (
           <div style={checkoutOverlayStyle} onClick={() => setIsCheckoutOpen(false)}>
             <div style={checkoutPanelStyle} onClick={(e) => e.stopPropagation()}>
@@ -486,8 +450,6 @@ function AdminManagement() {
                 <button onClick={() => setIsCheckoutOpen(false)} style={{ background: 'none', border: 'none', color: '#fff' }}><X size={24} /></button>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-                
-                {/* 🆕 1. 施術内容セクション (「変更」ボタン搭載) */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #4b2c85', paddingBottom: '5px', marginBottom: '15px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4b2c85', fontWeight: 'bold' }}><Clipboard size={16} /> 施術内容</div>
                   <button onClick={() => setIsMenuPopupOpen(true)} style={{ background: '#f3f0ff', color: '#4b2c85', border: '1px solid #4b2c85', borderRadius: '5px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -559,7 +521,6 @@ function AdminManagement() {
           </div>
         )}
 
-        {/* 🆕 ポップアップ式メニュー選択（ReservationForm風） */}
         {isMenuPopupOpen && (
           <div style={{ ...checkoutOverlayStyle, zIndex: 2000 }} onClick={() => setIsMenuPopupOpen(false)}>
             <div style={{ ...checkoutPanelStyle, width: '400px', borderRadius: '25px 0 0 25px' }} onClick={(e) => e.stopPropagation()}>
@@ -577,7 +538,7 @@ function AdminManagement() {
                         return (
                           <button key={svc.id} onClick={() => toggleCheckoutService(svc)} style={{
                             width: '100%', padding: '12px', textAlign: 'left', borderRadius: '10px', border: isActive ? `2px solid #4b2c85` : '1px solid #eee',
-                            background: isActive ? '#f3f0ff' : '#fff', cursor: 'pointer', transition: 'all 0.2s'
+                            background: isActive ? '#f3f0ff' : '#fff', cursor: 'pointer'
                           }}>
                             <div style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between' }}>
                               <span>{isActive ? '✅ ' : ''}{svc.name}</span>
@@ -649,8 +610,35 @@ function AdminManagement() {
   );
 }
 
+// 🆕 スタイル定義パーツ
 const SectionTitle = ({ icon, title, color }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color, fontWeight: 'bold', borderBottom: `2px solid ${color}`, paddingBottom: '5px', marginBottom: '15px' }}>{icon} {title}</div>
 );
+
+const fullPageWrapper = { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', display: 'flex', background: '#fff', zIndex: 9999, overflow: 'hidden' };
+const sidebarStyle = { width: '260px', background: '#e0d7f7', borderRight: '2px solid #4b2c85', padding: '15px', display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto' };
+const navBtnStyle = (active, color) => ({ width: '100%', padding: '12px', background: active ? '#fff' : color, color: active ? '#000' : '#fff', border: '1px solid #000', borderRadius: '2px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '6px', boxShadow: active ? 'inset 2px 2px 5px rgba(0,0,0,0.3)' : '2px 2px 0px rgba(0,0,0,0.5)' });
+const thStyle = { padding: '12px', border: '1px solid #4b2c85', textAlign: 'center' };
+const tdStyle = { padding: '12px', border: '1px solid #eee', textAlign: 'center' };
+const cardStyle = { background: '#fff', border: '2px solid #4b2c85', borderRadius: '8px', marginBottom: '30px', overflow: 'hidden' };
+const catHeaderStyle = { background: '#f3f0ff', padding: '15px 20px', borderBottom: '2px solid #4b2c85' };
+const svcRowStyle = { padding: '15px 20px', display: 'flex', alignItems: 'center', gap: '15px' };
+const priceInputStyle = { border: '1px solid #ddd', padding: '5px', width: '100px', textAlign: 'right', fontWeight: '900', color: '#d34817' };
+const optAddBtnStyle = { background: '#fff', border: '1px dashed #4285f4', color: '#4285f4', padding: '5px 12px', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 'bold' };
+const checkoutOverlayStyle = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.3)', zIndex: 1000, display: 'flex', justifyContent: 'flex-end' };
+const checkoutPanelStyle = { width: '450px', background: '#fff', height: '100%', boxShadow: '-5px 0px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column' };
+const checkoutHeaderStyle = { background: '#4b2c85', color: '#fff', padding: '20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+const checkoutRowStyle = { display: 'flex', justifyContent: 'space-between', padding: '15px 0', borderBottom: '1px solid #eee' };
+const checkoutFooterStyle = { background: '#f8fafc', padding: '25px', borderTop: '2px solid #ddd' };
+const adjBtnStyle = (active) => ({ padding: '10px 15px', background: active ? '#ef4444' : '#fff', color: active ? '#fff' : '#ef4444', border: '1px solid #ef4444', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' });
+const completeBtnStyle = { width: '100%', padding: '15px', background: '#008000', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '1.2rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' };
+const editInputStyle = { width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', marginBottom: '10px' };
+const headerBtnSmall = { padding: '5px 12px', borderRadius: '6px', border: '1px solid #fff', background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' };
+const categoryToggleStyle = { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '5px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', color: '#4b2c85' };
+const miniPriceInput = { border: 'none', background: '#f1f5f9', width: '60px', textAlign: 'right', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' };
+const adjChipStyle = { background: '#fff5f5', border: '1px solid #feb2b2', padding: '8px 12px', display: 'flex', gap: '5px', borderRadius: '10px' };
+const typeBtnStyle = { border: '1px solid #ef4444', background: '#fff', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#ef4444' };
+const optInputStyle = { background: 'transparent', border: 'none', fontSize: '0.9rem', fontWeight: 'bold' };
+const optPriceStyle = { border: 'none', background: '#fff', width: '70px', textAlign: 'right', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' };
 
 export default AdminManagement;
