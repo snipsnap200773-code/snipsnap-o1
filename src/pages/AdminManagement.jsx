@@ -75,7 +75,7 @@ function AdminManagement() {
         supabase.from('service_categories').select('*').eq('shop_id', cleanShopId).order('sort_order'),
         supabase.from('services').select('*').eq('shop_id', cleanShopId).order('sort_order'),
         supabase.from('service_options').select('*'),
-        supabase.from('admin_adjustments').select('*').order('category'),
+        supabase.from('admin_adjustments').select('*'),
         supabase.from('products').select('*').eq('shop_id', cleanShopId).order('sort_order')
       ]);
       setCategories(catRes.data || []);
@@ -83,7 +83,6 @@ function AdminManagement() {
       setServiceOptions(optRes.data || []);
       setAdminAdjustments(adjRes.data || []);
       setProducts(prodRes.data || []);
-      // 削除リストをリセット
       setDeletedAdjIds([]);
       setDeletedProductIds([]);
     } catch (err) {
@@ -127,7 +126,6 @@ function AdminManagement() {
     try {
       const formattedServices = services.map(svc => ({ id: svc.id, shop_id: cleanShopId, name: svc.name, price: svc.price || 0, category: svc.category, sort_order: svc.sort_order || 0 }));
       const formattedOptions = serviceOptions.map(opt => ({ id: opt.id, service_id: opt.service_id, group_name: opt.group_name, option_name: opt.option_name, additional_price: opt.additional_price || 0 }));
-      // 保存時に施術別メニューならカテゴリをnullに強制
       const formattedAdjustments = adminAdjustments.map(adj => ({ id: adj.id, service_id: adj.service_id, name: adj.name, price: adj.price || 0, is_percent: adj.is_percent || false, is_minus: adj.is_minus || false, category: adj.service_id ? null : (adj.category || 'その他') }));
       const formattedProducts = products.map((p, i) => ({ id: p.id, shop_id: cleanShopId, name: p.name, price: p.price || 0, sort_order: i }));
 
@@ -138,7 +136,6 @@ function AdminManagement() {
         supabase.from('products').upsert(formattedProducts)
       ];
       
-      // ✅ ゾンビ防止：蓄積した削除IDを実際にDBへ送る
       if (deletedAdjIds.length > 0) promises.push(supabase.from('admin_adjustments').delete().in('id', deletedAdjIds));
       if (deletedProductIds.length > 0) promises.push(supabase.from('products').delete().in('id', deletedProductIds));
 
@@ -160,7 +157,6 @@ function AdminManagement() {
     setAdminAdjustments([...adminAdjustments, { id: crypto.randomUUID(), service_id: svcId, name, price: 0, is_percent: false, is_minus: false, category: cat }]);
   };
 
-  // ✅ ゾンビ防止：削除用共通関数
   const handleRemoveAdjustment = (adj) => {
     if (adj.id && typeof adj.id === 'string' && !adj.id.includes('-temp')) {
       setDeletedAdjIds(prev => [...prev, adj.id]);
@@ -284,16 +280,31 @@ function AdminManagement() {
     return days;
   }, [viewMonth]);
 
-  // ✅ 全体調整のみグループ化
+  // ✅ 高度なソート関数
+  const sortAdjustmentItems = (items) => {
+    return [...items].sort((a, b) => {
+      // 1. カテゴリー順
+      const catA = a.category || 'その他';
+      const catB = b.category || 'その他';
+      if (catA !== catB) return catA.localeCompare(catB, 'ja');
+      // 2. 名前順
+      if (a.name !== b.name) return a.name.localeCompare(b.name, 'ja');
+      // 3. 金額順
+      return (a.price || 0) - (b.price || 0);
+    });
+  };
+
+  // ✅ 全体調整のみグループ化 ＆ ソート
   const groupedWholeAdjustments = useMemo(() => {
-    return adminAdjustments
-      .filter(adj => adj.service_id === null)
-      .reduce((acc, adj) => {
-        const cat = adj.category || 'その他';
-        if (!acc[cat]) acc[cat] = [];
-        acc[cat].push(adj);
-        return acc;
-      }, {});
+    const whole = adminAdjustments.filter(adj => adj.service_id === null);
+    const sorted = sortAdjustmentItems(whole);
+    
+    return sorted.reduce((acc, adj) => {
+      const cat = adj.category || 'その他';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(adj);
+      return acc;
+    }, {});
   }, [adminAdjustments]);
 
   // --- スタイル定義 ---
@@ -406,7 +417,8 @@ function AdminManagement() {
                        <input type="number" value={svc.price || 0} onChange={(e) => setServices(services.map(s => s.id === svc.id ? {...s, price: parseInt(e.target.value)} : s))} style={priceInputStyle} />
                        <button onClick={() => addAdjustment(svc.id)} style={optAddBtnStyle}>＋ プロ調整</button>
                        <div style={{ flex: 1, display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                          {adminAdjustments.filter(a => a.service_id === svc.id).map(adj => (
+                          {/* ✅ 施術別プロ調整：名前 ➔ 金額順にソートして表示 */}
+                          {sortAdjustmentItems(adminAdjustments.filter(a => a.service_id === svc.id)).map(adj => (
                             <div key={adj.id} style={{ ...adjChipStyle }}>
                                 <span>{adj.name}</span>
                                 <button onClick={() => cycleAdjType(adj.id)} style={typeBtnStyle}>{adj.is_percent ? '%' : adj.is_minus ? '-' : '+'}</button>
@@ -442,7 +454,8 @@ function AdminManagement() {
                   <button onClick={() => addAdjustment(null)} style={{ ...optAddBtnStyle, borderColor: '#ef4444', color: '#ef4444' }}>＋ 共通項目を追加</button>
                 </div>
                 <div style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
-                  {adminAdjustments.filter(a => a.service_id === null).map(adj => (
+                  {/* ✅ 全体調整：カテゴリー ➔ 名前 ➔ 金額順にソートして表示 */}
+                  {sortAdjustmentItems(adminAdjustments.filter(a => a.service_id === null)).map(adj => (
                     <div key={adj.id} style={{ ...adjChipStyle, padding: '10px 20px', flexDirection: 'column' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input value={adj.name} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, name: e.target.value} : a))} style={{ ...optInputStyle, width: '120px' }} />
@@ -450,7 +463,7 @@ function AdminManagement() {
                         <input type="number" value={adj.price || 0} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, price: parseInt(e.target.value)} : a))} style={{ ...optPriceStyle, width: '80px' }} />
                         <button onClick={() => handleRemoveAdjustment(adj)} style={{ color: '#ff1493', background: 'none', border: 'none' }}><Trash2 size={18} /></button>
                       </div>
-                      <input placeholder="カテゴリ（例：割引）" value={adj.category || ''} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, category: e.target.value} : a))} style={{ border: 'none', background: '#f8fafc', fontSize: '0.7rem', width: '100%', marginTop: '5px', padding: '2px 5px', borderRadius: '4px' }} />
+                      <input placeholder="カテゴリー（例：割引）" value={adj.category || ''} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, category: e.target.value} : a))} style={{ border: 'none', background: '#f8fafc', fontSize: '0.7rem', width: '100%', marginTop: '5px', padding: '2px 5px', borderRadius: '4px' }} />
                     </div>
                   ))}
                 </div>
@@ -483,9 +496,9 @@ function AdminManagement() {
                       <div style={{ marginTop: '30px' }}>
                         <SectionTitle icon={<Settings size={16} />} title="プロの微調整" color="#ef4444" />
                         
-                        {/* 1. 施術メニュー専用（カテゴリ化せずリスト表示） */}
+                        {/* 1. 施術メニュー専用（名前 ➔ 金額順） */}
                         {(() => {
-                           const proAdjs = adminAdjustments.filter(adj => adj.service_id !== null && reservationServiceIds.includes(adj.service_id));
+                           const proAdjs = sortAdjustmentItems(adminAdjustments.filter(adj => adj.service_id !== null && reservationServiceIds.includes(adj.service_id)));
                            if (proAdjs.length === 0) return null;
                            return (
                              <div style={{ marginBottom: '15px', padding: '10px', background: '#fff5f5', borderRadius: '8px', border: '1px solid #feb2b2' }}>
@@ -504,7 +517,7 @@ function AdminManagement() {
                            );
                         })()}
 
-                        {/* 2. 全体調整（カテゴリ別アコーディオン） */}
+                        {/* 2. 全体調整（カテゴリー ➔ 名前 ➔ 金額順） */}
                         {Object.entries(groupedWholeAdjustments).map(([catName, adjs]) => {
                           const isOpen = openAdjCategory === catName;
                           return (
