@@ -37,7 +37,7 @@ function AdminManagement() {
   const [checkoutAdjustments, setCheckoutAdjustments] = useState([]); 
   const [checkoutProducts, setCheckoutProducts] = useState([]); // 🆕 今回売れた店販
   const [finalPrice, setFinalPrice] = useState(0);
-  const [openAdjCategory, setOpenAdjCategory] = useState(null); // 🆕 アコーディオン用
+  const [openAdjCategory, setOpenAdjCategory] = useState(null); 
 
   // --- 顧客情報（カルテ）パネル用State ---
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
@@ -75,7 +75,7 @@ function AdminManagement() {
         supabase.from('service_categories').select('*').eq('shop_id', cleanShopId).order('sort_order'),
         supabase.from('services').select('*').eq('shop_id', cleanShopId).order('sort_order'),
         supabase.from('service_options').select('*'),
-        supabase.from('admin_adjustments').select('*'),
+        supabase.from('admin_adjustments').select('*').order('category'),
         supabase.from('products').select('*').eq('shop_id', cleanShopId).order('sort_order')
       ]);
       setCategories(catRes.data || []);
@@ -83,6 +83,9 @@ function AdminManagement() {
       setServiceOptions(optRes.data || []);
       setAdminAdjustments(adjRes.data || []);
       setProducts(prodRes.data || []);
+      // 削除リストをリセット
+      setDeletedAdjIds([]);
+      setDeletedProductIds([]);
     } catch (err) {
       console.error("Fetch Error:", err);
     } finally {
@@ -90,7 +93,6 @@ function AdminManagement() {
     }
   };
 
-  // ✅ 日付ナビゲーション関数
   const handleDateChange = (days) => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + days);
@@ -125,7 +127,8 @@ function AdminManagement() {
     try {
       const formattedServices = services.map(svc => ({ id: svc.id, shop_id: cleanShopId, name: svc.name, price: svc.price || 0, category: svc.category, sort_order: svc.sort_order || 0 }));
       const formattedOptions = serviceOptions.map(opt => ({ id: opt.id, service_id: opt.service_id, group_name: opt.group_name, option_name: opt.option_name, additional_price: opt.additional_price || 0 }));
-      const formattedAdjustments = adminAdjustments.map(adj => ({ id: adj.id, service_id: adj.service_id, name: adj.name, price: adj.price || 0, is_percent: adj.is_percent || false, is_minus: adj.is_minus || false, category: adj.category }));
+      // 保存時に施術別メニューならカテゴリをnullに強制
+      const formattedAdjustments = adminAdjustments.map(adj => ({ id: adj.id, service_id: adj.service_id, name: adj.name, price: adj.price || 0, is_percent: adj.is_percent || false, is_minus: adj.is_minus || false, category: adj.service_id ? null : (adj.category || 'その他') }));
       const formattedProducts = products.map((p, i) => ({ id: p.id, shop_id: cleanShopId, name: p.name, price: p.price || 0, sort_order: i }));
 
       const promises = [
@@ -134,6 +137,8 @@ function AdminManagement() {
         supabase.from('admin_adjustments').upsert(formattedAdjustments),
         supabase.from('products').upsert(formattedProducts)
       ];
+      
+      // ✅ ゾンビ防止：蓄積した削除IDを実際にDBへ送る
       if (deletedAdjIds.length > 0) promises.push(supabase.from('admin_adjustments').delete().in('id', deletedAdjIds));
       if (deletedProductIds.length > 0) promises.push(supabase.from('products').delete().in('id', deletedProductIds));
 
@@ -143,18 +148,24 @@ function AdminManagement() {
     } catch (err) { alert("保存失敗: " + err.message); } finally { setIsSaving(false); }
   };
 
-  // ✅ 不具合修正版：カテゴリ分けを全体調整のみに限定
   const addAdjustment = (svcId = null) => {
     const name = prompt("項目名を入力");
-    if (!name) return; // 名前がない場合は中断
+    if (!name) return;
     
     let cat = null;
     if (svcId === null) {
-      // 全体調整の場合のみカテゴリを尋ねる
       cat = prompt("カテゴリ名を入力（例：割引、プラス料金、オプション）", "その他") || "その他";
     }
 
     setAdminAdjustments([...adminAdjustments, { id: crypto.randomUUID(), service_id: svcId, name, price: 0, is_percent: false, is_minus: false, category: cat }]);
+  };
+
+  // ✅ ゾンビ防止：削除用共通関数
+  const handleRemoveAdjustment = (adj) => {
+    if (adj.id && typeof adj.id === 'string' && !adj.id.includes('-temp')) {
+      setDeletedAdjIds(prev => [...prev, adj.id]);
+    }
+    setAdminAdjustments(adminAdjustments.filter(a => a.id !== adj.id));
   };
 
   const addProduct = () => {
@@ -273,7 +284,7 @@ function AdminManagement() {
     return days;
   }, [viewMonth]);
 
-  // ✅ 全体調整のみカテゴリでグループ化
+  // ✅ 全体調整のみグループ化
   const groupedWholeAdjustments = useMemo(() => {
     return adminAdjustments
       .filter(adj => adj.service_id === null)
@@ -341,7 +352,6 @@ function AdminManagement() {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div style={{ background: '#d34817', padding: '15px 25px', color: '#fff', display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
               <h2 style={{ margin: 0, fontStyle: 'italic', fontSize: '1.4rem' }}>受付台帳：{selectedDate.replace(/-/g, '/')}</h2>
-              {/* ✅ 日付ナビゲーションボタン */}
               <div style={{ display: 'flex', gap: '8px', marginLeft: '20px' }}>
                 <button onClick={() => handleDateChange(-1)} style={headerBtnSmall}>前日</button>
                 <button onClick={() => setSelectedDate(new Date().toLocaleDateString('sv-SE'))} style={headerBtnSmall}>今日</button>
@@ -394,7 +404,6 @@ function AdminManagement() {
                     <div key={svc.id} style={svcRowStyle}>
                        <span style={{ fontWeight: 'bold', minWidth: '180px' }}>{svc.name}</span>
                        <input type="number" value={svc.price || 0} onChange={(e) => setServices(services.map(s => s.id === svc.id ? {...s, price: parseInt(e.target.value)} : s))} style={priceInputStyle} />
-                       {/* ✅ カットやヘアケア等の施術別プロ調整（カテゴリなし） */}
                        <button onClick={() => addAdjustment(svc.id)} style={optAddBtnStyle}>＋ プロ調整</button>
                        <div style={{ flex: 1, display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                           {adminAdjustments.filter(a => a.service_id === svc.id).map(adj => (
@@ -402,7 +411,7 @@ function AdminManagement() {
                                 <span>{adj.name}</span>
                                 <button onClick={() => cycleAdjType(adj.id)} style={typeBtnStyle}>{adj.is_percent ? '%' : adj.is_minus ? '-' : '+'}</button>
                                 <input type="number" value={adj.price || 0} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, price: parseInt(e.target.value)} : a))} style={miniPriceInput} />
-                                <button onClick={() => setAdminAdjustments(adminAdjustments.filter(a => a.id !== adj.id))} style={{border:'none', background:'none'}}>×</button>
+                                <button onClick={() => handleRemoveAdjustment(adj)} style={{border:'none', background:'none'}}>×</button>
                             </div>
                           ))}
                        </div>
@@ -433,14 +442,13 @@ function AdminManagement() {
                   <button onClick={() => addAdjustment(null)} style={{ ...optAddBtnStyle, borderColor: '#ef4444', color: '#ef4444' }}>＋ 共通項目を追加</button>
                 </div>
                 <div style={{ padding: '20px', display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
-                  {/* ✅ 全体調整のみカテゴリを表示・編集 */}
                   {adminAdjustments.filter(a => a.service_id === null).map(adj => (
                     <div key={adj.id} style={{ ...adjChipStyle, padding: '10px 20px', flexDirection: 'column' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <input value={adj.name} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, name: e.target.value} : a))} style={{ ...optInputStyle, width: '120px' }} />
                         <button onClick={() => cycleAdjType(adj.id)} style={typeBtnStyle}>{adj.is_percent ? '%' : adj.is_minus ? '-' : '+'}</button>
                         <input type="number" value={adj.price || 0} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, price: parseInt(e.target.value)} : a))} style={{ ...optPriceStyle, width: '80px' }} />
-                        <button onClick={() => setAdminAdjustments(adminAdjustments.filter(a => a.id !== adj.id))} style={{ color: '#ff1493', background: 'none', border: 'none' }}><Trash2 size={18} /></button>
+                        <button onClick={() => handleRemoveAdjustment(adj)} style={{ color: '#ff1493', background: 'none', border: 'none' }}><Trash2 size={18} /></button>
                       </div>
                       <input placeholder="カテゴリ（例：割引）" value={adj.category || ''} onChange={(e) => setAdminAdjustments(adminAdjustments.map(a => a.id === adj.id ? {...a, category: e.target.value} : a))} style={{ border: 'none', background: '#f8fafc', fontSize: '0.7rem', width: '100%', marginTop: '5px', padding: '2px 5px', borderRadius: '4px' }} />
                     </div>
@@ -472,11 +480,10 @@ function AdminManagement() {
                         </div>
                       ))}
 
-                      {/* ✅ プロの微調整セクション */}
                       <div style={{ marginTop: '30px' }}>
                         <SectionTitle icon={<Settings size={16} />} title="プロの微調整" color="#ef4444" />
                         
-                        {/* 1. 施術メニュー専用（カテゴリなしを最優先表示） */}
+                        {/* 1. 施術メニュー専用（カテゴリ化せずリスト表示） */}
                         {(() => {
                            const proAdjs = adminAdjustments.filter(adj => adj.service_id !== null && reservationServiceIds.includes(adj.service_id));
                            if (proAdjs.length === 0) return null;
