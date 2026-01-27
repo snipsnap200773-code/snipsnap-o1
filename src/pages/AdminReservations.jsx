@@ -401,38 +401,50 @@ function AdminReservations() {
       const exact = matches.find(r => new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false }) === timeStr);
       return exact || matches.find(r => r.res_type === 'blocked') || matches[0];
     }
-    const buffer = shop?.buffer_preparation_min || 0;
-    const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal' && r.shop_id === shopId);
-    const isInBuffer = dayRes.some(r => {
-      const resEnd = new Date(r.end_time).getTime();
-      return currentSlotStart >= resEnd && currentSlotStart < (resEnd + buffer * 60 * 1000);
-    });
-    if (isInBuffer) return { res_type: 'system_blocked', customer_name: 'ｲﾝﾀｰﾊﾞﾙ', isBuffer: true };
-    if (shop?.auto_fill_logic && dayRes.length > 0) {
-      const primeSeats = []; const gapCandidates = [];
-      dayRes.forEach(r => {
-        const resEnd = new Date(r.end_time).getTime();
-        const earliest = resEnd + (buffer * 60 * 1000);
-        const nextPrime = timeSlots.find(s => {
-          const [sh, sm] = s.split(':').map(Number);
-          const sd = new Date(dateStr); sd.setHours(sh, sm, 0, 0);
-          return sd.getTime() >= earliest;
+const buffer = shop?.buffer_preparation_min || 0;
+
+    // 🆕 1. その日の標準の営業時間を特定する
+    const dayName = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dateObj.getDay()];
+    const hours = shop?.business_hours?.[dayName];
+    // 🆕 2. 今の枠(timeStr)が「標準の営業時間内」かどうか判定
+    const isStandardTime = hours && !hours.is_closed && timeStr >= hours.open && timeStr < hours.close;
+
+    // 🆕 3. 標準の営業時間内である場合のみ、インターバルと自動詰め(－)を表示する
+    if (isStandardTime) {
+        const dayRes = reservations.filter(r => r.start_time.startsWith(dateStr) && r.res_type === 'normal' && r.shop_id === shopId);
+        const isInBuffer = dayRes.some(r => {
+            const resEnd = new Date(r.end_time).getTime();
+            return currentSlotStart >= resEnd && currentSlotStart < (resEnd + buffer * 60 * 1000);
         });
-        if (nextPrime) {
-          primeSeats.push(nextPrime);
-          const pIdx = timeSlots.indexOf(nextPrime);
-          if (pIdx + 1 < timeSlots.length) gapCandidates.push(timeSlots[pIdx + 1]);
+        if (isInBuffer) return { res_type: 'system_blocked', customer_name: 'ｲﾝﾀｰﾊﾞﾙ', isBuffer: true };
+
+        if (shop?.auto_fill_logic && dayRes.length > 0) {
+            const primeSeats = []; const gapCandidates = [];
+            dayRes.forEach(r => {
+                const resEnd = new Date(r.end_time).getTime();
+                const earliest = resEnd + (buffer * 60 * 1000);
+                const nextPrime = timeSlots.find(s => {
+                    const [sh, sm] = s.split(':').map(Number);
+                    const sd = new Date(dateStr); sd.setHours(sh, sm, 0, 0);
+                    return sd.getTime() >= earliest;
+                });
+                if (nextPrime) {
+                    primeSeats.push(nextPrime);
+                    const pIdx = timeSlots.indexOf(nextPrime);
+                    if (pIdx + 1 < timeSlots.length) gapCandidates.push(timeSlots[pIdx + 1]);
+                }
+                const rStartStr = new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+                const startIdx = timeSlots.indexOf(rStartStr);
+                if (startIdx >= 3) gapCandidates.push(timeSlots[startIdx - 3]);
+            });
+            if (gapCandidates.includes(timeStr) && !primeSeats.includes(timeStr)) {
+                return { res_type: 'system_blocked', customer_name: '－', isGap: true };
+            }
         }
-        const rStartStr = new Date(r.start_time).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
-        const startIdx = timeSlots.indexOf(rStartStr);
-        if (startIdx >= 3) gapCandidates.push(timeSlots[startIdx - 3]);
-      });
-      if (gapCandidates.includes(timeStr) && !primeSeats.includes(timeStr)) {
-        return { res_type: 'system_blocked', customer_name: '－', isGap: true };
-      }
-    }
+    } // 🆕 if (isStandardTime) の終わり
+
     return null;
-  };
+    };
 
   const handleBlockTime = async () => {
     // 🆕 1. 予定の名前を入力してもらう小窓を出す
