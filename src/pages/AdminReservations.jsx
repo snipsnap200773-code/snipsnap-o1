@@ -668,12 +668,13 @@ function AdminReservations() {
                       <td key={`${dStr}-${time}`} onClick={() => { setSelectedDate(dStr); setTargetTime(time); if(res && (isStart || res.res_type === 'blocked')){ openDetail(res); } else { setShowMenuModal(true); } }} style={{ borderRight: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9', position: 'relative', cursor: 'pointer' }}>
                         {res && (
                           <div style={{ position: 'absolute', inset: '1px', background: bgColor, color: textColor, padding: '4px 8px', borderRadius: '2px', zIndex: 5, overflow: 'hidden', borderLeft: `2px solid ${borderColor}`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-                            {res.res_type === 'blocked' ? (
-                              res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : 
-                              (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : '✕')
-                            ) : (
-                              res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> : 
-                              (isStart ? (
+{res.res_type === 'blocked' ? (
+  res.isRegularHoliday ? (isStart ? <span style={{fontSize:'0.6rem', fontWeight:'bold'}}>定休日</span> : '') : 
+  (res.customer_name === '臨時休業' && isStart ? <span style={{fontSize:'0.7rem', fontWeight:'bold'}}>臨時休業</span> : 
+    (isStart ? (res.customer_name === '管理者ブロック' ? '✕' : <div style={{fontWeight:'bold', fontSize:'0.7rem', lineHeight:'1.1', overflow:'hidden'}}>{res.customer_name}</div>) : '✕')
+  )
+) : (
+  res.res_type === 'system_blocked' ? <span style={{fontSize:'0.6rem'}}>{res.customer_name}</span> :                              (isStart ? (
                                 <div style={{
                                   fontWeight: 'bold',
                                   fontSize: isPC ? '0.9rem' : 'calc(0.7rem + 0.2vw)', 
