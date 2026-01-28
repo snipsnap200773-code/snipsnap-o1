@@ -273,7 +273,9 @@ function AdminManagement() {
   };
 
   const dailyTotalSales = useMemo(() => {
-    return todayReservations.filter(r => r.status === 'completed').reduce((sum, r) => sum + (r.total_price || 0), 0);
+return todayReservations
+  .filter(r => r.res_type === 'normal' && r.status === 'completed') // 🆕 普通の予約 かつ 完了のみ
+  .reduce((sum, r) => sum + (r.total_price || 0), 0);
   }, [todayReservations]);
 
   const calendarDays = useMemo(() => {
@@ -342,7 +344,7 @@ function AdminManagement() {
                 <button onClick={() => setSelectedDate(new Date().toLocaleDateString('sv-SE'))} style={headerBtnSmall}>今日</button>
                 <button onClick={() => handleDateChange(1)} style={headerBtnSmall}>次日</button>
               </div>
-              <div style={{ background: '#fff', color: '#d34817', padding: '5px 15px', fontWeight: 'bold', marginLeft: 'auto' }}>{todayReservations.length}件の予約</div>
+              <div style={{ background: '#fff', color: '#d34817', padding: '5px 15px', fontWeight: 'bold', marginLeft: 'auto' }}>{todayReservations.filter(r => r.res_type === 'normal').length}件の予約</div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -353,14 +355,39 @@ function AdminManagement() {
                 </thead>
                 <tbody>
                   {todayReservations.length > 0 ? todayReservations.map((res) => {
-                    const info = parseReservationDetails(res);
-                    return (
-                      <tr key={res.id} style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }}>
-                        <td onClick={() => openCheckout(res)} style={tdStyle}>{new Date(res.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                        <td onClick={() => openCustomerInfo(res)} style={{ ...tdStyle, background: res.status === 'completed' ? '#eee' : '#008000', color: '#fff', fontWeight: 'bold' }}>{res.customer_name} {res.status === 'completed' && '✓'}</td>
-                        <td onClick={() => openCheckout(res)} style={tdStyle}>{info.menuName}</td>
-                        <td onClick={() => openCheckout(res)} style={{ ...tdStyle, fontWeight: 'bold' }}>¥ {(res.total_price || info.totalPrice).toLocaleString()}</td>
-                      </tr>
+  const info = parseReservationDetails(res);
+  
+  // 🆕 1. 自己予定（ブロック枠）かどうかを判定
+  const isBlocked = res.res_type === 'blocked';
+
+  return (
+    <tr key={res.id} style={{ borderBottom: '1px solid #eee', cursor: isBlocked ? 'default' : 'pointer' }}>
+      
+      {/* 🆕 時間：予定の場合はクリック（お会計）させない */}
+      <td onClick={() => !isBlocked && openCheckout(res)} style={tdStyle}>
+        {new Date(res.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </td>
+      
+      {/* 🆕 名前：予定の場合は「グレー」、通常予約は「緑（または完了色）」 */}
+      <td onClick={() => openCustomerInfo(res)} style={{ 
+        ...tdStyle, 
+        background: isBlocked ? '#94a3b8' : (res.status === 'completed' ? '#eee' : '#008000'), 
+        color: isBlocked ? '#fff' : (res.status === 'completed' ? '#333' : '#fff'), 
+        fontWeight: 'bold' 
+      }}>
+        {res.customer_name} {res.status === 'completed' && '✓'}
+      </td>
+      
+      {/* 🆕 内容：予定の場合はその名前を、通常予約はメニュー名を表示 */}
+      <td onClick={() => !isBlocked && openCheckout(res)} style={tdStyle}>
+        {isBlocked ? `[自己予定] ${res.customer_name}` : info.menuName}
+      </td>
+      
+      {/* 🆕 金額：予定の場合は「---」を表示して、クリックも無効化 */}
+      <td onClick={() => !isBlocked && openCheckout(res)} style={{ ...tdStyle, fontWeight: 'bold' }}>
+        {isBlocked ? <span style={{color: '#ccc'}}>---</span> : `¥ ${(res.total_price || info.totalPrice).toLocaleString()}`}
+      </td>
+    </tr>
                     );
                   }) : (
                     <tr><td colSpan="4" style={{ padding: '50px', textAlign: 'center', color: '#999' }}>予約はありません。</td></tr>
