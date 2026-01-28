@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { 
   Save, Clipboard, Calendar, FolderPlus, PlusCircle, Trash2, 
-  Tag, ChevronDown, RefreshCw, ChevronLeft, ChevronRight, Settings, Users, Percent, Plus, Minus, X, CheckCircle, User, FileText, History, ShoppingBag, Edit3
+  Tag, ChevronDown, RefreshCw, ChevronLeft, ChevronRight, Settings, Users, Percent, Plus, Minus, X, CheckCircle, User, FileText, History, ShoppingBag, Edit3, BarChart3
 } from 'lucide-react';
 
 function AdminManagement() {
@@ -28,7 +28,7 @@ function AdminManagement() {
   const [deletedAdjIds, setDeletedAdjIds] = useState([]);
   const [deletedProductIds, setDeletedProductIds] = useState([]);
 
-  // --- 日常業務用 ---
+  // --- 予約データ（今年1年分を保持） ---
   const [todayReservations, setTodayReservations] = useState([]);
 
   // --- レジパネル用State ---
@@ -58,18 +58,22 @@ function AdminManagement() {
     }
   }, [cleanShopId, activeMenu, selectedDate]);
 
+  // ✅ 手順1: データ取得範囲を「今年1年分」に拡張
   const fetchInitialData = async () => {
     try {
       setLoading(true);
       const shopRes = await supabase.from('profiles').select('*').eq('id', cleanShopId).single();
       if (shopRes.data) setShop(shopRes.data);
 
+      const startOfYear = `${new Date().getFullYear()}-01-01T00:00:00`;
+      const endOfYear = `${new Date().getFullYear()}-12-31T23:59:59`;
+
       const { data: resData } = await supabase
         .from('reservations')
         .select('*')
         .eq('shop_id', cleanShopId)
-        .gte('start_time', `${selectedDate}T00:00:00`)
-        .lte('start_time', `${selectedDate}T23:59:59`)
+        .gte('start_time', startOfYear)
+        .lte('start_time', endOfYear)
         .order('start_time', { ascending: true });
       setTodayReservations(resData || []);
 
@@ -93,6 +97,36 @@ function AdminManagement() {
       setLoading(false);
     }
   };
+
+  // ✅ 手順2: 分析用集計ロジック (自己予定を完全に除外)
+  const analyticsData = useMemo(() => {
+    // 年間月別の箱 (1月〜12月)
+    const months = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, total: 0, count: 0 }));
+    // 月間日別の箱 (選択月の1日〜末日)
+    const currentYear = viewMonth.getFullYear();
+    const currentMonth = viewMonth.getMonth();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const days = Array.from({ length: daysInMonth }, (_, i) => ({ day: i + 1, total: 0, count: 0 }));
+
+    // 自己予定(blocked)を除外し、完了(completed)のみを計算
+    todayReservations.filter(r => r.res_type === 'normal' && r.status === 'completed').forEach(r => {
+      const d = new Date(r.start_time);
+      const rYear = d.getFullYear();
+      const rMonth = d.getMonth();
+      const rDay = d.getDate();
+
+      if (rYear === currentYear) {
+        months[rMonth].total += (r.total_price || 0);
+        months[rMonth].count += 1;
+
+        if (rMonth === currentMonth) {
+          days[rDay - 1].total += (r.total_price || 0);
+          days[rDay - 1].count += 1;
+        }
+      }
+    });
+    return { months, days };
+  }, [todayReservations, viewMonth]);
 
   const handleDateChange = (days) => {
     const d = new Date(selectedDate);
@@ -272,11 +306,12 @@ function AdminManagement() {
     } catch (err) { alert("保存失敗: " + err.message); } finally { setIsSavingMemo(false); }
   };
 
+  // ✅ 修正： 1年分の中から「選択した日付(selectedDate)」かつ「お客様(normal)」のみを合計
   const dailyTotalSales = useMemo(() => {
-return todayReservations
-  .filter(r => r.res_type === 'normal' && r.status === 'completed') // 🆕 普通の予約 かつ 完了のみ
-  .reduce((sum, r) => sum + (r.total_price || 0), 0);
-  }, [todayReservations]);
+    return todayReservations
+      .filter(r => r.start_time.startsWith(selectedDate) && r.res_type === 'normal' && r.status === 'completed') 
+      .reduce((sum, r) => sum + (r.total_price || 0), 0);
+  }, [todayReservations, selectedDate]);
 
   const calendarDays = useMemo(() => {
     const year = viewMonth.getFullYear(); const month = viewMonth.getMonth();
@@ -314,6 +349,9 @@ return todayReservations
         </div>
         <button style={navBtnStyle(activeMenu === 'work', '#d34817')} onClick={() => setActiveMenu('work')}>日常業務</button>
         <button style={navBtnStyle(activeMenu === 'master_tech', '#4285f4')} onClick={() => setActiveMenu('master_tech')}>施術商品</button>
+        {/* ✅ 手順3: 分析タブボタンを追加 */}
+        <button style={navBtnStyle(activeMenu === 'analytics', '#008000')} onClick={() => setActiveMenu('analytics')}>売上分析</button>
+
         <div style={{ background: '#fff', borderRadius: '12px', padding: '10px', marginTop: '15px', border: '1px solid #4b2c85' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>{viewMonth.getFullYear()}年{viewMonth.getMonth()+1}月</span>
@@ -344,7 +382,10 @@ return todayReservations
                 <button onClick={() => setSelectedDate(new Date().toLocaleDateString('sv-SE'))} style={headerBtnSmall}>今日</button>
                 <button onClick={() => handleDateChange(1)} style={headerBtnSmall}>次日</button>
               </div>
-              <div style={{ background: '#fff', color: '#d34817', padding: '5px 15px', fontWeight: 'bold', marginLeft: 'auto' }}>{todayReservations.filter(r => r.res_type === 'normal').length}件の予約</div>
+              {/* ✅ 修正：1年分の中から今日の日付(selectedDate)のお客様のみカウント */}
+              <div style={{ background: '#fff', color: '#d34817', padding: '5px 15px', fontWeight: 'bold', marginLeft: 'auto' }}>
+                {todayReservations.filter(r => r.start_time.startsWith(selectedDate) && r.res_type === 'normal').length}件の予約
+              </div>
             </div>
             <div style={{ flex: 1, overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -354,41 +395,17 @@ return todayReservations
                   </tr>
                 </thead>
                 <tbody>
-                  {todayReservations.filter(r => r.res_type === 'normal').length > 0 ? 
-  todayReservations.filter(r => r.res_type === 'normal').map((res) => {
-  const info = parseReservationDetails(res);
-  
-  // 🆕 1. 自己予定（ブロック枠）かどうかを判定
-  const isBlocked = res.res_type === 'blocked';
-
-  return (
-    <tr key={res.id} style={{ borderBottom: '1px solid #eee', cursor: isBlocked ? 'default' : 'pointer' }}>
-      
-      {/* 🆕 時間：予定の場合はクリック（お会計）させない */}
-      <td onClick={() => !isBlocked && openCheckout(res)} style={tdStyle}>
-        {new Date(res.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-      </td>
-      
-      {/* 🆕 名前：予定の場合は「グレー」、通常予約は「緑（または完了色）」 */}
-      <td onClick={() => openCustomerInfo(res)} style={{ 
-        ...tdStyle, 
-        background: isBlocked ? '#94a3b8' : (res.status === 'completed' ? '#eee' : '#008000'), 
-        color: isBlocked ? '#fff' : (res.status === 'completed' ? '#333' : '#fff'), 
-        fontWeight: 'bold' 
-      }}>
-        {res.customer_name} {res.status === 'completed' && '✓'}
-      </td>
-      
-      {/* 🆕 内容：予定の場合はその名前を、通常予約はメニュー名を表示 */}
-      <td onClick={() => !isBlocked && openCheckout(res)} style={tdStyle}>
-        {isBlocked ? `[自己予定] ${res.customer_name}` : info.menuName}
-      </td>
-      
-      {/* 🆕 金額：予定の場合は「---」を表示して、クリックも無効化 */}
-      <td onClick={() => !isBlocked && openCheckout(res)} style={{ ...tdStyle, fontWeight: 'bold' }}>
-        {isBlocked ? <span style={{color: '#ccc'}}>---</span> : `¥ ${(res.total_price || info.totalPrice).toLocaleString()}`}
-      </td>
-    </tr>
+                  {/* ✅ 修正：1年分の中から今日の日付(selectedDate)のお客様のみを表示 */}
+                  {todayReservations.filter(r => r.start_time.startsWith(selectedDate) && r.res_type === 'normal').length > 0 ? 
+                    todayReservations.filter(r => r.start_time.startsWith(selectedDate) && r.res_type === 'normal').map((res) => {
+                    const info = parseReservationDetails(res);
+                    return (
+                      <tr key={res.id} style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }}>
+                        <td onClick={() => openCheckout(res)} style={tdStyle}>{new Date(res.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td onClick={() => openCustomerInfo(res)} style={{ ...tdStyle, background: res.status === 'completed' ? '#eee' : '#008000', color: res.status === 'completed' ? '#333' : '#fff', fontWeight: 'bold' }}>{res.customer_name} {res.status === 'completed' && '✓'}</td>
+                        <td onClick={() => openCheckout(res)} style={tdStyle}>{info.menuName}</td>
+                        <td onClick={() => openCheckout(res)} style={{ ...tdStyle, fontWeight: 'bold' }}>¥ {(res.total_price || info.totalPrice).toLocaleString()}</td>
+                      </tr>
                     );
                   }) : (
                     <tr><td colSpan="4" style={{ padding: '50px', textAlign: 'center', color: '#999' }}>予約はありません。</td></tr>
@@ -399,6 +416,68 @@ return todayReservations
             <div style={{ display: 'flex', background: '#d34817', padding: '15px 25px', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', color: '#fff' }}>
                <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>本日のお会計確定 合計</div>
                <div style={{ fontSize: '1.8rem', fontWeight: '900' }}>¥ {dailyTotalSales.toLocaleString()}</div>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ 手順4: 売上分析タブの実装 */}
+        {activeMenu === 'analytics' && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
+            <div style={{ background: '#008000', padding: '15px 25px', color: '#fff' }}>
+              <h2 style={{ margin: 0, fontStyle: 'italic', fontSize: '1.4rem' }}>売上・集計分析 ({viewMonth.getFullYear()}年)</h2>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+              
+              {/* 月間・日別集計 */}
+              <div style={cardStyle}>
+                <div style={catHeaderStyle}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>📅 月間・日別集計 ({viewMonth.getMonth() + 1}月)</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        <th style={thStyle}>日付</th><th style={thStyle}>来客数</th><th style={thStyle}>売上高</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analyticsData.days.map(d => (
+                        <tr key={d.day} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={tdStyle}>{d.day}日</td>
+                          <td style={tdStyle}>{d.count}名</td>
+                          <td style={{ ...tdStyle, fontWeight: 'bold', color: '#d34817' }}>¥ {d.total.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 年間・月別集計 */}
+              <div style={cardStyle}>
+                <div style={catHeaderStyle}>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>🗓️ 年間・月別集計 ({viewMonth.getFullYear()}年)</span>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        <th style={thStyle}>月</th><th style={thStyle}>来客数</th><th style={thStyle}>売上高</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analyticsData.months.map(m => (
+                        <tr key={m.month} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={tdStyle}>{m.month}月</td>
+                          <td style={tdStyle}>{m.count}名</td>
+                          <td style={{ ...tdStyle, fontWeight: 'bold', color: '#4b2c85' }}>¥ {m.total.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
@@ -638,7 +717,7 @@ return todayReservations
   );
 }
 
-// 🆕 スタイル定義パーツ
+// スタイル定義パーツ
 const SectionTitle = ({ icon, title, color }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color, fontWeight: 'bold', borderBottom: `2px solid ${color}`, paddingBottom: '5px', marginBottom: '15px' }}>{icon} {title}</div>
 );
