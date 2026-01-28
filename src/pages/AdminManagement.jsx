@@ -381,7 +381,7 @@ return todayReservations
       
       {/* 🆕 内容：予定の場合はその名前を、通常予約はメニュー名を表示 */}
       <td onClick={() => !isBlocked && openCheckout(res)} style={tdStyle}>
-        {isBlocked ? `[「✕」または予定を入れる] ${res.customer_name}` : info.menuName}
+        {isBlocked ? `[自己予定] ${res.customer_name}` : info.menuName}
       </td>
       
       {/* 🆕 金額：予定の場合は「---」を表示して、クリックも無効化 */}
