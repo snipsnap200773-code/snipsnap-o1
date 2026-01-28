@@ -354,7 +354,8 @@ return todayReservations
                   </tr>
                 </thead>
                 <tbody>
-                  {todayReservations.length > 0 ? todayReservations.map((res) => {
+                  {todayReservations.filter(r => r.res_type === 'normal').length > 0 ? 
+  todayReservations.filter(r => r.res_type === 'normal').map((res) => {
   const info = parseReservationDetails(res);
   
   // 🆕 1. 自己予定（ブロック枠）かどうかを判定
