@@ -185,10 +185,10 @@ function ConfirmReservation() {
           }]);
       }
 
-      // ✅ 綺麗なメニュー名のラベルを作成 (カレンダーや台帳の表示用)
+// ✅ 修正：ReservationFormで作った「fullName（合体名）」を正式採用します
       const menuLabel = people.length > 1
-        ? people.map((p, i) => `${i + 1}人目: ${p.services.map(s => s.name).join(', ')}`).join(' / ')
-        : (people[0]?.services?.map(s => s.name).join(', ') || 'メニューなし');
+        ? people.map((p, i) => `${i + 1}人目: ${p.fullName}`).join(' / ')
+        : (people[0]?.fullName || 'メニューなし');
 
       const { error: dbError } = await supabase.from('reservations').insert([
         {
@@ -280,18 +280,19 @@ function ConfirmReservation() {
         </p>
         
         <p style={{ margin: '0 0 12px 0' }}>📅 <b>日時：</b> {displayDate} {displayTime} 〜</p>
-        <p style={{ margin: '0 0 8px 0' }}>📋 <b>選択メニュー：</b></p>
+<p style={{ margin: '0 0 8px 0' }}>📋 <b>選択メニュー：</b></p>
         <div style={{ background: '#fff', padding: '10px', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.85rem' }}>
           {people && people.map((person, idx) => (
             <div key={idx} style={{ marginBottom: idx < people.length - 1 ? '10px' : 0, paddingBottom: idx < people.length - 1 ? '10px' : 0, borderBottom: idx < people.length - 1 ? '1px dashed #eee' : 'none' }}>
               {people.length > 1 && (
                 <div style={{ fontWeight: 'bold', color: themeColor, marginBottom: '4px' }}>{idx + 1}人目</div>
               )}
-              {person.services.map(s => <div key={s.id}>・{s.name}</div>)}
+              {/* ✅ ここを修正：合体名(fullName)をドーンと表示します */}
+              <div style={{ fontWeight: 'bold' }}>{person.fullName}</div>
             </div>
           ))}
         </div>
-      </div>
+              </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div style={{ position: 'relative' }}>

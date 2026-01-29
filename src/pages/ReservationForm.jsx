@@ -138,20 +138,26 @@ useEffect(() => {
   const isTotalTimeOk = totalSlotsNeeded > 0;
   const isRequiredMet = checkRequiredMet();
 
-  const handleAddPerson = () => {
+const handleAddPerson = () => {
     if (people.length >= 3) return; 
     
+    // ✅ 修正：合体名を作ってから保存する
+    const baseName = selectedServices.map(s => s.name).join(', ');
+    const optName = Object.values(selectedOptions).map(o => o.option_name).join(', ');
+    const fullName = optName ? `${baseName}（${optName}）` : baseName;
+
     setPeople([...people, { 
       services: selectedServices, 
       options: selectedOptions, 
-      slots: currentPersonSlots 
+      slots: currentPersonSlots,
+      fullName: fullName // ✅ 合体名を保存
     }]);
 
     setSelectedServices([]);
     setSelectedOptions({});
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
+  
   const removePerson = (index) => {
     const newPeople = [...people];
     newPeople.splice(index, 1);
@@ -227,14 +233,24 @@ useEffect(() => {
     if (Object.keys(grouped).every(gn => newOptions[`${serviceId}-${gn}`])) scrollToNextValidCategory(catIdx);
   };
 
-  const handleNextStep = () => {
+const handleNextStep = () => {
     window.scrollTo(0,0);
 
+    // ✅ 修正：現在の人（n人目）の合体メニュー名を作る
+    const currentBaseName = selectedServices.map(s => s.name).join(', ');
+    const currentOptionName = Object.values(selectedOptions).map(o => o.option_name).join(', ');
+    const currentFullName = currentOptionName ? `${currentBaseName}（${currentOptionName}）` : currentBaseName;
+
     const commonState = { 
-      people: [...people, { services: selectedServices, options: selectedOptions, slots: currentPersonSlots }],
+      // 既存のpeopleデータに、今の人の合体名(fullName)を足して渡す
+      people: [...people, { 
+        services: selectedServices, 
+        options: selectedOptions, 
+        slots: currentPersonSlots,
+        fullName: currentFullName // ✅ これを次の画面に送る
+      }],
       totalSlotsNeeded,
       lineUser,
-      // ✅ 着せ替え後の店名を次の画面に引き継ぐ
       customShopName: displayBranding.name 
     };
 
