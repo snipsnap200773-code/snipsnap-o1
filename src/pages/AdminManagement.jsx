@@ -122,6 +122,7 @@ function AdminManagement() {
 
   // ✅ ① [修正箇所] お会計金額の計算ロジック（ toggle関数の上に配置しました）
 // --- お会計計算 ＆ 連動ロジック（ここから） ---
+// --- お会計計算 ＆ 連動ロジック ---
   const calculateFinalTotal = (currentSvcs, currentAdjs, currentProds) => {
     let total = currentSvcs.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
     if (selectedRes) {
@@ -130,8 +131,12 @@ function AdminManagement() {
       total += optPrice;
     }
     currentProds.forEach(p => total += Number(p.price || 0));
-    currentAdjs.filter(a => !a.is_percent).forEach(a => { total += a.is_minus ? -Number(a.price) : Number(a.price); });
-    currentAdjs.filter(a => a.is_percent).forEach(a => { total = total * (1 - (Number(a.price) / 100)); });
+    currentAdjs.filter(a => !a.is_percent).forEach(a => {
+      total += a.is_minus ? -Number(a.price) : Number(a.price);
+    });
+    currentAdjs.filter(a => a.is_percent).forEach(a => {
+      total = total * (1 - (Number(a.price) / 100));
+    });
     setFinalPrice(Math.max(0, Math.round(total)));
   };
 
@@ -165,7 +170,7 @@ function AdminManagement() {
     const fullDisplayName = branchNames.length > 0 ? `${newBaseName}（${branchNames.join(', ')}）` : newBaseName;
 
     setAllReservations(prev => prev.map(res => 
-      res.id === selectedRes.id ? { ...res, menu_name: fullDisplayName } : res
+      res.id === selectedRes.id ? { ...res, menu_name: fullDisplayName, total_price: finalPrice } : res
     ));
     setIsMenuPopupOpen(false);
   };
@@ -184,12 +189,30 @@ function AdminManagement() {
     try {
       const totalSlots = checkoutServices.reduce((sum, s) => sum + (Number(s.slots) || 1), 0);
       const endTime = new Date(new Date(selectedRes.start_time).getTime() + totalSlots * (shop.slot_interval_min || 15) * 60000);
-      await supabase.from('reservations').update({ total_price: finalPrice, status: 'completed', total_slots: totalSlots, end_time: endTime.toISOString(), menu_name: checkoutServices.map(s => s.name).join(', '), options: { services: checkoutServices, adjustments: checkoutAdjustments, products: checkoutProducts } }).eq('id', selectedRes.id);
+      
+      // ✅ 町田さんの件：お会計確定時も「枝分かれ込みの名前」でデータベースに保存
+      const currentBaseName = checkoutServices.map(s => s.name).join(', ');
+      const info = parseReservationDetails(selectedRes);
+      const branchNames = info.subItems.map(o => o.option_name).filter(Boolean);
+      const dbMenuName = branchNames.length > 0 ? `${currentBaseName}（${branchNames.join(', ')}）` : currentBaseName;
+
+      await supabase.from('reservations').update({ 
+        total_price: finalPrice, 
+        status: 'completed', 
+        total_slots: totalSlots, 
+        end_time: endTime.toISOString(), 
+        menu_name: dbMenuName, // 👈 ここを修正
+        options: { services: checkoutServices, adjustments: checkoutAdjustments, products: checkoutProducts } 
+      }).eq('id', selectedRes.id);
+
       const { data: cust } = await supabase.from('customers').select('id').eq('shop_id', cleanShopId).eq('name', selectedRes.customer_name).maybeSingle();
       const serviceAmt = checkoutServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
       const productAmt = checkoutProducts.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
       await supabase.from('sales').insert([{ shop_id: cleanShopId, reservation_id: selectedRes.id, customer_id: cust?.id || null, total_amount: finalPrice, service_amount: serviceAmt, product_amount: productAmt, sale_date: selectedDate, details: { services: checkoutServices, products: checkoutProducts, adjustments: checkoutAdjustments } }]);
-      alert("お会計を確定しました。"); setIsCheckoutOpen(false); fetchInitialData();
+      
+      alert("お会計を確定しました。"); 
+      setIsCheckoutOpen(false); 
+      fetchInitialData();
     } catch (err) { alert("確定失敗: " + err.message); }
   };
 
@@ -269,7 +292,7 @@ function AdminManagement() {
   };
 
   const handleDateChangeUI = (days) => { const d = new Date(selectedDate); d.setDate(d.getDate() + days); setSelectedDate(d.toLocaleDateString('sv-SE')); };
-  // --- お会計計算 ＆ 連動ロジック（ここまで） ---
+
   return (
     <div style={fullPageWrapper}>
       <div style={sidebarStyle}>
@@ -341,34 +364,54 @@ function AdminManagement() {
           </div>
         )}
 
-        {activeMenu === 'analytics' && (
+{activeMenu === 'analytics' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
             <div style={{ background: '#008000', padding: '15px 25px', color: '#fff' }}><h2 style={{ margin: 0, fontStyle: 'italic', fontSize: '1.4rem' }}>売上・集計分析 ({viewMonth.getFullYear()}年)</h2></div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px' }}>
-              <div style={{ ...cardStyle, flexShrink: 0 }}>
+              
+              {/* ✅ 日別集計カード（高さを制限して、下の月別表が見えるようにしました） */}
+              <div style={cardStyle}>
                 <div style={catHeaderStyle}><span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>📅 月間・日別集計 ({viewMonth.getMonth() + 1}月)</span></div>
-                <div style={{ maxHeight: '800px', overflowY: 'auto' }}>
+                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}><tr style={{ background: '#f8fafc' }}><th style={thStyle}>日付</th><th style={thStyle}>来客数</th><th style={thStyle}>売上高</th></tr></thead>
+                    <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+                      <tr style={{ background: '#f8fafc' }}>
+                        <th style={thStyle}>日付</th><th style={thStyle}>来客数</th><th style={thStyle}>売上高</th>
+                      </tr>
+                    </thead>
                     <tbody>{analyticsData.days.map(d => (
-                        <tr key={d.day} style={{ borderBottom: '1px solid #eee' }}><td style={tdStyle}>{d.day}日</td><td style={tdStyle}>{d.count}名</td><td style={{ ...tdStyle, fontWeight: 'bold', color: d.total > 0 ? '#d34817' : '#94a3b8' }}>¥ {d.total.toLocaleString()}</td></tr>
+                        <tr key={d.day} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={tdStyle}>{d.day}日</td>
+                          <td style={tdStyle}>{d.count}名</td>
+                          <td style={{ ...tdStyle, fontWeight: 'bold', color: d.total > 0 ? '#d34817' : '#94a3b8' }}>¥ {d.total.toLocaleString()}</td>
+                        </tr>
                     ))}</tbody>
                   </table>
                 </div>
               </div>
+
+              {/* ✅ 年間・月別集計カード（これで大きな画面でも表示されます） */}
               <div style={cardStyle}>
                 <div style={catHeaderStyle}><span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>🗓️ 年間・月別集計</span></div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead><tr style={{ background: '#f8fafc' }}><th style={thStyle}>月</th><th style={thStyle}>来客数</th><th style={thStyle}>売上高</th></tr></thead>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={thStyle}>月</th><th style={thStyle}>来客数</th><th style={thStyle}>売上高</th>
+                    </tr>
+                  </thead>
                   <tbody>{analyticsData.months.map(m => (
-                      <tr key={m.month} style={{ borderBottom: '1px solid #eee' }}><td style={tdStyle}>{m.month}月</td><td style={tdStyle}>{m.count}名</td><td style={{ ...tdStyle, fontWeight: 'bold', color: m.total > 0 ? '#4b2c85' : '#94a3b8' }}>¥ {m.total.toLocaleString()}</td></tr>
+                      <tr key={m.month} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={tdStyle}>{m.month}月</td>
+                        <td style={tdStyle}>{m.count}名</td>
+                        <td style={{ ...tdStyle, fontWeight: 'bold', color: m.total > 0 ? '#4b2c85' : '#94a3b8' }}>¥ {m.total.toLocaleString()}</td>
+                      </tr>
                   ))}</tbody>
                 </table>
               </div>
             </div>
           </div>
         )}
-
+        
         {activeMenu === 'master_tech' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
             <div style={{ background: '#4285f4', padding: '15px 25px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -454,7 +497,7 @@ function AdminManagement() {
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #4b2c85', marginBottom: '15px' }}><div style={{ fontWeight: 'bold' }}>施術内容</div><button onClick={() => setIsMenuPopupOpen(true)} style={{ background: '#f3f0ff', color: '#4b2c85', border: '1px solid #4b2c85', padding: '2px 10px', fontSize: '0.75rem', cursor: 'pointer' }}><Edit3 size={12} /> 変更</button></div>
 <div style={{ background: '#f9f9ff', padding: '15px', borderRadius: '10px', marginBottom: '25px', border: '1px dashed #4b2c85' }}>
   <div style={{ fontWeight: 'bold' }}>
-    {/* ✅ 修正：現在選ばれているメニュー名を表示し、枝分かれがあれば（）で足す */}
+    {/* メインメニュー名と枝分かれ名を合体させて表示 */}
     {checkoutServices.map(s => s.name).join(', ') || 'メニューなし'}
     {(() => {
       const info = parseReservationDetails(selectedRes);
@@ -462,13 +505,11 @@ function AdminManagement() {
       return optNames.length > 0 ? `（${optNames.join(', ')}）` : '';
     })()}
   </div>
-  {/* 時間と価格の表示は維持 */}
   <div style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
     <span>時間: {checkoutServices.reduce((sum, s) => sum + (Number(s.slots) || 1), 0) * (shop?.slot_interval_min || 15)} 分</span>
-<span style={{ fontWeight: 'bold' }}>
-  {/* ✅ ①で修正したロジック済みの「トータル金額(施術+オプション)」を直接表示します */}
-  ¥ {selectedRes ? parseReservationDetails(selectedRes).totalPrice.toLocaleString() : '0'}
-</span>
+    <span style={{ fontWeight: 'bold' }}>
+      ¥ {selectedRes ? parseReservationDetails(selectedRes).totalPrice.toLocaleString() : '0'}
+    </span>
   </div>
 </div>
               <SectionTitle icon={<Settings size={16} />} title="プロの微調整" color="#ef4444" />
@@ -513,7 +554,6 @@ function AdminManagement() {
               <SectionTitle icon={<History size={16} />} title="過去の履歴" color="#4b2c85" />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {pastVisits.map(v => {
-                  // ✅ ③ [修正箇所] 履歴に商品名を表示
                   const details = parseReservationDetails(v);
                   return (
                     <div key={v.id} style={{ background: '#fff', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
@@ -544,13 +584,40 @@ function AdminManagement() {
       )}
 
       {isMenuPopupOpen && (
-        <div style={{ ...checkoutOverlayStyle, zIndex: 2000 }} onClick={() => setIsMenuPopupOpen(false)}><div style={{ ...checkoutPanelStyle, width: '400px', borderRadius: '25px 0 0 25px' }} onClick={(e) => e.stopPropagation()}><div style={{ ...checkoutHeaderStyle, background: '#4b2c85' }}><h3 style={{ margin: 0 }}>メニューの追加・変更</h3><button onClick={() => setIsMenuPopupOpen(false)} style={{ background: 'none', border: 'none', color: '#fff' }}><X size={24} /></button></div><div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>{categories.map(cat => (<div key={cat.id} style={{ marginBottom: '25px' }}><h4 style={{ fontSize: '0.8rem', color: '#666', borderBottom: '1px solid #ddd', paddingBottom: '4px', marginBottom: '10px' }}>{cat.name}</h4><div style={{ display: 'grid', gap: '8px' }}>{services.filter(s => s.category === cat.name).map(svc => (<button key={svc.id} onClick={() => toggleCheckoutService(svc)} style={{ width: '100%', padding: '12px', textAlign: 'left', borderRadius: '10px', border: checkoutServices.some(s => s.id === svc.id) ? `2px solid #4b2c85` : '1px solid #eee', background: checkoutServices.some(s => s.id === svc.id) ? '#f3f0ff' : '#fff', cursor: 'pointer' }}><div style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between' }}><span>{checkoutServices.some(s => s.id === svc.id) ? '✅ ' : ''}{svc.name}</span><span style={{ color: '#4b2c85' }}>¥{svc.price.toLocaleString()}</span></div></button>))}</div></div>))}</div><div style={{ padding: '20px', background: '#f8fafc', borderTop: '1px solid #ddd' }}><button onClick={() => setIsMenuPopupOpen(false)} style={{ ...completeBtnStyle, background: '#4b2c85' }}>完了して反映</button></div></div></div>
+        <div style={{ ...checkoutOverlayStyle, zIndex: 2000 }} onClick={() => setIsMenuPopupOpen(false)}>
+          <div style={{ ...checkoutPanelStyle, width: '400px', borderRadius: '25px 0 0 25px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ ...checkoutHeaderStyle, background: '#4b2c85' }}>
+              <h3 style={{ margin: 0 }}>メニューの追加・変更</h3>
+              <button onClick={() => setIsMenuPopupOpen(false)} style={{ background: 'none', border: 'none', color: '#fff' }}><X size={24} /></button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              {categories.map(cat => (
+                <div key={cat.id} style={{ marginBottom: '25px' }}>
+                  <h4 style={{ fontSize: '0.8rem', color: '#666', borderBottom: '1px solid #ddd', paddingBottom: '4px', marginBottom: '10px' }}>{cat.name}</h4>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {services.filter(s => s.category === cat.name).map(svc => (
+                      <button key={svc.id} onClick={() => toggleCheckoutService(svc)} style={{ width: '100%', padding: '12px', textAlign: 'left', borderRadius: '10px', border: checkoutServices.some(s => s.id === svc.id) ? `2px solid #4b2c85` : '1px solid #eee', background: checkoutServices.some(s => s.id === svc.id) ? '#f3f0ff' : '#fff', cursor: 'pointer' }}>
+                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{checkoutServices.some(s => s.id === svc.id) ? '✅ ' : ''}{svc.name}</span>
+                          <span style={{ color: '#4b2c85' }}>¥{svc.price.toLocaleString()}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: '20px', background: '#f8fafc', borderTop: '1px solid #ddd' }}>
+              <button onClick={applyMenuChangeToLedger} style={{ ...completeBtnStyle, background: '#4b2c85' }}>完了して反映</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-// スタイル定義
+// スタイル定義（ここは変更なし）
 const SectionTitle = ({ icon, title, color }) => (<div style={{ display: 'flex', alignItems: 'center', gap: '8px', color, fontWeight: 'bold', borderBottom: `2px solid ${color}`, paddingBottom: '5px', marginBottom: '15px' }}>{icon} {title}</div>);
 const fullPageWrapper = { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', display: 'flex', background: '#fff', zIndex: 9999, overflow: 'hidden' };
 const sidebarStyle = { width: '260px', background: '#e0d7f7', borderRight: '2px solid #4b2c85', padding: '15px', display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto' };
