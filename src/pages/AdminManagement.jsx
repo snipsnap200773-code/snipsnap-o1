@@ -89,28 +89,46 @@ function AdminManagement() {
   // ✅ ② [修正箇所] データの読み込み口：商品名(savedProducts)を抽出できるようにしました
   const parseReservationDetails = (res) => {
     if (!res) return { menuName: '', totalPrice: 0, items: [], subItems: [], savedAdjustments: [], savedProducts: [] };
+
     const opt = typeof res.options === 'string' ? JSON.parse(res.options) : (res.options || {});
     const items = opt.services || opt.people?.[0]?.services || [];
     const subItems = Object.values(opt.options || opt.people?.[0]?.options || {});
+    
+    // ✅ 修正：DBに保存されたフルネーム(menu_name)を優先的に使い、無ければ組み立てる
+    const baseNames = items.map(s => s.name).join(', ');
+    const optionNames = subItems.map(o => o.option_name).join(', ');
+    const fullMenuName = res.menu_name || (optionNames ? `${baseNames}（${optionNames}）` : (baseNames || 'メニューなし'));
+
     let basePrice = items.reduce((sum, item) => {
       let p = Number(item.price);
-      if (!p || p === 0) { const master = services.find(s => s.id === item.id || s.name === item.name); p = master ? Number(master.price) : 0; }
+      if (!p || p === 0) {
+        const master = services.find(s => s.id === item.id || s.name === item.name);
+        p = master ? Number(master.price) : 0;
+      }
       return sum + p;
     }, 0);
+
     const optPrice = subItems.reduce((sum, o) => sum + (Number(o.additional_price) || 0), 0);
+
     return { 
-      menuName: items.map(s => s.name).join(', ') || 'メニューなし', 
+      menuName: fullMenuName, 
       totalPrice: basePrice + optPrice, 
       items, 
       subItems, 
       savedAdjustments: opt.adjustments || [], 
-      savedProducts: opt.products || [] // ← 商品履歴のために追加
+      savedProducts: opt.products || [] 
     };
   };
 
   // ✅ ① [修正箇所] お会計金額の計算ロジック（ toggle関数の上に配置しました）
+// --- お会計計算 ＆ 連動ロジック（ここから） ---
   const calculateFinalTotal = (currentSvcs, currentAdjs, currentProds) => {
     let total = currentSvcs.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+    if (selectedRes) {
+      const info = parseReservationDetails(selectedRes);
+      const optPrice = info.subItems.reduce((sum, o) => sum + (Number(o.additional_price) || 0), 0);
+      total += optPrice;
+    }
     currentProds.forEach(p => total += Number(p.price || 0));
     currentAdjs.filter(a => !a.is_percent).forEach(a => { total += a.is_minus ? -Number(a.price) : Number(a.price); });
     currentAdjs.filter(a => a.is_percent).forEach(a => { total = total * (1 - (Number(a.price) / 100)); });
@@ -131,7 +149,27 @@ function AdminManagement() {
     calculateFinalTotal(checkoutServices, checkoutAdjustments, newSelection);
   };
 
-  // ✅ レジを開く：リセット防止
+  const toggleCheckoutService = (svc) => {
+    const isSelected = checkoutServices.find(s => s.id === svc.id);
+    const newSelection = isSelected ? checkoutServices.filter(s => s.id !== svc.id) : [...checkoutServices, svc];
+    setCheckoutServices(newSelection);
+    calculateFinalTotal(newSelection, checkoutAdjustments, checkoutProducts);
+  };
+
+  // ✅ 町田さんの件：完了ボタンを押した瞬間に台帳へ同期する命令
+  const applyMenuChangeToLedger = () => {
+    if (!selectedRes) return;
+    const newBaseName = checkoutServices.map(s => s.name).join(', ');
+    const info = parseReservationDetails(selectedRes);
+    const branchNames = info.subItems.map(o => o.option_name).filter(Boolean);
+    const fullDisplayName = branchNames.length > 0 ? `${newBaseName}（${branchNames.join(', ')}）` : newBaseName;
+
+    setAllReservations(prev => prev.map(res => 
+      res.id === selectedRes.id ? { ...res, menu_name: fullDisplayName } : res
+    ));
+    setIsMenuPopupOpen(false);
+  };
+
   const openCheckout = (res) => {
     const info = parseReservationDetails(res);
     setSelectedRes(res);
@@ -162,9 +200,7 @@ function AdminManagement() {
   };
 
   const handleRemoveAdjustment = (adj) => { if (adj.id && typeof adj.id === 'string' && !adj.id.includes('-temp')) setDeletedAdjIds(prev => [...prev, adj.id]); setAdminAdjustments(adminAdjustments.filter(a => a.id !== adj.id)); };
-
   const addProduct = () => { const name = prompt("商品名を入力してください"); if (name) setProducts([...products, { id: crypto.randomUUID(), name, price: 0 }]); };
-
   const dailyTotalSales = useMemo(() => allReservations.filter(r => r.start_time.startsWith(selectedDate) && r.res_type === 'normal' && r.status === 'completed').reduce((sum, r) => sum + (r.total_price || 0), 0), [allReservations, selectedDate]);
 
   const analyticsData = useMemo(() => {
@@ -226,17 +262,14 @@ function AdminManagement() {
   const cycleAdjType = (id) => {
     setAdminAdjustments(prev => prev.map(a => {
       if (a.id !== id) return a;
-      // 現在が「＋」なら「－」へ
       if (!a.is_minus && !a.is_percent) return { ...a, is_minus: true, is_percent: false };
-      // 現在が「－」なら「％」へ
       if (a.is_minus) return { ...a, is_minus: false, is_percent: true };
-      // 現在が「％」なら「＋」へ戻る
       return { ...a, is_minus: false, is_percent: false };
     }));
   };
 
   const handleDateChangeUI = (days) => { const d = new Date(selectedDate); d.setDate(d.getDate() + days); setSelectedDate(d.toLocaleDateString('sv-SE')); };
-
+  // --- お会計計算 ＆ 連動ロジック（ここまで） ---
   return (
     <div style={fullPageWrapper}>
       <div style={sidebarStyle}>
@@ -421,14 +454,23 @@ function AdminManagement() {
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #4b2c85', marginBottom: '15px' }}><div style={{ fontWeight: 'bold' }}>施術内容</div><button onClick={() => setIsMenuPopupOpen(true)} style={{ background: '#f3f0ff', color: '#4b2c85', border: '1px solid #4b2c85', padding: '2px 10px', fontSize: '0.75rem', cursor: 'pointer' }}><Edit3 size={12} /> 変更</button></div>
 <div style={{ background: '#f9f9ff', padding: '15px', borderRadius: '10px', marginBottom: '25px', border: '1px dashed #4b2c85' }}>
   <div style={{ fontWeight: 'bold' }}>
-    {/* ✅ メインメニューと枝分かれ（オプション）を合体させた名前を表示します */}
-    {selectedRes ? parseReservationDetails(selectedRes).menuName : 'メニューなし'}
+    {/* ✅ 修正：現在選ばれているメニュー名を表示し、枝分かれがあれば（）で足す */}
+    {checkoutServices.map(s => s.name).join(', ') || 'メニューなし'}
+    {(() => {
+      const info = parseReservationDetails(selectedRes);
+      const optNames = info.subItems.map(o => o.option_name).filter(Boolean);
+      return optNames.length > 0 ? `（${optNames.join(', ')}）` : '';
+    })()}
   </div>
+  {/* 時間と価格の表示は維持 */}
   <div style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
     <span>時間: {checkoutServices.reduce((sum, s) => sum + (Number(s.slots) || 1), 0) * (shop?.slot_interval_min || 15)} 分</span>
-    <span style={{ fontWeight: 'bold' }}>¥ {checkoutServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0).toLocaleString()}</span>
+<span style={{ fontWeight: 'bold' }}>
+  {/* ✅ ①で修正したロジック済みの「トータル金額(施術+オプション)」を直接表示します */}
+  ¥ {selectedRes ? parseReservationDetails(selectedRes).totalPrice.toLocaleString() : '0'}
+</span>
   </div>
-</div>              
+</div>
               <SectionTitle icon={<Settings size={16} />} title="プロの微調整" color="#ef4444" />
               {(() => {
                 const resIds = checkoutServices.map(s => s.id);
