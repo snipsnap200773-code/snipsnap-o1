@@ -89,14 +89,26 @@ const [isMenuPopupOpen, setIsMenuPopupOpen] = useState(false);
   };
 
   // ✅ ② [修正箇所] データの読み込み口：商品名(savedProducts)を抽出できるようにしました
-  const parseReservationDetails = (res) => {
+const parseReservationDetails = (res) => {
     if (!res) return { menuName: '', totalPrice: 0, items: [], subItems: [], savedAdjustments: [], savedProducts: [] };
 
     const opt = typeof res.options === 'string' ? JSON.parse(res.options) : (res.options || {});
-    const items = opt.services || opt.people?.[0]?.services || [];
-    const subItems = Object.values(opt.options || opt.people?.[0]?.options || {});
     
-    // ✅ 修正：DBに保存されたフルネーム(menu_name)を優先的に使い、無ければ組み立てる
+    // ✅ 修正：people配列がある場合、全員分のservicesとoptionsを合体させる
+    let items = [];
+    let subItems = [];
+
+    if (opt.people && Array.isArray(opt.people)) {
+      // 全員のメニューを一つの配列にまとめる
+      items = opt.people.flatMap(p => p.services || []);
+      // 全員の枝分かれ（シャンプー等）を一つの配列にまとめる
+      subItems = opt.people.flatMap(p => Object.values(p.options || {}));
+    } else {
+      // 従来の単名予約の場合
+      items = opt.services || [];
+      subItems = Object.values(opt.options || {});
+    }
+
     const baseNames = items.map(s => s.name).join(', ');
     const optionNames = subItems.map(o => o.option_name).join(', ');
     const fullMenuName = res.menu_name || (optionNames ? `${baseNames}（${optionNames}）` : (baseNames || 'メニューなし'));
@@ -552,19 +564,32 @@ const [isMenuPopupOpen, setIsMenuPopupOpen] = useState(false);
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #4b2c85', marginBottom: '15px' }}><div style={{ fontWeight: 'bold' }}>施術内容</div><button onClick={() => setIsMenuPopupOpen(true)} style={{ background: '#f3f0ff', color: '#4b2c85', border: '1px solid #4b2c85', padding: '2px 10px', fontSize: '0.75rem', cursor: 'pointer' }}><Edit3 size={12} /> 変更</button></div>
 <div style={{ background: '#f9f9ff', padding: '15px', borderRadius: '10px', marginBottom: '25px', border: '1px dashed #4b2c85' }}>
-  <div style={{ fontWeight: 'bold' }}>
-    {/* メインメニュー名と枝分かれ名を合体させて表示 */}
-    {checkoutServices.map(s => s.name).join(', ') || 'メニューなし'}
+  <div style={{ fontWeight: 'bold', marginBottom: '10px' }}>
+    {/* ✅ 修正：2人以上の時だけ「n人目」を表示し、1人の時はメニュー名のみ表示 */}
     {(() => {
-      const info = parseReservationDetails(selectedRes);
-      const optNames = info.subItems.map(o => o.option_name).filter(Boolean);
-      return optNames.length > 0 ? `（${optNames.join(', ')}）` : '';
+      const opt = typeof selectedRes?.options === 'string' ? JSON.parse(selectedRes.options) : (selectedRes?.options || {});
+      const people = opt.people || [];
+
+      if (people.length > 1) {
+        // 2人以上の場合
+        return people.map((p, i) => (
+          <div key={i} style={{ fontSize: '0.9rem', marginBottom: '5px' }}>
+            <span style={{ color: '#4b2c85' }}>{i + 1}人目:</span> {p.fullName || p.services.map(s => s.name).join(', ')}
+          </div>
+        ));
+      } else {
+        // 1人の場合（1人目という文字を消してスッキリ表示）
+        const singleMenu = people[0]?.fullName || 
+                           people[0]?.services.map(s => s.name).join(', ') || 
+                           parseReservationDetails(selectedRes).menuName;
+        return <div>{singleMenu}</div>;
+      }
     })()}
   </div>
-  <div style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
-    <span>時間: {checkoutServices.reduce((sum, s) => sum + (Number(s.slots) || 1), 0) * (shop?.slot_interval_min || 15)} 分</span>
-    <span style={{ fontWeight: 'bold' }}>
-      ¥ {selectedRes ? parseReservationDetails(selectedRes).totalPrice.toLocaleString() : '0'}
+  <div style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #eee', paddingTop: '8px' }}>
+    <span>合計コマ数: {selectedRes?.total_slots || 0} コマ</span>
+    <span style={{ fontWeight: 'bold', color: '#d34817', fontSize: '1rem' }}>
+      施術合計: ¥ {selectedRes ? parseReservationDetails(selectedRes).totalPrice.toLocaleString() : '0'}
     </span>
   </div>
 </div>
