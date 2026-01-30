@@ -40,8 +40,10 @@ function AdminManagement() {
   const [checkoutProducts, setCheckoutProducts] = useState([]); 
   const [finalPrice, setFinalPrice] = useState(0);
   const [openAdjCategory, setOpenAdjCategory] = useState(null); 
-  const [isMenuPopupOpen, setIsMenuPopupOpen] = useState(false); 
-
+const [isMenuPopupOpen, setIsMenuPopupOpen] = useState(false); 
+  // --- 🆕 売上分析用の新Stateを追加 ---
+  const [viewYear, setViewYear] = useState(new Date().getFullYear()); // 表示する年
+  const [selectedMonthData, setSelectedMonthData] = useState(null);   // ポップアップで表示する月のデータ
   // --- 顧客情報（カルテ）パネル用State ---
   const [isCustomerInfoOpen, setIsCustomerInfoOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -226,18 +228,54 @@ function AdminManagement() {
   const addProduct = () => { const name = prompt("商品名を入力してください"); if (name) setProducts([...products, { id: crypto.randomUUID(), name, price: 0 }]); };
   const dailyTotalSales = useMemo(() => allReservations.filter(r => r.start_time.startsWith(selectedDate) && r.res_type === 'normal' && r.status === 'completed').reduce((sum, r) => sum + (r.total_price || 0), 0), [allReservations, selectedDate]);
 
+// ✅ ロジック修正：年単位で12ヶ月分を日別データ込みで集計します
   const analyticsData = useMemo(() => {
-    const months = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, total: 0, count: 0 }));
-    const currentYear = viewMonth.getFullYear(); const currentMonth = viewMonth.getMonth();
-    const daysInMonthCount = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const days = Array.from({ length: daysInMonthCount }, (_, i) => ({ day: i + 1, total: 0, count: 0 }));
-    const salesResIds = new Set(salesRecords.map(s => s.reservation_id));
-    allReservations.filter(r => r.res_type === 'normal' && r.status === 'completed' && !salesResIds.has(r.id)).forEach(r => {
-      const d = new Date(r.start_time); if (d.getFullYear() === currentYear) { months[d.getMonth()].total += (r.total_price || 0); months[d.getMonth()].count += 1; if (d.getMonth() === currentMonth) { days[d.getDate() - 1].total += (r.total_price || 0); days[d.getDate() - 1].count += 1; } }
+    const currentYear = viewYear;
+    // 12ヶ月分の箱を用意
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const month = i + 1;
+      // その月の日数を計算
+      const daysInMonth = new Date(currentYear, month, 0).getDate();
+      return {
+        month: month,
+        total: 0,
+        count: 0,
+        days: Array.from({ length: daysInMonth }, (_, j) => ({ day: j + 1, total: 0, count: 0 }))
+      };
     });
-    salesRecords.forEach(s => { const d = new Date(s.sale_date); if (d.getFullYear() === currentYear) { months[d.getMonth()].total += (s.total_amount || 0); months[d.getMonth()].count += 1; if (d.getMonth() === currentMonth) { days[d.getDate() - 1].total += (s.total_amount || 0); days[d.getDate() - 1].count += 1; } } });
-    return { months, days };
-  }, [allReservations, salesRecords, viewMonth]);
+
+    const salesResIds = new Set(salesRecords.map(s => s.reservation_id));
+
+    // 1. 予約データ（reservations）の集計
+    allReservations.filter(r => r.status === 'completed' && !salesResIds.has(r.id)).forEach(r => {
+      const d = new Date(r.start_time);
+      if (d.getFullYear() === currentYear) {
+        const mIdx = d.getMonth();
+        const dIdx = d.getDate() - 1;
+        months[mIdx].total += (r.total_price || 0);
+        months[mIdx].count += 1;
+        months[mIdx].days[dIdx].total += (r.total_price || 0);
+        months[mIdx].days[dIdx].count += 1;
+      }
+    });
+
+    // 2. 売上記録（sales）の集計
+    salesRecords.forEach(s => {
+      const d = new Date(s.sale_date);
+      if (d.getFullYear() === currentYear) {
+        const mIdx = d.getMonth();
+        const dIdx = d.getDate() - 1;
+        months[mIdx].total += (s.total_amount || 0);
+        months[mIdx].count += 1;
+        if (months[mIdx].days[dIdx]) {
+          months[mIdx].days[dIdx].total += (s.total_amount || 0);
+          months[mIdx].days[dIdx].count += 1;
+        }
+      }
+    });
+
+    return months;
+  }, [allReservations, salesRecords, viewYear]);
 
   const groupedWholeAdjustments = useMemo(() => {
     const sorted = sortItems(adminAdjustments.filter(adj => adj.service_id === null));
@@ -365,50 +403,68 @@ function AdminManagement() {
         )}
 
 {activeMenu === 'analytics' && (
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f8fafc' }}>
-            <div style={{ background: '#008000', padding: '15px 25px', color: '#fff' }}><h2 style={{ margin: 0, fontStyle: 'italic', fontSize: '1.4rem' }}>売上・集計分析 ({viewMonth.getFullYear()}年)</h2></div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px' }}>
-              
-              {/* ✅ 日別集計カード（高さを制限して、下の月別表が見えるようにしました） */}
-              <div style={cardStyle}>
-                <div style={catHeaderStyle}><span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>📅 月間・日別集計 ({viewMonth.getMonth() + 1}月)</span></div>
-                <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
-                      <tr style={{ background: '#f8fafc' }}>
-                        <th style={thStyle}>日付</th><th style={thStyle}>来客数</th><th style={thStyle}>売上高</th>
-                      </tr>
-                    </thead>
-                    <tbody>{analyticsData.days.map(d => (
-                        <tr key={d.day} style={{ borderBottom: '1px solid #eee' }}>
-                          <td style={tdStyle}>{d.day}日</td>
-                          <td style={tdStyle}>{d.count}名</td>
-                          <td style={{ ...tdStyle, fontWeight: 'bold', color: d.total > 0 ? '#d34817' : '#94a3b8' }}>¥ {d.total.toLocaleString()}</td>
-                        </tr>
-                    ))}</tbody>
-                  </table>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f0f2f5' }}>
+            {/* 🆕 年度切り替えヘッダー */}
+            <div style={{ background: '#008000', padding: '15px 25px', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '30px' }}>
+              <button onClick={() => setViewYear(v => v - 1)} style={yearBtnStyle}>◀</button>
+              <h2 style={{ margin: 0, fontStyle: 'italic', fontSize: '1.6rem' }}>{viewYear}年 売上分析</h2>
+              <button onClick={() => setViewYear(v => v + 1)} style={yearBtnStyle}>▶</button>
+            </div>
+
+            {/* 🆕 月別カードグリッド（タイル状に並べる） */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '15px' }}>
+              {analyticsData.map(m => (
+                <div key={m.month} onClick={() => setSelectedMonthData(m)} style={monthCardStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '1.4rem', fontWeight: '900', color: '#008000' }}>{m.month}月</span>
+                    <BarChart3 size={20} color="#94a3b8" />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <span style={{ color: '#666', fontSize: '0.8rem' }}>来客数</span>
+                    <span style={{ fontWeight: 'bold' }}>{m.count} 名</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ color: '#666', fontSize: '0.8rem' }}>売上合計</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: '900', color: '#d34817' }}>¥ {m.total.toLocaleString()}</span>
+                  </div>
+                  <div style={{ marginTop: '12px', fontSize: '0.65rem', color: '#4285f4', textAlign: 'right', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>タップして日別詳細を表示 →</div>
+                </div>
+              ))}
+            </div>
+
+            {/* 🆕 日別詳細ポップアップ（モーダル） */}
+            {selectedMonthData && (
+              <div style={modalOverlayStyle} onClick={() => setSelectedMonthData(null)}>
+                <div style={modalContentStyle} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #008000', paddingBottom: '10px', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0 }}>{viewYear}年 {selectedMonthData.month}月 日別詳細</h3>
+                    <button onClick={() => setSelectedMonthData(null)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}><X /></button>
+                  </div>
+                  <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}><tr style={{ background: '#f8fafc' }}><th style={thStyle}>日付</th><th style={thStyle}>来客数</th><th style={thStyle}>売上高</th></tr></thead>
+                      <tbody>
+                        {selectedMonthData.days.filter(d => d.total > 0).length > 0 ? (
+                          selectedMonthData.days.filter(d => d.total > 0).map(d => (
+                            <tr key={d.day} style={{ borderBottom: '1px solid #eee' }}>
+                              <td style={tdStyle}>{d.day}日</td>
+                              <td style={tdStyle}>{d.count}名</td>
+                              <td style={{ ...tdStyle, fontWeight: 'bold', color: '#d34817' }}>¥ {d.total.toLocaleString()}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr><td colSpan="3" style={{ padding: '30px', textAlign: 'center', color: '#999' }}>売上データなし</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ marginTop: '20px', padding: '15px', background: '#f0fdf4', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 'bold', color: '#008000' }}>{selectedMonthData.month}月 合計</span>
+                    <span style={{ fontSize: '1.6rem', fontWeight: '900', color: '#d34817' }}>¥ {selectedMonthData.total.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
-
-              {/* ✅ 年間・月別集計カード（これで大きな画面でも表示されます） */}
-              <div style={cardStyle}>
-                <div style={catHeaderStyle}><span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>🗓️ 年間・月別集計</span></div>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc' }}>
-                      <th style={thStyle}>月</th><th style={thStyle}>来客数</th><th style={thStyle}>売上高</th>
-                    </tr>
-                  </thead>
-                  <tbody>{analyticsData.months.map(m => (
-                      <tr key={m.month} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={tdStyle}>{m.month}月</td>
-                        <td style={tdStyle}>{m.count}名</td>
-                        <td style={{ ...tdStyle, fontWeight: 'bold', color: m.total > 0 ? '#4b2c85' : '#94a3b8' }}>¥ {m.total.toLocaleString()}</td>
-                      </tr>
-                  ))}</tbody>
-                </table>
-              </div>
-            </div>
+            )}
           </div>
         )}
         
@@ -643,5 +699,9 @@ const adjChipStyle = { background: '#fff5f5', border: '1px solid #feb2b2', paddi
 const typeBtnStyle = { border: '1px solid #ef4444', background: '#fff', borderRadius: '4px', padding: '2px 5px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#ef4444' };
 const optInputStyle = { background: 'transparent', border: 'none', fontSize: '0.9rem', fontWeight: 'bold' };
 const optPriceStyle = { border: 'none', background: '#fff', width: '70px', textAlign: 'right', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' };
+const yearBtnStyle = { background: 'rgba(255,255,255,0.2)', border: '1px solid #fff', color: '#fff', padding: '5px 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' };
+const monthCardStyle = { background: '#fff', padding: '20px', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0', cursor: 'pointer' };
+const modalOverlayStyle = { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 10000 };
+const modalContentStyle = { background: '#fff', padding: '25px', borderRadius: '24px', width: '90%', maxWidth: '450px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' };
 
 export default AdminManagement;
