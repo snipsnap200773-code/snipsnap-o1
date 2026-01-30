@@ -758,19 +758,35 @@ const getStatusAt = (dateStr, timeStr) => {
       <div style={{ background: themeColorLight, padding: '10px', borderRadius: '8px', marginBottom: '15px', border: `1px solid ${themeColor}` }}>
         <label style={{ fontSize: '0.7rem', fontWeight: 'bold', color: themeColor }}>📋 予約メニュー</label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '5px' }}>
-          {selectedRes.options?.people ? (
-            selectedRes.options.people.map((person, pIdx) => (
-              person.services.map((s, sIdx) => (
-                <span key={`${pIdx}-${sIdx}`} style={{ background: themeColor, color: '#fff', padding: '2px 8px', borderRadius: '15px', fontSize: '0.7rem', fontWeight: 'bold' }}>
-                  {selectedRes.options.people.length > 1 ? `(${pIdx + 1})${s.name}` : s.name}
-                </span>
-              ))
-            ))
-          ) : (
-            selectedRes.options?.services?.map((s, idx) => (
-              <span key={idx} style={{ background: themeColor, color: '#fff', padding: '2px 8px', borderRadius: '15px', fontSize: '0.7rem', fontWeight: 'bold' }}>{s.name}</span>
-            )) || <span style={{fontSize:'0.75rem', color:'#94a3b8'}}>メニュー情報なし</span>
-          )}
+{selectedRes.options?.people ? (
+  selectedRes.options.people.map((person, pIdx) => (
+    person.services.map((s, sIdx) => {
+      // ✅ このメニュー(s.id)に紐づくオプション名を抽出
+      const optNames = Object.values(person.options || {})
+        .filter(opt => opt.service_id === s.id)
+        .map(opt => opt.option_name);
+      const displayName = optNames.length > 0 ? `${s.name}（${optNames.join(', ')}）` : s.name;
+
+      return (
+        <span key={`${pIdx}-${sIdx}`} style={{ background: themeColor, color: '#fff', padding: '2px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+          {selectedRes.options.people.length > 1 ? `(${pIdx + 1})${displayName}` : displayName}
+        </span>
+      );
+    })
+  ))
+) : (
+  selectedRes.options?.services?.map((s, idx) => {
+    // 単名予約の場合のオプション抽出
+    const optNames = Object.values(selectedRes.options.options || {})
+      .filter(opt => opt.service_id === s.id)
+      .map(opt => opt.option_name);
+    const displayName = optNames.length > 0 ? `${s.name}（${optNames.join(', ')}）` : s.name;
+
+    return (
+      <span key={idx} style={{ background: themeColor, color: '#fff', padding: '2px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 'bold' }}>{displayName}</span>
+    );
+  }) || <span style={{fontSize:'0.75rem', color:'#94a3b8'}}>メニュー情報なし</span>
+)}
         </div>
       </div>
     )}
@@ -814,11 +830,23 @@ const getStatusAt = (dateStr, timeStr) => {
                   {!selectedRes?.isRegularHoliday && (showCustomerModal ? customerFullHistory : customerHistory).map(h => (
                     <div key={h.id} style={{ padding: '12px', borderBottom: '1px solid #f1f5f9', fontSize: '0.85rem' }}>
                       <div style={{ fontWeight: 'bold' }}>{new Date(h.start_time).toLocaleDateString('ja-JP')}</div>
-                      <div style={{ color: themeColor, marginTop: '2px' }}>
-                        {h.options?.people 
-                          ? h.options.people.map(p => p.services.map(s => s.name).join(', ')).join(' / ')
-                          : h.options?.services?.map(s => s.name).join(', ') || 'メニュー情報なし'}
-                      </div>
+<div style={{ color: themeColor, marginTop: '2px' }}>
+  {h.options?.people 
+    ? h.options.people.map(p => 
+        p.services.map(s => {
+          const optNames = Object.values(p.options || {})
+            .filter(opt => opt.service_id === s.id)
+            .map(opt => opt.option_name);
+          return optNames.length > 0 ? `${s.name}（${optNames.join(', ')}）` : s.name;
+        }).join(', ')
+      ).join(' / ')
+    : h.options?.services?.map(s => {
+        const optNames = Object.values(h.options.options || {})
+          .filter(opt => opt.service_id === s.id)
+          .map(opt => opt.option_name);
+        return optNames.length > 0 ? `${s.name}（${optNames.join(', ')}）` : s.name;
+      }).join(', ') || 'メニュー情報なし'}
+</div>
                     </div>
                   ))}
                 </div>
