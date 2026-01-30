@@ -236,6 +236,8 @@ function Home() {
           </div>
         </div>
 
+      </div>
+
       <div style={{ padding: '60px 20px', textAlign: 'center', color: '#cbd5e1', fontSize: '0.7rem' }}>
         <p>© 2026 Solopreneur Portal SoloPre</p>
       </div>
