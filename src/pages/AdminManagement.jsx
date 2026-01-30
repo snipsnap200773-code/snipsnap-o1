@@ -38,6 +38,8 @@ function AdminManagement() {
   const [checkoutServices, setCheckoutServices] = useState([]); 
   const [checkoutAdjustments, setCheckoutAdjustments] = useState([]); 
   const [checkoutProducts, setCheckoutProducts] = useState([]); 
+  // ✅ 追記：レジで選択中の枝分かれメニューを保持する箱
+  const [checkoutOptions, setCheckoutOptions] = useState({});
   const [finalPrice, setFinalPrice] = useState(0);
   const [openAdjCategory, setOpenAdjCategory] = useState(null); 
 const [isMenuPopupOpen, setIsMenuPopupOpen] = useState(false); 
@@ -137,13 +139,15 @@ const parseReservationDetails = (res) => {
   // ✅ ① [修正箇所] お会計金額の計算ロジック（ toggle関数の上に配置しました）
 // --- お会計計算 ＆ 連動ロジック（ここから） ---
 // --- お会計計算 ＆ 連動ロジック ---
-  const calculateFinalTotal = (currentSvcs, currentAdjs, currentProds) => {
+const calculateFinalTotal = (currentSvcs, currentAdjs, currentProds, currentOpts = checkoutOptions) => {
+    // 1. メインメニューの合計
     let total = currentSvcs.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
-    if (selectedRes) {
-      const info = parseReservationDetails(selectedRes);
-      const optPrice = info.subItems.reduce((sum, o) => sum + (Number(o.additional_price) || 0), 0);
-      total += optPrice;
-    }
+    
+    // ✅ 修正：予約データ(parseDetails)ではなく、レジで選択中のオプション(currentOpts)を合計する
+    const optPrice = Object.values(currentOpts).reduce((sum, o) => sum + (Number(o.additional_price) || 0), 0);
+    total += optPrice;
+
+    // 3. 店販・調整の計算
     currentProds.forEach(p => total += Number(p.price || 0));
     currentAdjs.filter(a => !a.is_percent).forEach(a => {
       total += a.is_minus ? -Number(a.price) : Number(a.price);
@@ -153,7 +157,6 @@ const parseReservationDetails = (res) => {
     });
     setFinalPrice(Math.max(0, Math.round(total)));
   };
-
   const toggleCheckoutAdj = (adj) => {
     const isSelected = checkoutAdjustments.find(a => a.id === adj.id);
     const newSelection = isSelected ? checkoutAdjustments.filter(a => a.id !== adj.id) : [...checkoutAdjustments, adj];
@@ -189,16 +192,33 @@ const parseReservationDetails = (res) => {
     setIsMenuPopupOpen(false);
   };
 
-  const openCheckout = (res) => {
+const openCheckout = (res) => {
     const info = parseReservationDetails(res);
     setSelectedRes(res);
     setCheckoutServices(info.items);
     setCheckoutAdjustments(info.savedAdjustments);
     setCheckoutProducts(info.savedProducts);
+
+    // ✅ 追記：予約時の枝分かれ設定をレジ用の箱(checkoutOptions)にコピー
+    const opt = typeof res.options === 'string' ? JSON.parse(res.options) : (res.options || {});
+    // 複数名予約(people)と単名予約(options)の両方から集約
+    const initialOpts = opt.people 
+      ? opt.people.flatMap(p => Object.entries(p.options || {})) 
+      : Object.entries(opt.options || {});
+    setCheckoutOptions(Object.fromEntries(initialOpts));
+
     setFinalPrice(res.total_price || info.totalPrice);
     setOpenAdjCategory(null); setIsCheckoutOpen(true); setIsCustomerInfoOpen(false);
-  };
+  }; // 👈 ここで openCheckout は一旦終わり！
 
+  // --- 4. 操作用関数（新しく追加するもの） ---
+  // openCheckout の中ではなく、すぐ下に新しく書きます
+  const toggleCheckoutOption = (serviceId, groupName, opt) => {
+    const key = `${serviceId}-${groupName}`;
+    const newOptions = { ...checkoutOptions, [key]: opt };
+    setCheckoutOptions(newOptions);
+    calculateFinalTotal(checkoutServices, checkoutAdjustments, checkoutProducts, newOptions);
+  };
   const completePayment = async () => {
     try {
       const totalSlots = checkoutServices.reduce((sum, s) => sum + (Number(s.slots) || 1), 0);
@@ -216,8 +236,12 @@ const parseReservationDetails = (res) => {
         total_slots: totalSlots, 
         end_time: endTime.toISOString(), 
         menu_name: dbMenuName, // 👈 ここを修正
-        options: { services: checkoutServices, adjustments: checkoutAdjustments, products: checkoutProducts } 
-      }).eq('id', selectedRes.id);
+options: { 
+  services: checkoutServices, 
+  adjustments: checkoutAdjustments, 
+  products: checkoutProducts, 
+  options: checkoutOptions // 👈 これを付け足す
+}      }).eq('id', selectedRes.id);
 
       const { data: cust } = await supabase.from('customers').select('id').eq('shop_id', cleanShopId).eq('name', selectedRes.customer_name).maybeSingle();
       const serviceAmt = checkoutServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
@@ -676,15 +700,64 @@ const parseReservationDetails = (res) => {
                 <div key={cat.id} style={{ marginBottom: '25px' }}>
                   <h4 style={{ fontSize: '0.8rem', color: '#666', borderBottom: '1px solid #ddd', paddingBottom: '4px', marginBottom: '10px' }}>{cat.name}</h4>
                   <div style={{ display: 'grid', gap: '8px' }}>
-                    {services.filter(s => s.category === cat.name).map(svc => (
-                      <button key={svc.id} onClick={() => toggleCheckoutService(svc)} style={{ width: '100%', padding: '12px', textAlign: 'left', borderRadius: '10px', border: checkoutServices.some(s => s.id === svc.id) ? `2px solid #4b2c85` : '1px solid #eee', background: checkoutServices.some(s => s.id === svc.id) ? '#f3f0ff' : '#fff', cursor: 'pointer' }}>
-                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>{checkoutServices.some(s => s.id === svc.id) ? '✅ ' : ''}{svc.name}</span>
-                          <span style={{ color: '#4b2c85' }}>¥{svc.price.toLocaleString()}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+{services.filter(s => s.category === cat.name).map(svc => {
+  // ① 今このメニューにチェックが入っているか確認
+  const isSelected = checkoutServices.some(s => s.id === svc.id);
+  
+  // ② このメニューに紐づく「枝分かれ（ブリーチ回数など）」を取得してグループ分け
+  const svcOpts = serviceOptions.filter(o => o.service_id === svc.id);
+  const grouped = svcOpts.reduce((acc, o) => {
+    if (!acc[o.group_name]) acc[o.group_name] = [];
+    acc[o.group_name].push(o);
+    return acc;
+  }, {});
+
+  return (
+    <div key={svc.id} style={{ marginBottom: '10px', border: '1px solid #eee', borderRadius: '12px', overflow: 'hidden', background: '#fff' }}>
+      {/* メインのメニューボタン */}
+      <button 
+        onClick={() => toggleCheckoutService(svc)} 
+        style={{ width: '100%', padding: '15px', border: 'none', textAlign: 'left', background: isSelected ? '#f3f0ff' : '#fff', cursor: 'pointer' }}
+      >
+        <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{isSelected ? '✅ ' : ''}{svc.name}</span>
+          <span style={{ color: '#4b2c85', fontSize: '0.9rem' }}>¥{svc.price.toLocaleString()}</span>
+        </div>
+      </button>
+
+      {/* ✅ サービスが選択されている時だけ、その下の枝分かれ項目（シャンプーや回数）を表示 */}
+      {isSelected && Object.keys(grouped).length > 0 && (
+        <div style={{ padding: '12px', background: '#f8fafc', borderTop: '1px solid #eee' }}>
+          {Object.keys(grouped).map(gn => (
+            <div key={gn} style={{ marginBottom: '10px' }}>
+              <p style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold', margin: '0 0 6px 0' }}>└ {gn}</p>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {grouped[gn].map(opt => {
+                  // レジ専用の選択状態(checkoutOptions)を確認
+                  const isOptSelected = checkoutOptions[`${svc.id}-${gn}`]?.id === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => toggleCheckoutOption(svc.id, gn, opt)}
+                      style={{
+                        padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid',
+                        borderColor: isOptSelected ? '#4b2c85' : '#cbd5e1',
+                        background: isOptSelected ? '#4b2c85' : '#fff',
+                        color: isOptSelected ? '#fff' : '#475569', cursor: 'pointer'
+                      }}
+                    >
+                      {opt.option_name} {opt.additional_price > 0 ? `(+¥${opt.additional_price})` : ''}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+})}                  </div>
                 </div>
               ))}
             </div>
