@@ -236,18 +236,6 @@ function Home() {
           </div>
         </div>
 
-        {/* 6. トライアル登録への案内 */}
-        <div style={{ marginTop: '20px', padding: '30px 20px', background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', borderRadius: '20px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-          <h4 style={{ color: '#fff', margin: '0 0 10px 0', fontSize: '1.1rem', fontWeight: 'bold' }}>あなたのビジネスも掲載しませんか？</h4>
-          <p style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: '1.6', marginBottom: '20px' }}>SOLOは個人で頑張る起業家を応援します。<br/>今ならベータ版につき、無料で登録可能です。</p>
-          <Link to="/trial-registration" style={{ textDecoration: 'none' }}>
-            <div style={{ background: '#e60012', color: '#fff', padding: '12px 30px', borderRadius: '30px', fontSize: '0.9rem', fontWeight: 'bold', display: 'inline-block', boxShadow: '0 4px 15px rgba(230,0,18,0.3)' }}>
-              ベータ版はこちら 🚀
-            </div>
-          </Link>
-        </div>
-      </div>
-
       <div style={{ padding: '60px 20px', textAlign: 'center', color: '#cbd5e1', fontSize: '0.7rem' }}>
         <p>© 2026 Solopreneur Portal SoloPre</p>
       </div>
